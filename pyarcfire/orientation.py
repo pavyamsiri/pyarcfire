@@ -211,7 +211,7 @@ def generate_orientation_fields(
         orientation_field_levels,
     )
 
-    denoised_field = merged_field.denoise()
+    denoised_field = merged_field
     orientation_vectors = denoised_field.field
     strengths = denoised_field.get_strengths()
     directions = denoised_field.get_directions()
