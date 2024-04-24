@@ -26,9 +26,16 @@ def main(raw_args: Sequence[str]) -> None:
         image, radius=UNSHARP_MASK_RADIUS, amount=UNSHARP_MASK_AMOUNT
     )
 
+    from .orientation import generate_orientation_fields
+
+    field, strengths, directions = generate_orientation_fields(contrast_image)
+    print(strengths.shape)
+    print(field.shape)
+    print(directions.shape)
+
     fig = plt.figure()
     left_axis = fig.add_subplot(121)
-    left_axis.imshow(image, cmap="gray")
+    left_axis.imshow(directions, cmap="gray")
     left_axis.set_title("Original image")
     left_axis.set_axis_off()
 
