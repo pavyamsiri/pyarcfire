@@ -32,9 +32,15 @@ def main(raw_args: Sequence[str]) -> None:
     strengths = field.get_strengths()
     nonzero_cells = np.count_nonzero(strengths)
     total_cells = strengths.size
-    print(
+    log.info(
         f"Strengths has {nonzero_cells}/{total_cells} |{100*(nonzero_cells/total_cells):.2f}%| nonzero cells"
     )
+    # Next steps
+    # 1. Generate similarity matrix
+    # 2. Generate HAC tree containing similar clusters/regions (Hierarchical Agglomerative Clustering)
+    # 3. Fit spirals to clusters
+    # 4. Merge clusters and arcs by considering compatible arcs
+    # 5. Color arcs red for S-wise and cyan for Z-wise
 
     fig = plt.figure()
     original_axis = fig.add_subplot(131)
