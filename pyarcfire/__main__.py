@@ -35,7 +35,7 @@ def main(raw_args: Sequence[str]) -> None:
 
     fig = plt.figure()
     left_axis = fig.add_subplot(121)
-    left_axis.imshow(directions, cmap="gray")
+    left_axis.imshow(strengths, cmap="gray")
     left_axis.set_title("Original image")
     left_axis.set_axis_off()
 

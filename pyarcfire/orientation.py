@@ -1,4 +1,7 @@
+from __future__ import annotations
+
 # Standard libraries
+from functools import reduce
 from typing import Sequence
 
 # External libraries
@@ -12,40 +15,213 @@ from skimage import transform
 from .definitions import ImageArray, ImageArraySequence
 
 
+class OrientationField:
+    def __init__(self, field: ImageArray):
+        assert (
+            len(field.shape) == 3 and field.shape[2] == 2
+        ), "OrientationFields are MxNx2 arrays."
+        assert (
+            field.shape[0] % 2 == 0
+        ), "The height of an OrientationField must be even!"
+        assert field.shape[1] % 2 == 0, "The width of an OrientationField must be even!"
+        self._field: ImageArray = field
+
+    @staticmethod
+    def from_cartesian(x: ImageArray, y: ImageArray) -> OrientationField:
+        field: ImageArray = np.zeros((x.shape[0], x.shape[1], 2))
+        field[:, :, 0] = x
+        field[:, :, 1] = y
+        return OrientationField(field)
+
+    @staticmethod
+    def from_polar(magnitudes: ImageArray, angles: ImageArray) -> OrientationField:
+        x = magnitudes * np.cos(angles)
+        y = magnitudes * np.sin(angles)
+        return OrientationField.from_cartesian(x, y)
+
+    def __str__(self) -> str:
+        return f"OrientationField(num_rows={self.num_rows}, num_columns={self.num_columns})"
+
+    @property
+    def num_rows(self) -> int:
+        return self._field.shape[0]
+
+    @property
+    def num_columns(self) -> int:
+        return self._field.shape[1]
+
+    @property
+    def shape(self) -> tuple[int, int, int]:
+        assert self.field.shape[2] == 2
+        return (self.num_rows, self.num_columns, self.field.shape[2])
+
+    @property
+    def field(self) -> ImageArray:
+        return self._field
+
+    @property
+    def x(self) -> ImageArray:
+        return self._field[:, :, 0]
+
+    @property
+    def y(self) -> ImageArray:
+        return self._field[:, :, 1]
+
+    def get_vector_at(
+        self, row_index: int, column_index: int
+    ) -> npt.NDArray[np.floating]:
+        return np.squeeze(self.field[row_index, column_index, :])
+
+    def get_strengths(self) -> ImageArray:
+        strengths = np.sqrt(np.square(self.x) + np.square(self.y))
+        return strengths
+
+    def get_directions(self) -> ImageArray:
+        directions = np.arctan2(self.y, self.x) % np.pi
+        return directions
+
+    def rescale(self, scale_factor: float) -> OrientationField:
+        resized_field = transform.rescale(self.field, scale_factor, channel_axis=2)
+        return OrientationField(resized_field)
+
+    def merge(self, other: OrientationField) -> OrientationField:
+        print(self.shape)
+        print(other.shape)
+        resized_coarse_field = np.zeros(other.shape)
+        # NOTE: This implicitly requires that the finer field is twice the dimensions of the coarse field
+        resized_coarse_field = self.rescale(2)
+        resized_coarse_strengths = resized_coarse_field.get_strengths()
+        fine_field_strengths = other.get_strengths()
+
+        gains = fine_field_strengths
+        gains[fine_field_strengths != 0] /= (
+            fine_field_strengths + resized_coarse_strengths
+        )[fine_field_strengths != 0]
+        merged_field = resized_coarse_field.add(
+            other.subtract(resized_coarse_field).scalar_field_multiply(gains)
+        )
+        return merged_field
+
+    def scalar_field_multiply(self, scalar_field: ImageArray) -> OrientationField:
+        assert (
+            len(scalar_field.shape) == 2
+        ), "The scalar field must be MxN as it is scalar."
+        assert (
+            scalar_field.shape[0] == self.num_rows
+            and scalar_field.shape[1] == self.num_columns
+        ), "The scalar field must have the same height and width as the OrientationField"
+        result = self.field
+        result[:, :, 0] *= scalar_field
+        result[:, :, 1] *= scalar_field
+        return OrientationField(result)
+
+    def add(self, other: OrientationField) -> OrientationField:
+        return self._add_or_subtract(other, add=True)
+
+    def subtract(self, other: OrientationField) -> OrientationField:
+        return self._add_or_subtract(other, add=False)
+
+    def _add_or_subtract(self, other: OrientationField, add: bool) -> OrientationField:
+        negative_vertical = other.y < 0
+        b = other.field
+        b[negative_vertical, 0] -= b[negative_vertical, 0]
+        b[negative_vertical, 1] -= b[negative_vertical, 1]
+        vector_sum = self.field + b
+        vector_difference = self.field - b
+        vector_sum_lengths = np.sqrt(np.sum(np.square(vector_sum), axis=2))
+        vector_difference_lengths = np.sqrt(
+            np.sum(np.square(vector_difference), axis=2)
+        )
+        sum_greater = vector_sum_lengths > vector_difference_lengths
+        sum_greater = np.repeat(sum_greater[:, :, np.newaxis], 2, axis=2)
+        result = np.zeros_like(self.field)
+        if add:
+            result[sum_greater] = vector_sum[sum_greater]
+            result[~sum_greater] = vector_difference[~sum_greater]
+        else:
+            result[~sum_greater] = vector_sum[~sum_greater]
+            result[sum_greater] = vector_difference[sum_greater]
+        return OrientationField(result)
+
+    def denoise(self, neighbour_distance: int = 5) -> OrientationField:
+        # Performs the orientation field de-noising described in the PhD thesis
+        # "Inferring Galaxy Morphology Through Texture Analysis" (K. Au 2006).
+        # INPUTS:
+        #   ofld: orientation field without de-noising (but already merged from 3
+        #       resolution levels if the process in the thesis is followed)
+        # OUTPUTS:
+        #   dofld: de-noised orientation field
+        denoised = np.zeros(self.shape)
+
+        for row_idx in rprogress.track(range(self.num_rows)):
+            for column_idx in range(self.num_columns):
+                current_vector = self.get_vector_at(row_idx, column_idx)
+                current_vector_norm = np.sqrt(np.sum(np.square(current_vector)))
+                neighbour_vectors = []
+                # Check that the neighbour is not past the top left corner
+                for row_offset, column_offset in (
+                    (-neighbour_distance, -neighbour_distance),
+                    (+neighbour_distance, -neighbour_distance),
+                    (-neighbour_distance, +neighbour_distance),
+                    (+neighbour_distance, +neighbour_distance),
+                ):
+                    target_row = row_idx + row_offset
+                    target_column = column_idx + column_offset
+                    if target_row < 0 or target_row >= self.num_rows:
+                        continue
+                    if target_column < 0 or target_column >= self.num_columns:
+                        continue
+                    neighbour_vectors.append(
+                        self.get_vector_at(target_row, target_column)
+                    )
+                neighbour_sims = np.zeros(len(neighbour_vectors))
+
+                subtract_amount = np.cos(np.pi / 4)
+                for idx, neighbour in enumerate(neighbour_vectors):
+                    neighbour_norm = np.sqrt(np.sum(np.square(neighbour)))
+                    neighbour_sims[idx] = max(
+                        abs(neighbour * current_vector) - subtract_amount
+                    ) / (current_vector_norm * neighbour_norm)
+
+                denoised[row_idx, column_idx, :] = (
+                    current_vector / current_vector_norm
+                ) * np.median(neighbour_sims)
+        return OrientationField(denoised)
+
+
 def generate_orientation_fields(
-    image: ImageArray,
+    image: ImageArray, num_orientation_field_levels: int = 3
 ) -> tuple[ImageArray, ImageArray, ImageArray]:
     # Number of image scales to use when computing the orientation field.
     # The dimensions of the preprocessed image (see resizeDims) must be
     # divisible by 2^(numOrientationFieldLevels-1).
-    num_orientation_field_levels: int = 3
 
-    orientation_field_levels: list[tuple[ImageArray, ImageArray, ImageArray]] = []
+    orientation_field_levels: list[OrientationField] = []
     for idx in range(num_orientation_field_levels):
         scale_factor: float = 1 / 2 ** (num_orientation_field_levels - idx - 1)
         resized_image = transform.rescale(image, scale_factor)
         current_level = generate_single_orientation_field_level(resized_image)
+        criteria = current_level.y < 0
+        current_level.field[criteria] = -current_level.field[criteria]
         orientation_field_levels.append(current_level)
 
     # Now merge orientation fields
-    merged_field = orientation_field_levels[0][0]
-    for idx in range(1, num_orientation_field_levels):
-        merged_field = merge_orientation_fields(
-            merged_field,
-            orientation_field_levels[idx][0],
-            orientation_field_levels[idx][2],
-        )
+    merged_field: OrientationField = reduce(
+        lambda x, y: x.merge(y),
+        orientation_field_levels,
+    )
 
-    orientation_vectors = denoise_orientation_field(merged_field)
-    strengths = get_orientation_field_strengths(merged_field)
-    directions = get_orientation_field_directions(merged_field)
+    denoised_field = merged_field.denoise()
+    orientation_vectors = denoised_field.field
+    strengths = denoised_field.get_strengths()
+    directions = denoised_field.get_directions()
     return orientation_vectors, strengths, directions
 
 
 def generate_single_orientation_field_level(
     image: ImageArray,
     light_dark: int = 1,
-) -> tuple[ImageArray, ImageArray, ImageArray]:
+) -> OrientationField:
     filtered_images = generate_orientation_filtered_images(image)
 
     if light_dark > 0:
@@ -53,18 +229,18 @@ def generate_single_orientation_field_level(
     elif light_dark < 0:
         filtered_images[filtered_images > 0] = 0
 
-    energy = np.square(filtered_images, dtype=np.complex64)
+    energies = np.square(filtered_images, dtype=np.complex64)
     for idx in range(9):
-        energy[:, :, idx] = energy[:, :, idx] * np.exp(1j * 2 * idx * np.pi / 9)
-    energy = np.sum(energy, axis=2)
+        energies[:, :, idx] = energies[:, :, idx] * np.exp(1j * 2 * idx * np.pi / 9)
+    energy = np.sum(energies, axis=2)
+    # Magnitude of complex valued energy
     strengths = np.abs(energy)
-    directions = np.angle(energy) / 2
+    # Angle of complex valued energy
+    angles = np.angle(energy) / 2
 
-    orientation_vectors = np.zeros((energy.shape[0], energy.shape[1], 2))
-    orientation_vectors[:, :, 0] = strengths * np.cos(directions)
-    orientation_vectors[:, :, 1] = strengths * np.sin(directions)
+    field = OrientationField.from_polar(strengths, angles)
 
-    return orientation_vectors, energy, strengths
+    return field
 
 
 def generate_orientation_filtered_images(
