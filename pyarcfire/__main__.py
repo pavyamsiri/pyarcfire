@@ -11,6 +11,7 @@ from skimage import filters
 
 # Internal libraries
 from .log_utils import setup_logging
+from .orientation import generate_orientation_fields
 
 log = logging.getLogger(__name__)
 
@@ -26,12 +27,10 @@ def main(raw_args: Sequence[str]) -> None:
         image, radius=UNSHARP_MASK_RADIUS, amount=UNSHARP_MASK_AMOUNT
     )
 
-    from .orientation import generate_orientation_fields
 
-    field, strengths, directions = generate_orientation_fields(contrast_image)
-    print(strengths.shape)
-    print(field.shape)
-    print(directions.shape)
+    field = generate_orientation_fields(contrast_image)
+    field = field.resize(256, 256)
+    strengths = field.get_strengths()
     print(
         f"Strengths has {np.count_nonzero(strengths)} out of a possible {strengths.shape[0] * strengths.shape[1]}"
     )

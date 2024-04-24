@@ -84,6 +84,9 @@ class OrientationField:
         resized_field = transform.rescale(self.field, scale_factor, channel_axis=2)
         return OrientationField(resized_field)
 
+    def resize(self, new_width: int, new_height: int) -> OrientationField:
+        return OrientationField(transform.resize(self.field, (new_height, new_width)))
+
     def merge(self, other: OrientationField) -> OrientationField:
         resized_coarse_field = np.zeros(other.shape)
         # NOTE: This implicitly requires that the finer field is twice the dimensions of the coarse field
@@ -193,7 +196,7 @@ class OrientationField:
 
 def generate_orientation_fields(
     image: ImageArray, num_orientation_field_levels: int = 3
-) -> tuple[ImageArray, ImageArray, ImageArray]:
+) -> OrientationField:
     # Number of image scales to use when computing the orientation field.
     # The dimensions of the preprocessed image (see resizeDims) must be
     # divisible by 2^(numOrientationFieldLevels-1).
@@ -212,10 +215,7 @@ def generate_orientation_fields(
     )
 
     denoised_field = merged_field
-    orientation_vectors = denoised_field.field
-    strengths = denoised_field.get_strengths()
-    directions = denoised_field.get_directions()
-    return orientation_vectors, strengths, directions
+    return denoised_field
 
 
 def generate_single_orientation_field_level(
