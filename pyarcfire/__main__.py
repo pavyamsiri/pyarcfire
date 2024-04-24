@@ -27,26 +27,35 @@ def main(raw_args: Sequence[str]) -> None:
         image, radius=UNSHARP_MASK_RADIUS, amount=UNSHARP_MASK_AMOUNT
     )
 
-
     field = generate_orientation_fields(contrast_image)
-    field = field.resize(256, 256)
+    field = field.resize(128, 128)
     strengths = field.get_strengths()
+    nonzero_cells = np.count_nonzero(strengths)
+    total_cells = strengths.size
     print(
-        f"Strengths has {np.count_nonzero(strengths)} out of a possible {strengths.shape[0] * strengths.shape[1]}"
+        f"Strengths has {nonzero_cells}/{total_cells} |{100*(nonzero_cells/total_cells):.2f}%| nonzero cells"
     )
 
     fig = plt.figure()
-    left_axis = fig.add_subplot(121)
-    left_axis.imshow(strengths, cmap="gray")
-    left_axis.set_title("Original image")
-    left_axis.set_axis_off()
+    original_axis = fig.add_subplot(131)
+    original_axis.imshow(image, cmap="gray")
+    original_axis.set_title("Original image")
+    original_axis.set_axis_off()
 
-    right_axis = fig.add_subplot(122)
-    right_axis.imshow(contrast_image, cmap="gray")
-    right_axis.set_title(
+    contrast_axis = fig.add_subplot(132)
+    contrast_axis.imshow(contrast_image, cmap="gray")
+    contrast_axis.set_title(
         rf"Unsharp image $\text{{Radius}} = {UNSHARP_MASK_RADIUS}, \; \text{{Amount}} = {UNSHARP_MASK_AMOUNT}$"
     )
-    right_axis.set_axis_off()
+    contrast_axis.set_axis_off()
+
+    space_range = np.arange(field.shape[0])
+    x, y = np.meshgrid(space_range, -space_range)
+    orientation_axis = fig.add_subplot(133)
+    orientation_axis.quiver(x, y, field.x, field.y, color="tab:blue", headaxislength=0)
+    orientation_axis.set_aspect("equal")
+    orientation_axis.set_title("Orientation field")
+    orientation_axis.set_axis_off()
 
     fig.tight_layout()
     plt.show()
