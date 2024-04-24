@@ -70,7 +70,7 @@ class OrientationField:
     def get_vector_at(
         self, row_index: int, column_index: int
     ) -> npt.NDArray[np.floating]:
-        return np.squeeze(self.field[row_index, column_index, :])
+        return self.field[row_index, column_index, :]
 
     def get_strengths(self) -> ImageArray:
         strengths = np.sqrt(np.square(self.x) + np.square(self.y))
@@ -155,6 +155,8 @@ class OrientationField:
             for column_idx in range(self.num_columns):
                 current_vector = self.get_vector_at(row_idx, column_idx)
                 current_vector_norm = np.sqrt(np.sum(np.square(current_vector)))
+                if current_vector_norm == 0:
+                    continue
                 neighbour_vectors = []
                 # Check that the neighbour is not past the top left corner
                 for row_offset, column_offset in (
@@ -177,6 +179,8 @@ class OrientationField:
                 subtract_amount = np.cos(np.pi / 4)
                 for idx, neighbour in enumerate(neighbour_vectors):
                     neighbour_norm = np.sqrt(np.sum(np.square(neighbour)))
+                    if neighbour_norm == 0:
+                        continue
                     neighbour_sims[idx] = max(
                         abs(neighbour * current_vector) - subtract_amount
                     ) / (current_vector_norm * neighbour_norm)

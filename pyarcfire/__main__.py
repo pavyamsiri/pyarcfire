@@ -32,6 +32,9 @@ def main(raw_args: Sequence[str]) -> None:
     print(strengths.shape)
     print(field.shape)
     print(directions.shape)
+    print(
+        f"Strengths has {np.count_nonzero(strengths)} out of a possible {strengths.shape[0] * strengths.shape[1]}"
+    )
 
     fig = plt.figure()
     left_axis = fig.add_subplot(121)
