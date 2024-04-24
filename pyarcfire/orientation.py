@@ -85,8 +85,6 @@ class OrientationField:
         return OrientationField(resized_field)
 
     def merge(self, other: OrientationField) -> OrientationField:
-        print(self.shape)
-        print(other.shape)
         resized_coarse_field = np.zeros(other.shape)
         # NOTE: This implicitly requires that the finer field is twice the dimensions of the coarse field
         resized_coarse_field = self.rescale(2)
@@ -124,8 +122,8 @@ class OrientationField:
     def _add_or_subtract(self, other: OrientationField, add: bool) -> OrientationField:
         negative_vertical = other.y < 0
         b = other.field
-        b[negative_vertical, 0] -= b[negative_vertical, 0]
-        b[negative_vertical, 1] -= b[negative_vertical, 1]
+        b[negative_vertical, 0] = -b[negative_vertical, 0]
+        b[negative_vertical, 1] = -b[negative_vertical, 1]
         vector_sum = self.field + b
         vector_difference = self.field - b
         vector_sum_lengths = np.sqrt(np.sum(np.square(vector_sum), axis=2))
@@ -201,8 +199,6 @@ def generate_orientation_fields(
         scale_factor: float = 1 / 2 ** (num_orientation_field_levels - idx - 1)
         resized_image = transform.rescale(image, scale_factor)
         current_level = generate_single_orientation_field_level(resized_image)
-        criteria = current_level.y < 0
-        current_level.field[criteria] = -current_level.field[criteria]
         orientation_field_levels.append(current_level)
 
     # Now merge orientation fields
@@ -315,7 +311,6 @@ def generate_orientation_filter_fxn(
 def merge_orientation_fields(
     coarse_field: ImageArray,
     fine_field: ImageArray,
-    fine_field_strengths: ImageArray,
 ) -> ImageArray:
     # Merges two orientation fields at different resolutions, as described in
     # the PhD thesis "Inferring Galaxy Morphology Through Texture Analysis"
@@ -338,6 +333,7 @@ def merge_orientation_fields(
     # Note: Might have to do it separately
     resized_coarse_field = transform.rescale(coarse_field, 2, channel_axis=2)
     resized_coarse_strengths = get_orientation_field_strengths(resized_coarse_field)
+    fine_field_strengths = get_orientation_field_strengths(fine_field)
 
     gains = fine_field_strengths / (resized_coarse_strengths + fine_field_strengths)
     gains[np.isnan(gains)] = 0
