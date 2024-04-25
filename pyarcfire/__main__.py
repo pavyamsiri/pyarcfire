@@ -17,6 +17,9 @@ from .orientation import generate_orientation_fields
 log = logging.getLogger(__name__)
 
 
+IMAGE_SIZE: int = 256
+
+
 def main(raw_args: Sequence[str]) -> None:
     args = _parse_args(raw_args)
     # Load image
@@ -28,7 +31,7 @@ def main(raw_args: Sequence[str]) -> None:
         image, radius=UNSHARP_MASK_RADIUS, amount=UNSHARP_MASK_AMOUNT
     )
 
-    contrast_image = transform.resize(contrast_image, (128, 128))
+    contrast_image = transform.resize(contrast_image, (IMAGE_SIZE, IMAGE_SIZE))
     field = generate_orientation_fields(contrast_image)
     strengths = field.get_strengths()
     nonzero_cells = np.count_nonzero(strengths)
@@ -44,15 +47,18 @@ def main(raw_args: Sequence[str]) -> None:
     # 5. Color arcs red for S-wise and cyan for Z-wise
 
     matrix = generate_similarity_matrix(field)
-    generate_hac_tree(matrix, contrast_image, field)
-    return
+    clusters = generate_hac_tree(matrix, contrast_image, field)
+    clusters = sorted(clusters, key=lambda x: x.size, reverse=True)
+    cluster_sizes = np.array([cluster.size for cluster in clusters])
+    cluster_bins = np.logspace(0, np.log10(max(cluster_sizes)), 10)
+
     fig = plt.figure()
-    original_axis = fig.add_subplot(131)
+    original_axis = fig.add_subplot(231)
     original_axis.imshow(image, cmap="gray")
     original_axis.set_title("Original image")
     original_axis.set_axis_off()
 
-    contrast_axis = fig.add_subplot(132)
+    contrast_axis = fig.add_subplot(232)
     contrast_axis.imshow(contrast_image, cmap="gray")
     contrast_axis.set_title(
         rf"Unsharp image $\text{{Radius}} = {UNSHARP_MASK_RADIUS}, \; \text{{Amount}} = {UNSHARP_MASK_AMOUNT}$"
@@ -61,11 +67,21 @@ def main(raw_args: Sequence[str]) -> None:
 
     space_range = np.arange(field.shape[0])
     x, y = np.meshgrid(space_range, -space_range)
-    orientation_axis = fig.add_subplot(133)
+    orientation_axis = fig.add_subplot(233)
     orientation_axis.quiver(x, y, field.x, field.y, color="tab:blue", headaxislength=0)
     orientation_axis.set_aspect("equal")
     orientation_axis.set_title("Orientation field")
     orientation_axis.set_axis_off()
+
+    cluster_axis = fig.add_subplot(234)
+    cluster_axis.set_title("Clusters")
+    cluster_axis.imshow(clusters[0].get_mask(IMAGE_SIZE, IMAGE_SIZE))
+    cluster_axis.set_axis_off()
+
+    cluster_size_axis = fig.add_subplot(235)
+    cluster_size_axis.set_title("Cluster size")
+    cluster_size_axis.set_yscale("log")
+    cluster_size_axis.hist(cluster_sizes, bins=cluster_bins)
 
     fig.tight_layout()
     plt.show()

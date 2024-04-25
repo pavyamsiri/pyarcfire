@@ -43,6 +43,12 @@ class Cluster:
         self._first_cluster_index = first_index
         self._second_cluster_index = second_index
 
+    def get_mask(self, num_rows: int, num_columns: int) -> ImageArray:
+        row_indices, column_indices = np.unravel_index(self.get_points(), (num_rows, num_columns))
+        mask = np.zeros((num_rows, num_columns))
+        mask[row_indices, column_indices] = 1
+        return mask
+
 
 # def find_clusters(
 #     orientation: OrientationField, similarity_cutoff: float = -np.inf
@@ -195,7 +201,7 @@ def generate_hac_tree(
     stop_threshold: float = 0.15,
     error_ratio_threshold: float = 2.5,
     merge_check_minimum_cluster_size: int = 25,
-):
+) -> Sequence[Cluster]:
     # Performs HAC clustering and returns the resulting dendogram
     # INPUTS:
     #   simlMtx: the similarity matrix to use for clustering
@@ -265,7 +271,8 @@ def generate_hac_tree(
             min(first_cluster.size, second_cluster.size)
             > merge_check_minimum_cluster_size
         ):
-            # log.debug("PAST THE THRESHOLD")
+            log.debug(f"Cluster sizes are {first_cluster.size} and {second_cluster.size}")
+            log.debug("PAST THE THRESHOLD")
             pass
 
         # Similarity value is high
@@ -340,4 +347,5 @@ def generate_hac_tree(
             break
 
     clusters = list(np.array(clusters)[active_clusters])
-    log.debug(np.count_nonzero(active_clusters))
+
+    return clusters
