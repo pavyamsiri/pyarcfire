@@ -43,6 +43,10 @@ class OrientationField:
         return f"OrientationField(num_rows={self.num_rows}, num_columns={self.num_columns})"
 
     @property
+    def num_cells(self) -> int:
+        return self.num_rows * self.num_columns
+
+    @property
     def num_rows(self) -> int:
         return self._field.shape[0]
 

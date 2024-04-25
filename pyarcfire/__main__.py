@@ -7,10 +7,11 @@ from typing import Sequence
 from matplotlib import pyplot as plt
 import numpy as np
 from PIL import Image
-from skimage import filters
+from skimage import filters, transform
 
 # Internal libraries
 from .log_utils import setup_logging
+from .cluster import generate_similarity_matrix, generate_hac_tree
 from .orientation import generate_orientation_fields
 
 log = logging.getLogger(__name__)
@@ -27,8 +28,8 @@ def main(raw_args: Sequence[str]) -> None:
         image, radius=UNSHARP_MASK_RADIUS, amount=UNSHARP_MASK_AMOUNT
     )
 
+    contrast_image = transform.resize(contrast_image, (128, 128))
     field = generate_orientation_fields(contrast_image)
-    field = field.resize(128, 128)
     strengths = field.get_strengths()
     nonzero_cells = np.count_nonzero(strengths)
     total_cells = strengths.size
@@ -42,6 +43,9 @@ def main(raw_args: Sequence[str]) -> None:
     # 4. Merge clusters and arcs by considering compatible arcs
     # 5. Color arcs red for S-wise and cyan for Z-wise
 
+    matrix = generate_similarity_matrix(field)
+    generate_hac_tree(matrix, contrast_image, field)
+    return
     fig = plt.figure()
     original_axis = fig.add_subplot(131)
     original_axis.imshow(image, cmap="gray")
