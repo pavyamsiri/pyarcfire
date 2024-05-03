@@ -114,8 +114,8 @@ def calculate_pixel_similarities(
         )
         assert isinstance(neighbour_indices, np.ndarray)
         neighbours = orientation_vectors[neighbour_indices]
-        neighbour_similarities: npt.NDArray[np.floating] = np.dot(
-            neighbours, orientation_vectors[idx]
+        neighbour_similarities: npt.NDArray[np.floating] = np.abs(
+            np.dot(neighbours, orientation_vectors[idx])
         )
         assert len(neighbour_similarities) == len(neighbours)
 
