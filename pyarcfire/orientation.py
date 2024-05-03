@@ -161,7 +161,7 @@ class OrientationField:
         for row_idx in rprogress.track(range(self.num_rows)):
             for column_idx in range(self.num_columns):
                 current_vector = self.get_vector_at(row_idx, column_idx)
-                current_vector_norm = np.sqrt(np.sum(np.square(current_vector)))
+                current_vector_norm = np.linalg.norm(current_vector)
                 if current_vector_norm == 0:
                     continue
                 neighbour_vectors = []
@@ -185,11 +185,11 @@ class OrientationField:
 
                 subtract_amount = np.cos(np.pi / 4)
                 for idx, neighbour in enumerate(neighbour_vectors):
-                    neighbour_norm = np.sqrt(np.sum(np.square(neighbour)))
+                    neighbour_norm = np.linalg.norm(neighbour)
                     if neighbour_norm == 0:
                         continue
                     neighbour_sims[idx] = max(
-                        abs(neighbour * current_vector) - subtract_amount
+                        np.dot(neighbour, current_vector) - subtract_amount, 0
                     ) / (current_vector_norm * neighbour_norm)
 
                 denoised[row_idx, column_idx, :] = (
@@ -218,7 +218,7 @@ def generate_orientation_fields(
         orientation_field_levels,
     )
 
-    denoised_field = merged_field
+    denoised_field = merged_field.denoise()
     return denoised_field
 
 
