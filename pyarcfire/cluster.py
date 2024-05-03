@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 # Standard libraries
+import dataclasses
+from dataclasses import dataclass
 import logging
 from typing import Sequence
+from queue import PriorityQueue
 
 
 # External libraries
@@ -22,29 +25,24 @@ log = logging.getLogger(__name__)
 
 
 class Cluster:
-    def __init__(self, merged_points: Sequence[int], merge_value: float):
-        self._first_cluster_index: int | None = None
-        self._second_cluster_index: int | None = None
-        self._merge_value: float = merge_value
-        self._merged_points: list[int] = list(merged_points)
-
-    @staticmethod
-    def empty() -> Cluster:
-        return Cluster(merged_points=[], merge_value=0)
+    def __init__(self, seed: int) -> None:
+        self._points: list[int] = [seed]
 
     def __str__(self) -> str:
-        return f"Cluster(first={self._first_cluster_index}, second={self._second_cluster_index}, value={self._merge_value}, points={self._merged_points})"
+        return f"Cluster(size={self.size})"
 
     @property
     def size(self) -> int:
-        return len(self._merged_points)
+        return len(self._points)
 
-    def get_points(self) -> list[int]:
-        return self._merged_points
+    def get_points(self) -> Sequence[int]:
+        return self._points
 
-    def set_clusters(self, first_index: int, second_index: int) -> None:
-        self._first_cluster_index = first_index
-        self._second_cluster_index = second_index
+    def add_point(self, seed: int) -> None:
+        assert (
+            seed not in self._points
+        ), "Clusters must have a set of points i.e. no duplicates"
+        self._points.append(seed)
 
     def get_mask(self, num_rows: int, num_columns: int) -> ImageArray:
         row_indices, column_indices = np.unravel_index(
@@ -53,6 +51,25 @@ class Cluster:
         mask = np.zeros((num_rows, num_columns))
         mask[row_indices, column_indices] = 1
         return mask
+
+
+@dataclass
+class ClusterPair:
+    similarity: float
+    first: Cluster
+    second: Cluster
+
+    def __eq__(self, other: object) -> bool:
+        assert isinstance(
+            other, ClusterPair
+        ), f"Equality is only supported for {self.__class__}"
+        return self.similarity == other.similarity
+
+    def __lt__(self, other: object) -> bool:
+        assert isinstance(
+            other, ClusterPair
+        ), f"Less than is only supported for {self.__class__}"
+        return self.similarity > other.similarity
 
 
 # def find_clusters(
@@ -68,7 +85,7 @@ class Cluster:
 
 
 def generate_hac_tree(
-    similarity_matrix: sparse.coo_matrix,
+    similarity_matrix: sparse.csr_matrix,
     image: ImageArray,
     orientation: OrientationField,
     # barInfo,
@@ -111,123 +128,18 @@ def generate_hac_tree(
     # delete self-similarities
     similarity_matrix.setdiag(0)
     similarity_matrix.eliminate_zeros()
-    # NOTE: This isn't in the original code, but it does assume that similarities are nonnegative
-    similarity_matrix = abs(similarity_matrix)
 
-    # Indices of non-zero columns
-    select_points = similarity_matrix.sum(axis=0).nonzero()[1]
-    select_rows, select_columns = np.unravel_index(
-        select_points, (num_rows, num_columns)
-    )
-    select_points = select_points[image[select_rows, select_columns] > 0]
-    # NOTE: After this similarity matrix's shape has changed if to len(select_points) x len(select_points)
-    nonzero_similarity_matrix = similarity_matrix.tocsc()[select_points, :][
-        :, select_points
-    ]
-    assert isinstance(nonzero_similarity_matrix, sparse.csc_matrix)
-    num_points = nonzero_similarity_matrix.shape[1]
-    # create a cluster for each point that has a nonzero similarity with at
-    # least one other point
-    clusters: list[Cluster] = []
-    for select_point in select_points:
-        cluster = Cluster(merged_points=(select_point,), merge_value=0)
-        clusters.append(cluster)
-    active_clusters = np.ones(num_points, dtype=np.bool_)
-    arc_merge_checks: int = 0
-    merge_stop_count: int = 0
-    iteration_count: int = 0
-    while True:
-        iteration_count += 1
-        max_idx = nonzero_similarity_matrix.argmax()
-        row_idx, column_idx = np.unravel_index(max_idx, nonzero_similarity_matrix.shape)
-        assert isinstance(row_idx, np.integer)
-        assert isinstance(column_idx, np.integer)
-        value = nonzero_similarity_matrix[row_idx, column_idx]
-        assert isinstance(value, float)
-        first_cluster: Cluster = clusters[row_idx]
-        second_cluster: Cluster = clusters[column_idx]
-        # Check that both clusters are past the threshold cluster size
-        if (
-            min(first_cluster.size, second_cluster.size)
-            > merge_check_minimum_cluster_size
-        ):
-            log.debug(
-                f"Cluster sizes are {first_cluster.size} and {second_cluster.size}"
-            )
-            log.debug("PAST THE THRESHOLD")
-            pass
-
-        # Similarity value is high
-        if value >= stop_threshold:
-            # Create new merged cluster
-            merged_cluster = Cluster(
-                merged_points=first_cluster.get_points() + second_cluster.get_points(),
-                merge_value=value,
-            )
-            merged_cluster.set_clusters(int(row_idx), int(column_idx))
-            clusters[row_idx] = merged_cluster
-            clusters[column_idx] = Cluster.empty()
-            active_clusters[column_idx] = False
-
-            new_similarities = np.maximum(
-                nonzero_similarity_matrix[:, row_idx].toarray(),
-                nonzero_similarity_matrix[:, column_idx].toarray(),
-            )
-            new_similarities[row_idx] = 0
-            first_nonzero_rows, _ = np.nonzero(new_similarities)
-            second_nonzero_rows, _ = np.nonzero(
-                nonzero_similarity_matrix[:, row_idx].toarray()
-            )
-            has_old_values = np.isin(first_nonzero_rows, second_nonzero_rows)
-            change_values = new_similarities[first_nonzero_rows]
-            assert not np.any((nonzero_similarity_matrix < 0).toarray())
-            change_values[has_old_values] -= nonzero_similarity_matrix[
-                second_nonzero_rows, row_idx
-            ].toarray()
-            # First nonzero rows - row idx
-            change_row_indices = np.zeros(2 * len(first_nonzero_rows))
-            change_row_indices[: len(first_nonzero_rows)] = first_nonzero_rows
-            change_row_indices[len(first_nonzero_rows) :] = row_idx
-
-            # Row idx - first nonzero rows
-            change_column_indices = np.zeros(2 * len(first_nonzero_rows))
-            change_column_indices[: len(first_nonzero_rows)] = row_idx
-            change_column_indices[len(first_nonzero_rows) :] = first_nonzero_rows
-            change_matrix = sparse.coo_matrix(
-                (
-                    np.tile(change_values, (2, 1)).flatten(),
-                    (change_row_indices, change_column_indices),
-                ),
-                (num_points, num_points),
-            )
-            nonzero_similarity_matrix += change_matrix
-
-            third_nonzero_rows, _ = np.nonzero(
-                nonzero_similarity_matrix[:, column_idx].toarray()
-            )
-            # Third nonzero rows - column idx
-            change_row_indices = np.zeros(2 * len(third_nonzero_rows))
-            change_row_indices[: len(third_nonzero_rows)] = third_nonzero_rows
-            change_row_indices[len(third_nonzero_rows) :] = column_idx
-
-            # Column idx - third nonzero rows
-            change_column_indices = np.zeros(2 * len(third_nonzero_rows))
-            change_column_indices[: len(third_nonzero_rows)] = column_idx
-            change_column_indices[len(third_nonzero_rows) :] = third_nonzero_rows
-            change_values = -nonzero_similarity_matrix[
-                third_nonzero_rows, column_idx
-            ].toarray()
-            change_matrix = sparse.coo_matrix(
-                (
-                    np.tile(change_values, (2, 1)).flatten(),
-                    (change_row_indices, change_column_indices),
-                ),
-                (num_points, num_points),
-            )
-            nonzero_similarity_matrix += change_matrix
-        else:
-            break
-
-    clusters = list(np.array(clusters)[active_clusters])
-
-    return clusters
+    # Indices of pixels which have a non-zero similarity with another pixel
+    points = similarity_matrix.sum(axis=0).nonzero()[1]
+    clusters = {idx: Cluster(idx) for idx in points}
+    row_indices, column_indices = similarity_matrix.nonzero()
+    cluster_queue: PriorityQueue[ClusterPair] = PriorityQueue()
+    for row_idx, column_idx in zip(row_indices, column_indices):
+        similarity = similarity_matrix[row_idx, column_idx]
+        assert isinstance(similarity, float)
+        pair = ClusterPair(
+            similarity=similarity, first=clusters[row_idx], second=clusters[column_idx]
+        )
+        cluster_queue.put(pair)
+    log.debug(cluster_queue.get())
+    return []
