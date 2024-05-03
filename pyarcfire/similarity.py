@@ -7,6 +7,7 @@ import logging
 # External libraries
 import numpy as np
 from numpy import typing as npt
+from rich import progress as rprogress
 from scipy import sparse
 
 
@@ -85,33 +86,33 @@ def calculate_pixel_similarities(
     nonzero_indices = np.flatnonzero(strengths)
     num_nonzero_vectors = nonzero_indices.size
 
-    max_num_elements: int = 9 * num_nonzero_vectors
+    max_num_elements: int = 8 * num_nonzero_vectors
     # Actually the root index?
+    similarity_values = np.full(max_num_elements, np.nan)
     root_indices = np.zeros(max_num_elements)
     # Actually the child indices?
     child_indices = np.zeros(max_num_elements)
-    similarity_values = np.zeros(max_num_elements)
 
-    next_index: int = 1
-    for idx in nonzero_indices:
+    add_neighbour_row = maximum_distance * np.array([-1, -1, -1, 0, 0, +1, +1, +1])
+    add_neighbour_column = maximum_distance * np.array([-1, 0, +1, -1, +1, -1, 0, +1])
+
+    fill_idx: int = 0
+    for idx in rprogress.track(nonzero_indices):
+        # Compute similarity values for each neighbour
         row_idx, column_idx = np.unravel_index(idx, (num_rows, num_columns))
-        neighbour_column_indices = column_idx + maximum_distance * np.array(
-            [-1, 0, 1, -1, 0]
-        )
-        neighbour_row_indices = row_idx + maximum_distance * np.array(
-            [-1, -1, -1, 0, 0]
-        )
+        neighbour_row_indices = row_idx + add_neighbour_row
+        neighbour_column_indices = column_idx + add_neighbour_column
         in_range = (
             (neighbour_column_indices >= 0)
             & (neighbour_column_indices < num_columns)
             & (neighbour_row_indices >= 0)
+            & (neighbour_row_indices < num_rows)
         )
         neighbour_indices = np.ravel_multi_index(
             (neighbour_row_indices[in_range], neighbour_column_indices[in_range]),
             (num_rows, num_columns),
         )
         assert isinstance(neighbour_indices, np.ndarray)
-
         neighbours = orientation_vectors[neighbour_indices]
         neighbour_similarities: npt.NDArray[np.floating] = np.dot(
             neighbours, orientation_vectors[idx]
@@ -120,25 +121,19 @@ def calculate_pixel_similarities(
 
         neighbour_similarities[neighbour_similarities < similarity_cutoff] = 0
 
-        # Assign values for (up to) five neighbours including itself
-        num_neighbours: int = len(neighbour_similarities)
-        assign_indices = slice(next_index, next_index + num_neighbours)
+        num_neighbours = len(neighbours)
+        start_idx = 8 * fill_idx
+        stride = num_neighbours
+        assert stride <= 8
+        assign_indices = slice(start_idx, start_idx + stride)
+        similarity_values[assign_indices] = neighbour_similarities
         root_indices[assign_indices] = idx
         child_indices[assign_indices] = neighbour_indices
-        similarity_values[assign_indices] = neighbour_similarities
-        next_index += num_neighbours
+        fill_idx += 1
+    valid_indices = ~np.isnan(similarity_values)
 
-        # Now assign values for last four neighbours
-        num_lower_neighbours: int = num_neighbours - 1
-        assign_indices = slice(next_index, next_index + num_lower_neighbours)
-        root_indices[assign_indices] = neighbour_indices[:-1]
-        child_indices[assign_indices] = idx
-        similarity_values[assign_indices] = neighbour_similarities[:-1]
-        next_index += num_lower_neighbours
-    last_idx = np.flatnonzero(root_indices)[-1]
-
-    root_indices = root_indices[: last_idx + 1]
-    child_indices = child_indices[: last_idx + 1]
-    similarity_values = similarity_values[: last_idx + 1]
+    similarity_values = similarity_values[valid_indices]
+    root_indices = root_indices[valid_indices]
+    child_indices = child_indices[valid_indices]
 
     return (similarity_values, root_indices, child_indices, num_vecs)
