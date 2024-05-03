@@ -16,6 +16,10 @@ from .orientation import OrientationField
 
 log = logging.getLogger(__name__)
 
+# Clustering
+# 1. Each pixel with non-zero similarity with other pixels gets assigned a cluster
+# 2. This single pixel cluster has
+
 
 class Cluster:
     def __init__(self, merged_points: Sequence[int], merge_value: float):

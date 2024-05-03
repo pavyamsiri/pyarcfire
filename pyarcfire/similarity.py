@@ -42,6 +42,15 @@ def generate_similarity_matrix(
     similarity_matrix = sparse.coo_matrix(
         (similarity_values, (root_indices, child_indices)), shape=(num_vecs, num_vecs)
     )
+    log.debug(
+        f"Similarity matrix has {similarity_matrix.count_nonzero():,} nonzero elements."
+    )
+    is_hollow = np.allclose(similarity_matrix.diagonal(), 0)
+    assert is_hollow, "Similarity matrix has non-zero diagonal values!"
+    is_symmetric = (
+        similarity_matrix - similarity_matrix.transpose()
+    ).count_nonzero() == 0
+    assert is_symmetric, "Similarity matrix is not symmetric!"
     return similarity_matrix
 
 
