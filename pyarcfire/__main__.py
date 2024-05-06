@@ -49,9 +49,10 @@ def main(raw_args: Sequence[str]) -> None:
 
     matrix = generate_similarity_matrix(field)
     clusters = generate_hac_tree(matrix.tocsr(), contrast_image, field)  # type:ignore
-    # clusters = sorted(clusters, key=lambda x: x.size, reverse=True)
-    # cluster_sizes = np.array([cluster.size for cluster in clusters])
-    # cluster_bins = np.logspace(0, np.log10(max(cluster_sizes)), 10)
+    clusters = sorted(clusters, key=lambda x: x.size, reverse=True)
+    cluster_sizes = np.array([cluster.size for cluster in clusters])
+    cluster_bins = np.logspace(0, np.log10(max(cluster_sizes)), 10)
+    log.debug(f"Cluster sizes = {cluster_sizes[:5]}")
 
     fig = plt.figure()
     original_axis = fig.add_subplot(231)
@@ -74,15 +75,16 @@ def main(raw_args: Sequence[str]) -> None:
     orientation_axis.set_title("Orientation field")
     orientation_axis.set_axis_off()
 
-    # cluster_axis = fig.add_subplot(234)
-    # cluster_axis.set_title("Clusters")
-    # cluster_axis.imshow(clusters[0].get_mask(IMAGE_SIZE, IMAGE_SIZE))
-    # cluster_axis.set_axis_off()
-    #
-    # cluster_size_axis = fig.add_subplot(235)
-    # cluster_size_axis.set_title("Cluster size")
-    # cluster_size_axis.set_yscale("log")
-    # cluster_size_axis.hist(cluster_sizes, bins=cluster_bins)
+    cluster_axis = fig.add_subplot(234)
+    cluster_axis.set_title("Clusters")
+    for current_cluster in clusters[:10]:
+        cluster_axis.imshow(current_cluster.get_mask(IMAGE_SIZE, IMAGE_SIZE))
+    cluster_axis.set_axis_off()
+
+    cluster_size_axis = fig.add_subplot(235)
+    cluster_size_axis.set_title("Cluster size")
+    cluster_size_axis.set_yscale("log")
+    cluster_size_axis.hist(cluster_sizes, bins=cluster_bins)
 
     fig.tight_layout()
     plt.show()
