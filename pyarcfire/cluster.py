@@ -1,17 +1,13 @@
 from __future__ import annotations
 
 # Standard libraries
-import dataclasses
 from dataclasses import dataclass
 import logging
 from typing import Sequence
-from queue import PriorityQueue
-
 
 # External libraries
 import numpy as np
 from scipy import sparse
-
 
 # Internal libraries
 from .definitions import ImageArray
@@ -36,7 +32,7 @@ class Cluster:
 
     @staticmethod
     def combine(first: Cluster, second: Cluster) -> Cluster:
-        all_points = first.get_points() + second.get_points()
+        all_points = first._points + second._points
         return Cluster(all_points)
 
     @property
@@ -96,13 +92,6 @@ def generate_hac_tree(
     similarity_matrix: sparse.csr_matrix,
     image: ImageArray,
     orientation: OrientationField,
-    # barInfo,
-    # ctrR,
-    # ctrC,
-    # stgs,
-    # tracePts,
-    # aviName,
-    # colorThres,
     stop_threshold: float = 0.15,
     error_ratio_threshold: float = 2.5,
     merge_check_minimum_cluster_size: int = 25,
