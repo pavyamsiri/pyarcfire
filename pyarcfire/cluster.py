@@ -142,6 +142,7 @@ def generate_hac_tree(
     clusters = {idx: Cluster([idx]) for idx in points}
     while True:
         max_idx = similarity_matrix.argmax()
+        log.debug(f"Initial max index = {similarity_matrix.argmax():,}")
         unraveled_idx = np.unravel_index(max_idx, similarity_matrix.get_shape())
         first_idx = int(unraveled_idx[0])
         second_idx = int(unraveled_idx[1])
@@ -158,98 +159,101 @@ def generate_hac_tree(
         log.debug(f"Merged cluster has new size = {clusters[first_idx].size}")
         del clusters[second_idx]
 
-        _update_similarity_matrix(similarity_matrix, first_idx, second_idx)
-        _clear_similarity_matrix_row_column(similarity_matrix, second_idx)
+        similarity_matrix = _update_similarity_matrix(
+            similarity_matrix, first_idx, second_idx
+        )
+        similarity_matrix = _clear_similarity_matrix_row_column(
+            similarity_matrix, second_idx
+        )
 
     log.debug(f"Number of clusters = {len(clusters)}")
     return list(clusters.values())
 
 
 def _update_similarity_matrix(
-    similarity_matrix: sparse.csr_matrix, first_idx: int, second_idx: int
-) -> None:
+    similarity_matrix: sparse.csr_matrix, target_idx: int, source_idx: int
+) -> sparse.csr_matrix:
     # Merged cluster similarity is the maximum possible similarity from the set of cluster points
-    old_similarity_values = similarity_matrix[first_idx, :]
-    new_similarity_values = similarity_matrix[first_idx, :].maximum(
-        similarity_matrix[second_idx, :]
+    old_similarity_values = similarity_matrix[target_idx, :]
+    # The updated values max(Ti, Si)
+    new_similarity_values = similarity_matrix[target_idx, :].maximum(
+        similarity_matrix[source_idx, :]
     )
-    # Set self similarity to 0 i.e. points within same merged cluster should have 0 similarity
-    log.debug(f"First row = {similarity_matrix.getrow(first_idx)}")
-    log.debug(f"First column = {similarity_matrix.getcol(first_idx)}")
-    new_similarity_values[0, first_idx] = 0
-    new_similarity_values_array = np.asarray(
+    # Remove self-similarity
+    new_similarity_values[0, target_idx] = 0
+
+    desired_target_array = np.asarray(
         new_similarity_values[new_similarity_values.nonzero()]
     ).flatten()
+    # AIM: Construct matrix such that when added, the target row and column is updated to the desired values
+    # NOTE: Have to handle when the target row/column already have the desired value
 
-    # Add a term so that the resultant matrix has new similarity values at row/column = first_idx without duplicating additions
-    _, old_nonzero_indices = old_similarity_values.nonzero()
-    _, new_nonzero_indices = new_similarity_values.nonzero()
-    has_old_values = new_nonzero_indices[
-        np.isin(new_nonzero_indices, old_nonzero_indices)
-    ]
-    set_max_values_matrix_values = new_similarity_values
-    set_max_values_matrix_values[0, has_old_values] -= old_similarity_values[
-        0, has_old_values
-    ]
-    _, set_max_values_matrix_indices = set_max_values_matrix_values.nonzero()
-    num_nonzero = len(set_max_values_matrix_indices)
-    set_max_values_matrix_row_indices = np.tile(set_max_values_matrix_indices, 2)
-    set_max_values_matrix_row_indices[num_nonzero:] = first_idx
-    set_max_values_matrix_column_indices = np.tile(set_max_values_matrix_indices, 2)
-    set_max_values_matrix_column_indices[:num_nonzero] = first_idx
-    set_max_values_matrix_values_expanded = np.asarray(
-        np.tile(
-            np.asarray(
-                set_max_values_matrix_values[set_max_values_matrix_values.nonzero()]
-            ),  # type:ignore
-            2,
-        )
-    ).flatten()
-    log.debug(f"Values = {set_max_values_matrix_values_expanded}")
-    set_max_values_matrix = sparse.coo_matrix(
-        (
-            set_max_values_matrix_values_expanded,
+    add_matrix_values = new_similarity_values - old_similarity_values
+    if add_matrix_values.count_nonzero() == 0:  # type:ignore
+        new_matrix = similarity_matrix
+    else:
+        _, add_matrix_indices = add_matrix_values.nonzero()
+        add_matrix_values = np.asarray(
+            add_matrix_values[add_matrix_values.nonzero()]
+        ).flatten()
+        num_nonzero = len(add_matrix_indices)
+        add_matrix_row_indices = np.tile(add_matrix_indices, 2)
+        add_matrix_row_indices[num_nonzero:] = target_idx
+        add_matrix_column_indices = np.tile(add_matrix_indices, 2)
+        add_matrix_column_indices[:num_nonzero] = target_idx
+        add_matrix = sparse.coo_matrix(
             (
-                set_max_values_matrix_row_indices,
-                set_max_values_matrix_column_indices,
+                np.tile(add_matrix_values, 2),
+                (
+                    add_matrix_row_indices,
+                    add_matrix_column_indices,
+                ),
             ),
-        ),
-        shape=similarity_matrix.shape,
-    )
-    similarity_matrix += set_max_values_matrix
+            shape=similarity_matrix.shape,
+        )
+        new_matrix = similarity_matrix + add_matrix
 
-    first_row = np.asarray(
-        similarity_matrix[first_idx, :][similarity_matrix[first_idx, :].nonzero()]
+    target_row = np.asarray(
+        new_matrix.getrow(target_idx)[new_matrix.getrow(target_idx).nonzero()]
     ).flatten()
-    # TODO: Problem when all max values are in first idx then we get an empty sparse matrix which crashes
-    assert np.allclose(first_row, new_similarity_values_array), "Not on target"
+    target_column = np.asarray(
+        new_matrix.getcol(target_idx)[new_matrix.getcol(target_idx).nonzero()]
+    ).flatten()
+    row_on_target = np.allclose(target_row, desired_target_array)
+    assert row_on_target, "Row not on target"
+    column_on_target = np.allclose(target_column, desired_target_array)
+    assert column_on_target, "Column not on target"
+
+    return new_matrix
 
 
 def _clear_similarity_matrix_row_column(
     similarity_matrix: sparse.csr_matrix, clear_idx: int
-) -> None:
-    clear_nonzero_indices = np.asarray(similarity_matrix[clear_idx, :].nonzero()[1])
-    num_nonzero = len(clear_nonzero_indices)
-    set_clear_values_matrix_row_indices = np.tile(clear_nonzero_indices, 2)
-    set_clear_values_matrix_row_indices[num_nonzero:] = clear_idx
-    set_clear_values_matrix_column_indices = np.tile(clear_nonzero_indices, 2)
-    set_clear_values_matrix_column_indices[:num_nonzero] = clear_idx
-    set_clear_values_matrix_values = -np.asarray(
-        np.tile(similarity_matrix[clear_idx, clear_nonzero_indices].toarray(), 2)
+) -> sparse.csr_matrix:
+    values = np.asarray(
+        similarity_matrix.getrow(clear_idx)[
+            similarity_matrix.getrow(clear_idx).nonzero()
+        ]
     ).flatten()
-    set_clear_values_matrix = sparse.coo_matrix(
+    indices = similarity_matrix.getrow(clear_idx).nonzero()[1]
+
+    num_nonzero = len(indices)
+    clear_matrix_row_indices = np.tile(indices, 2)
+    clear_matrix_row_indices[num_nonzero:] = clear_idx
+    clear_matrix_column_indices = np.tile(indices, 2)
+    clear_matrix_column_indices[:num_nonzero] = clear_idx
+    clear_matrix = sparse.coo_matrix(
         (
-            set_clear_values_matrix_values,
+            np.tile(values, 2),
             (
-                set_clear_values_matrix_row_indices,
-                set_clear_values_matrix_column_indices,
+                clear_matrix_row_indices,
+                clear_matrix_column_indices,
             ),
         ),
         shape=similarity_matrix.shape,
     )
-    similarity_matrix += set_clear_values_matrix
+    new_matrix = similarity_matrix - clear_matrix
 
-    is_symmetric = (
-        similarity_matrix - similarity_matrix.transpose()
-    ).count_nonzero() == 0
+    is_symmetric = (new_matrix - new_matrix.transpose()).count_nonzero() == 0  # type:ignore
     assert is_symmetric, "Similarity matrix is not symmetric!"
+    return new_matrix
