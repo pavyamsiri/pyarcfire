@@ -10,6 +10,7 @@ from PIL import Image
 from skimage import filters, transform
 
 # Internal libraries
+from .arc import fit_spiral_to_image, log_spiral
 from .cluster import generate_hac_tree
 from .log_utils import setup_logging
 from .similarity import generate_similarity_matrix
@@ -52,7 +53,15 @@ def main(raw_args: Sequence[str]) -> None:
     clusters = sorted(clusters, key=lambda x: x.size, reverse=True)
     cluster_sizes = np.array([cluster.size for cluster in clusters])
     cluster_bins = np.logspace(0, np.log10(max(cluster_sizes)), 10)
+    num_rows = field.num_rows
+    num_columns = field.num_columns
     log.debug(f"Cluster sizes = {cluster_sizes[:5]}")
+    mask = clusters[0].get_mask(num_rows, num_columns)
+    cluster_image = contrast_image.copy()
+    cluster_image[~mask] = 0
+    theta_offset, pitch_angle, initial_radius, angle_width = fit_spiral_to_image(
+        cluster_image
+    )
 
     fig = plt.figure()
     original_axis = fig.add_subplot(231)
@@ -77,9 +86,13 @@ def main(raw_args: Sequence[str]) -> None:
 
     cluster_axis = fig.add_subplot(234)
     cluster_axis.set_title("Clusters")
-    for current_cluster in clusters[:10]:
+    for current_cluster in clusters[:1]:
         cluster_axis.imshow(current_cluster.get_mask(IMAGE_SIZE, IMAGE_SIZE))
-    cluster_axis.set_axis_off()
+    theta = np.linspace(theta_offset, theta_offset + angle_width, 100)
+    radii = log_spiral(theta, theta_offset, pitch_angle, initial_radius)
+    x = radii * np.cos(theta) + field.num_columns // 2
+    y = radii * np.sin(theta) + field.num_rows // 2
+    cluster_axis.plot(x, y)
 
     cluster_size_axis = fig.add_subplot(235)
     cluster_size_axis.set_title("Cluster size")

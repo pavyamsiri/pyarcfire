@@ -52,8 +52,8 @@ class Cluster:
         row_indices, column_indices = np.unravel_index(
             self.get_points(), (num_rows, num_columns)
         )
-        mask = np.zeros((num_rows, num_columns))
-        mask[row_indices, column_indices] = 1
+        mask = np.zeros((num_rows, num_columns), dtype=np.bool_)
+        mask[row_indices, column_indices] = True
         return mask
 
 
@@ -131,13 +131,10 @@ def generate_hac_tree(
     clusters = {idx: Cluster([idx]) for idx in points}
     while True:
         max_idx = similarity_matrix.argmax()
-        log.debug(f"Initial max index = {similarity_matrix.argmax():,}")
         unraveled_idx = np.unravel_index(max_idx, similarity_matrix.get_shape())
         first_idx = int(unraveled_idx[0])
         second_idx = int(unraveled_idx[1])
         value = float(similarity_matrix[first_idx, second_idx])  # type:ignore
-        log.debug(f"{first_idx} <-> {second_idx}")
-        log.debug(f"Value = {value}")
         if value < stop_threshold:
             break
 
@@ -145,7 +142,6 @@ def generate_hac_tree(
         second_cluster = clusters[second_idx]
         target_cluster = Cluster.combine(first_cluster, second_cluster)
         clusters[first_idx] = target_cluster
-        log.debug(f"Merged cluster has new size = {clusters[first_idx].size}")
         del clusters[second_idx]
 
         similarity_matrix = _update_similarity_matrix(
