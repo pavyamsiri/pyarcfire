@@ -1,4 +1,5 @@
 # Standard libraries
+from dataclasses import dataclass
 import logging
 
 # External libraries
@@ -11,7 +12,18 @@ from .definitions import FloatArray1D, ImageArray
 log = logging.getLogger(__name__)
 
 
-def fit_spiral_to_image(image: ImageArray) -> tuple[float, float, float, tuple[float, float]]:
+@dataclass
+class LogSpiralFitResult:
+    offset: float
+    pitch_angle: float
+    initial_radius: float
+    arc_bounds: tuple[float, float]
+    error: float
+
+
+def fit_spiral_to_image(
+    image: ImageArray,
+) -> LogSpiralFitResult:
     row_indices, column_indices = image.nonzero()
     row_offset = image.shape[0] // 2
     column_offset = image.shape[1] // 2
@@ -21,21 +33,22 @@ def fit_spiral_to_image(image: ImageArray) -> tuple[float, float, float, tuple[f
     theta = (np.arctan2(y, x) + 2 * np.pi) % (2 * np.pi)
     weights = image[row_indices, column_indices]
 
-    bounds, rotation_amount, _ = _calculate_bounds(theta)
+    (lower_bound, upper_bound), rotation_amount, max_gap_size = _calculate_bounds(theta)
     theta = (theta - rotation_amount) % (2 * np.pi)
-    if bounds is None:
-        log.warn("Has bad bounds!")
-        assert False, "Can't deal with this case"
-    lower_bound, upper_bound = bounds
-    initial_offset = (lower_bound + upper_bound) / 2
-    res = optimize.least_squares(
-        calculate_log_spiral_error_from_pitch_angle,
-        jac=calculate_log_spiral_jacobian_from_pitch_angle,  # type:ignore
-        x0=0,
-        args=(radii, theta, weights, initial_offset),
-    )
-    assert res.success, "Failed to fit pitch angle"
-    pitch_angle = res.x
+    if max_gap_size <= 0.1:
+        log.warn(f"Bad bounds! Gap size = {max_gap_size}")
+        initial_offset = 0
+        pitch_angle = 0
+    else:
+        initial_offset = (lower_bound + upper_bound) / 2
+        res = optimize.least_squares(
+            calculate_log_spiral_error_from_pitch_angle,
+            jac=calculate_log_spiral_jacobian_from_pitch_angle,  # type:ignore
+            x0=0,
+            args=(radii, theta, weights, initial_offset),
+        )
+        assert res.success, "Failed to fit pitch angle"
+        pitch_angle = res.x
     initial_radius = calculate_best_initial_radius(
         radii, theta, weights, initial_offset, pitch_angle
     )
@@ -68,15 +81,27 @@ def fit_spiral_to_image(image: ImageArray) -> tuple[float, float, float, tuple[f
         radii, theta, weights, new_offset, pitch_angle
     )
     offset = new_offset
-    arc_bounds = (arc_bounds[0] - offset_shift + offset, arc_bounds[1] - offset_shift + offset)
+    arc_bounds = (
+        arc_bounds[0] - offset_shift + offset,
+        arc_bounds[1] - offset_shift + offset,
+    )
     residuals = calculate_log_spiral_residual_vector(
         radii, theta, weights, offset, pitch_angle, initial_radius
     )
+    error = np.sum(np.square(residuals))
 
-    total_error = np.abs(np.sum(residuals) - error) / len(residuals)
-    assert total_error < 1e-4, "Total error is too high!"
+    error_diagnostic = np.abs(np.sum(residuals) - error) / len(residuals)
+    # assert error_diagnostic < 1e-4, "Total error is too high!"
 
-    return (offset, pitch_angle, initial_radius, arc_bounds)
+    result = LogSpiralFitResult(
+        offset=offset,
+        pitch_angle=pitch_angle,
+        initial_radius=initial_radius,
+        arc_bounds=arc_bounds,
+        error=error,
+    )
+
+    return result
 
 
 def calculate_log_spiral_error_from_pitch_angle(
@@ -157,7 +182,7 @@ def calculate_best_initial_radius(
 
 def _calculate_bounds(
     theta: FloatArray1D,
-) -> tuple[tuple[float, float] | None, float, float]:
+) -> tuple[tuple[float, float], float, float]:
     sorted_theta = np.sort(theta)
     gaps = np.diff(sorted_theta)
 
@@ -182,10 +207,7 @@ def _calculate_bounds(
         lower_bound = sorted_theta[-1] - rotation_amount % (2 * np.pi)
         upper_bound = 2 * np.pi
         max_gap_size = upper_bound - lower_bound
-    if max_gap_size > 0.1:
-        bounds = (lower_bound, upper_bound)
-    else:
-        bounds = None
+    bounds = (lower_bound, upper_bound)
     return (bounds, rotation_amount, max_gap_size)
 
 

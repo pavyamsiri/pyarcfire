@@ -12,6 +12,7 @@ from scipy import sparse
 
 # Internal libraries
 from .definitions import ImageArray
+from .merge import calculate_arc_merge_error
 from .orientation import OrientationField
 
 log = logging.getLogger(__name__)
@@ -48,6 +49,15 @@ class Cluster:
             seed not in self._points
         ), "Clusters must have a set of points i.e. no duplicates"
         self._points.append(seed)
+
+    def get_masked_image(self, image: ImageArray) -> ImageArray:
+        num_rows, num_columns = image.shape
+        row_indices, column_indices = np.unravel_index(
+            self.get_points(), (num_rows, num_columns)
+        )
+        masked_image = image.copy()
+        masked_image[row_indices, column_indices] = 0
+        return masked_image
 
     def get_mask(self, num_rows: int, num_columns: int) -> npt.NDArray[np.bool_]:
         row_indices, column_indices = np.unravel_index(
@@ -127,6 +137,10 @@ def generate_hac_tree(
     similarity_matrix.setdiag(0)
     similarity_matrix.eliminate_zeros()
 
+    # Diagnostics
+    check_arc_merge_count: int = 0
+    merge_stop_count: int = 0
+
     # Indices of pixels which have a non-zero similarity with another pixel
     points = similarity_matrix.sum(axis=0).nonzero()[1]
     clusters = {idx: Cluster([idx]) for idx in points}
@@ -135,12 +149,33 @@ def generate_hac_tree(
         unraveled_idx = np.unravel_index(max_idx, similarity_matrix.get_shape())
         first_idx = int(unraveled_idx[0])
         second_idx = int(unraveled_idx[1])
+        first_cluster = clusters[first_idx]
+        second_cluster = clusters[second_idx]
+
+        if (
+            min(first_cluster.size, second_cluster.size)
+            > merge_check_minimum_cluster_size
+        ):
+            check_arc_merge_count += 1
+            first_cluster_array = first_cluster.get_masked_image(image)
+            second_cluster_array = second_cluster.get_masked_image(image)
+            merge_error = calculate_arc_merge_error(
+                first_cluster_array, second_cluster_array
+            )
+            log.debug(
+                f"Merging cluster {first_cluster} and {second_cluster} has merge error of {merge_error}"
+            )
+            if merge_error > error_ratio_threshold:
+                log.debug("Abort cluster merge!")
+                merge_stop_count += 1
+                similarity_matrix[first_idx, second_idx] = 0
+                similarity_matrix[second_idx, first_idx] = 0
+                continue
+
         value = float(similarity_matrix[first_idx, second_idx])  # type:ignore
         if value < stop_threshold:
             break
 
-        first_cluster = clusters[first_idx]
-        second_cluster = clusters[second_idx]
         target_cluster = Cluster.combine(first_cluster, second_cluster)
         clusters[first_idx] = target_cluster
         del clusters[second_idx]
@@ -153,6 +188,8 @@ def generate_hac_tree(
         )
 
     log.debug(f"Number of clusters = {len(clusters)}")
+    log.debug(f"Checked {check_arc_merge_count} possible cluster arc merges")
+    log.debug(f"Stopped {merge_stop_count} arc merges")
     return list(clusters.values())
 
 

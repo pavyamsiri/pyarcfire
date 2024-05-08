@@ -4,6 +4,7 @@ import logging
 from typing import Sequence
 
 # External libraries
+import matplotlib as mpl
 from matplotlib import pyplot as plt
 import numpy as np
 from PIL import Image
@@ -56,13 +57,6 @@ def main(raw_args: Sequence[str]) -> None:
     num_rows = field.num_rows
     num_columns = field.num_columns
     log.debug(f"Cluster sizes = {cluster_sizes[:5]}")
-    current_cluster = clusters[0]
-    mask = current_cluster.get_mask(num_rows, num_columns)
-    cluster_image = contrast_image.copy()
-    cluster_image[np.logical_not(mask)] = 0
-    theta_offset, pitch_angle, initial_radius, arc_bounds = fit_spiral_to_image(
-        cluster_image
-    )
 
     fig = plt.figure()
     original_axis = fig.add_subplot(231)
@@ -87,12 +81,13 @@ def main(raw_args: Sequence[str]) -> None:
 
     cluster_axis = fig.add_subplot(234)
     cluster_axis.set_title("Clusters")
-    cluster_axis.imshow(current_cluster.get_mask(IMAGE_SIZE, IMAGE_SIZE))
-    theta = np.linspace(arc_bounds[0], arc_bounds[1], 100)
-    radii = log_spiral(theta, theta_offset, pitch_angle, initial_radius)
-    x = radii * np.cos(theta) + field.num_columns // 2
-    y = radii * np.sin(theta) + field.num_rows // 2
-    cluster_axis.plot(x, y)
+    clusters = [cluster for cluster in clusters if cluster.size >= 150]
+    color_map = mpl.colormaps["hsv"]
+    for idx, cluster in enumerate(clusters):
+        mask = cluster.get_mask(num_rows, num_columns)
+        cluster_mask = np.zeros((contrast_image.shape[0], contrast_image.shape[1], 4))
+        cluster_mask[mask, :] = color_map(idx / len(clusters))
+        cluster_axis.imshow(cluster_mask)
 
     cluster_size_axis = fig.add_subplot(235)
     cluster_size_axis.set_title("Cluster size")
