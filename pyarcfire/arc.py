@@ -20,10 +20,8 @@ def fit_spiral_to_image(image: ImageArray) -> tuple[float, float, float, float]:
     radii = np.sqrt(np.square(x) + np.square(y))
     theta = (np.arctan2(y, x) + 2 * np.pi) % (2 * np.pi)
     weights = image[row_indices, column_indices]
-    log.debug(f"Radii = {radii}")
-    log.debug(f"Theta = {theta}")
 
-    bounds, rotation_amount, max_gap_size = _calculate_bounds(theta)
+    bounds, rotation_amount, _ = _calculate_bounds(theta)
     theta = (theta - rotation_amount) % (2 * np.pi)
     if bounds is None:
         log.warn("Has bad bounds!")
@@ -76,12 +74,8 @@ def fit_spiral_to_image(image: ImageArray) -> tuple[float, float, float, float]:
     )
 
     total_error = np.abs(np.sum(residuals) - error) / len(residuals)
-    log.debug(f"Total error = {total_error}")
     assert total_error < 1e-4, "Total error is too high!"
     angle_width = float(np.max(theta - offset))
-    log.debug(
-        f"phi = {np.rad2deg(offset)}, a = {pitch_angle}, r0 = {initial_radius}, thetae = {np.rad2deg(angle_width)}"
-    )
 
     return (offset, pitch_angle, initial_radius, angle_width)
 
@@ -180,13 +174,11 @@ def _calculate_bounds(
     # problem, fit the log-spiral model to the set of rotated points,
     # and then reverse the rotation on the fitted model.
     if not gap_crosses_axis:
-        log.debug("Gap does not cross axis")
         rotation_amount = 0
         max_gap_size_idx = np.argmax(gaps)
         lower_bound = sorted_theta[max_gap_size_idx]
         upper_bound = sorted_theta[max_gap_size_idx + 1]
     else:
-        log.debug("Gap does cross axis")
         rotation_amount = sorted_theta[0]
         lower_bound = sorted_theta[-1] - rotation_amount % (2 * np.pi)
         upper_bound = 2 * np.pi
