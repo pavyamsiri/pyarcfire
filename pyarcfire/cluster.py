@@ -7,6 +7,7 @@ from typing import Sequence
 
 # External libraries
 import numpy as np
+from numpy import typing as npt
 from scipy import sparse
 
 # Internal libraries
@@ -48,7 +49,7 @@ class Cluster:
         ), "Clusters must have a set of points i.e. no duplicates"
         self._points.append(seed)
 
-    def get_mask(self, num_rows: int, num_columns: int) -> ImageArray:
+    def get_mask(self, num_rows: int, num_columns: int) -> npt.NDArray[np.bool_]:
         row_indices, column_indices = np.unravel_index(
             self.get_points(), (num_rows, num_columns)
         )
