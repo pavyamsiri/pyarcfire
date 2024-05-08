@@ -60,7 +60,7 @@ def main(raw_args: Sequence[str]) -> None:
     mask = current_cluster.get_mask(num_rows, num_columns)
     cluster_image = contrast_image.copy()
     cluster_image[np.logical_not(mask)] = 0
-    theta_offset, pitch_angle, initial_radius, angle_width = fit_spiral_to_image(
+    theta_offset, pitch_angle, initial_radius, arc_bounds = fit_spiral_to_image(
         cluster_image
     )
 
@@ -88,7 +88,7 @@ def main(raw_args: Sequence[str]) -> None:
     cluster_axis = fig.add_subplot(234)
     cluster_axis.set_title("Clusters")
     cluster_axis.imshow(current_cluster.get_mask(IMAGE_SIZE, IMAGE_SIZE))
-    theta = np.linspace(theta_offset, theta_offset + angle_width, 100)
+    theta = np.linspace(arc_bounds[0], arc_bounds[1], 100)
     radii = log_spiral(theta, theta_offset, pitch_angle, initial_radius)
     x = radii * np.cos(theta) + field.num_columns // 2
     y = radii * np.sin(theta) + field.num_rows // 2

@@ -11,7 +11,7 @@ from .definitions import FloatArray1D, ImageArray
 log = logging.getLogger(__name__)
 
 
-def fit_spiral_to_image(image: ImageArray) -> tuple[float, float, float, float]:
+def fit_spiral_to_image(image: ImageArray) -> tuple[float, float, float, tuple[float, float]]:
     row_indices, column_indices = image.nonzero()
     row_offset = image.shape[0] // 2
     column_offset = image.shape[1] // 2
@@ -68,16 +68,15 @@ def fit_spiral_to_image(image: ImageArray) -> tuple[float, float, float, float]:
         radii, theta, weights, new_offset, pitch_angle
     )
     offset = new_offset
-    arc_bounds = (arc_bounds[0] - offset_shift, arc_bounds[1] - offset_shift)
+    arc_bounds = (arc_bounds[0] - offset_shift + offset, arc_bounds[1] - offset_shift + offset)
     residuals = calculate_log_spiral_residual_vector(
         radii, theta, weights, offset, pitch_angle, initial_radius
     )
 
     total_error = np.abs(np.sum(residuals) - error) / len(residuals)
     assert total_error < 1e-4, "Total error is too high!"
-    angle_width = float(np.max(theta - offset))
 
-    return (offset, pitch_angle, initial_radius, angle_width)
+    return (offset, pitch_angle, initial_radius, arc_bounds)
 
 
 def calculate_log_spiral_error_from_pitch_angle(
