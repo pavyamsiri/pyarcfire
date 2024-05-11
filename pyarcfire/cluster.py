@@ -130,6 +130,7 @@ def generate_hac_tree(
     while True:
         max_idx = similarity_matrix.argmax()
         unraveled_idx = np.unravel_index(max_idx, similarity_matrix.get_shape())
+        # TODO: Somehow a deleted cluster has a similarity value still?
         first_idx = int(unraveled_idx[0])
         second_idx = int(unraveled_idx[1])
         first_cluster = clusters[first_idx]
