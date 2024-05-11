@@ -207,23 +207,50 @@ class OrientationField:
 def generate_orientation_fields(
     image: ImageArray, num_orientation_field_levels: int = 3
 ) -> OrientationField:
-    # Number of image scales to use when computing the orientation field.
-    # The dimensions of the preprocessed image (see resizeDims) must be
-    # divisible by 2^(numOrientationFieldLevels-1).
+    """Generates an orientation field for the given image.
+    This includes a merging step and a denoising step.
 
+    Parameters
+    ----------
+    image : ImageArray
+        The image to generate an orientation field of.
+    num_orientation_field_levels: int, optional
+        The number of orientation fields to create and merge. This number must be at least 1.
+        The resolution shrinks by half for each additional level. The default is 3.
+
+    Returns
+    -------
+    OrientationField
+        The orientation field of the given image.
+    """
+    assert num_orientation_field_levels >= 1, "The number of levels must be at least 1."
+    # The dimensions of the image must be divisible by the largest shrink factor
+    maximum_shrink_factor: int = 2 ** (num_orientation_field_levels - 1)
+    assert (
+        image.shape[0] % maximum_shrink_factor == 0
+    ), f"Image height must be divisible by {maximum_shrink_factor}"
+    assert (
+        image.shape[1] % maximum_shrink_factor == 0
+    ), f"Image width must be divisible by {maximum_shrink_factor}"
+
+    # Generate all the different orientation field levels
     orientation_field_levels: list[OrientationField] = []
     for idx in range(num_orientation_field_levels):
+        # Resize
         scale_factor: float = 1 / 2 ** (num_orientation_field_levels - idx - 1)
         resized_image = transform.rescale(image, scale_factor)
+
+        # Generate
         current_level = generate_single_orientation_field_level(resized_image)
         orientation_field_levels.append(current_level)
 
-    # Now merge orientation fields
+    # Merge orientation fields
     merged_field: OrientationField = reduce(
         lambda x, y: x.merge(y),
         orientation_field_levels,
     )
 
+    # Denoise
     denoised_field = merged_field.denoise()
     return denoised_field
 
@@ -231,7 +258,7 @@ def generate_orientation_fields(
 def generate_single_orientation_field_level(
     image: ImageArray,
 ) -> OrientationField:
-    """Generates the orientation field for the given image with no merging
+    """Generates an orientation field for the given image with no merging
     or denoising steps.
 
     Parameters
