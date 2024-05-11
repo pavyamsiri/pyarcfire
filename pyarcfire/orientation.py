@@ -253,7 +253,7 @@ def generate_orientation_filtered_images(
     filtered_images = np.zeros((image.shape[0], image.shape[1], 9))
     for idx in range(9):
         angle = (idx * np.pi) / 9
-        orientation_filter = generate_orientation_filter_fxn(angle)
+        orientation_filter = generate_orientation_filter_kernel(angle)
         # NOTE: Matlab's conv2 and scipy's convolve2d produce different results for the same mode if the image has
         # an odd number of rows and/or columns. Let's assume for now that they are the same.
         filtered_images[:, :, idx] = signal.convolve2d(
@@ -262,7 +262,7 @@ def generate_orientation_filtered_images(
     return filtered_images
 
 
-def generate_orientation_filter_fxn(theta: float, radius: int = 5) -> ImageArray:
+def generate_orientation_filter_kernel(theta: float, radius: int = 5) -> ImageArray:
     """Generates an orientation field filter kernel as described in the PhD thesis
     "Inferring Galaxy Morphology Through Texture Analysis" (K. Au 2006).
     The filter is a 1D LoG filter extended in 2D along an angle theta, such
