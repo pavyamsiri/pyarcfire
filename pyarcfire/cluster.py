@@ -55,8 +55,10 @@ class Cluster:
         row_indices, column_indices = np.unravel_index(
             self.get_points(), (num_rows, num_columns)
         )
+        mask = np.ones_like(image, dtype=np.bool_)
+        mask[row_indices, column_indices] = False
         masked_image = image.copy()
-        masked_image[row_indices, column_indices] = 0
+        masked_image[mask] = 0
         return masked_image
 
     def get_mask(self, num_rows: int, num_columns: int) -> npt.NDArray[np.bool_]:
