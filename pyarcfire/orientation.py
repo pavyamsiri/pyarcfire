@@ -442,7 +442,7 @@ def generate_orientation_fields(
         resized_image = transform.rescale(image, scale_factor)
 
         # Generate
-        current_level = generate_single_orientation_field_level(resized_image)
+        current_level = _generate_raw_orientation_field(resized_image)
         orientation_field_levels.append(current_level)
 
     # Merge orientation fields
@@ -456,7 +456,7 @@ def generate_orientation_fields(
     return denoised_field
 
 
-def generate_single_orientation_field_level(
+def _generate_raw_orientation_field(
     image: ImageArray,
 ) -> OrientationField:
     """Generates an orientation field for the given image with no merging
@@ -474,7 +474,7 @@ def generate_single_orientation_field_level(
 
     """
     # Filter the images using the orientation filters
-    filtered_images = generate_orientation_filtered_images(image)
+    filtered_images = _generate_orientation_filtered_images(image)
 
     # Clip negative values
     filtered_images[filtered_images < 0] = 0
@@ -495,7 +495,7 @@ def generate_single_orientation_field_level(
     return field
 
 
-def generate_orientation_filtered_images(
+def _generate_orientation_filtered_images(
     image: ImageArray,
 ) -> ImageArraySequence:
     """Convolve the given image with 9 orientation filters and return all results.
@@ -514,14 +514,14 @@ def generate_orientation_filtered_images(
     for idx in range(9):
         # TODO: The 9 filters are always the same so we should precompute this
         angle = (idx * np.pi) / 9
-        orientation_filter = generate_orientation_filter_kernel(angle)
+        orientation_filter = _generate_orientation_filter_kernel(angle)
         filtered_images[:, :, idx] = signal.convolve2d(
             image, orientation_filter, mode="same"
         )
     return filtered_images
 
 
-def generate_orientation_filter_kernel(theta: float, radius: int = 5) -> ImageArray:
+def _generate_orientation_filter_kernel(theta: float, radius: int = 5) -> ImageArray:
     """The filter is a 1D Ricker wavelet filter extended in 2D along an angle theta, such
     that the filter response is strongest for that angle.
 
