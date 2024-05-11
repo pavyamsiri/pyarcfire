@@ -13,8 +13,6 @@ from functools import reduce
 # External libraries
 import numpy as np
 from numpy import typing as npt
-from numpy._typing import NDArray
-from rich import progress as rprogress
 from scipy import signal
 from skimage import transform
 
