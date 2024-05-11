@@ -22,7 +22,12 @@ from .definitions import ImageArray, ImageArraySequence
 
 
 class OrientationField:
-    def __init__(self, field: ImageArray):
+    """The orientation field of an image.
+    Each pixel in the image is given a corresponding orientation field strength and direction,
+    dependent on how aligned it is with nearby pixels.
+    """
+
+    def __init__(self, field: ImageArray) -> None:
         assert (
             len(field.shape) == 3 and field.shape[2] == 2
         ), "OrientationFields are MxNx2 arrays."
@@ -50,70 +55,158 @@ class OrientationField:
 
     @property
     def num_cells(self) -> int:
+        """int: The total number of grid cells."""
         return self.num_rows * self.num_columns
 
     @property
     def num_rows(self) -> int:
+        """int: The number of rows."""
         return self._field.shape[0]
 
     @property
     def num_columns(self) -> int:
+        """int: The number of columns."""
         return self._field.shape[1]
 
     @property
     def shape(self) -> tuple[int, int, int]:
+        """tuple[int, int, int]: The shape of the underlying array."""
         assert self.field.shape[2] == 2
         return (self.num_rows, self.num_columns, self.field.shape[2])
 
     @property
     def field(self) -> ImageArray:
+        """ImageArray: The underlying field array."""
         return self._field
 
     @property
     def x(self) -> ImageArray:
+        """ImageArray: The x-component of the orientation."""
         return self._field[:, :, 0]
 
     @property
     def y(self) -> ImageArray:
+        """ImageArray: The y-component of the orientation."""
         return self._field[:, :, 1]
 
     def get_vector_at(
         self, row_index: int, column_index: int
     ) -> npt.NDArray[np.floating]:
+        """The 2D orientation vector at the given indices.
+
+        Parameters
+        ----------
+        row_index : int
+            The row index.
+        column_index : int
+            The column index.
+
+        Returns
+        -------
+        npt.NDArray[np.floating]
+            The 2D orientation vector.
+        """
         return self.field[row_index, column_index, :]
 
     def get_strengths(self) -> ImageArray:
+        """The orientation strength of each cell.
+
+        Returns
+        -------
+        ImageArray
+            The orientation strength as an array.
+        """
         strengths = np.sqrt(np.square(self.x) + np.square(self.y))
         return strengths
 
     def get_directions(self) -> ImageArray:
+        """The orientation direction of each cell given as angles in the range [0, pi)
+
+        Returns
+        -------
+        ImageArray
+            The orientation directions in angles in the range [0, pi).
+        """
         directions = np.arctan2(self.y, self.x) % np.pi
         return directions
 
-    def rescale(self, scale_factor: float) -> OrientationField:
-        resized_field = transform.rescale(self.field, scale_factor, channel_axis=2)
-        return OrientationField(resized_field)
-
     def resize(self, new_width: int, new_height: int) -> OrientationField:
+        """Returns the orientation field resized via interpolation.
+
+        Parameters
+        ----------
+        new_width : int
+            The new width of the field.
+        new_height : int
+            The new height of the field.
+
+        Returns
+        -------
+        OrientationField
+            The resized field.
+        """
         return OrientationField(transform.resize(self.field, (new_height, new_width)))
 
-    def merge(self, other: OrientationField) -> OrientationField:
-        resized_coarse_field = np.zeros(other.shape)
-        # NOTE: This implicitly requires that the finer field is twice the dimensions of the coarse field
-        resized_coarse_field = self.rescale(2)
-        resized_coarse_strengths = resized_coarse_field.get_strengths()
-        fine_field_strengths = other.get_strengths()
+    @staticmethod
+    def merge(
+        coarser_field: OrientationField, finer_field: OrientationField
+    ) -> OrientationField:
+        """Merge two orientation fields together. The first field must be of a lower resolution
+        than the second field. The resultant field is the same resolution as that of the finer field.
 
+        Parameters
+        ----------
+        coarser_field : OrientationField
+            The coarse field to merge.
+        finer_field : OrientationField
+            The fine field to merge.
+
+        Returns
+        -------
+        merged_field : OrientationField
+            The merged field.
+        """
+        is_finer_higher_resolution: bool = (
+            coarser_field.num_rows < finer_field.num_rows
+            and coarser_field.num_columns < finer_field.num_columns
+        )
+        assert (
+            is_finer_higher_resolution
+        ), "The finer field must be a higher resolution than the coarser field."
+
+        # Upscale coarse field to have same resolution as finer field
+        resized_coarse_field = np.zeros(finer_field.shape)
+        resized_coarse_field = coarser_field.resize(
+            finer_field.num_columns, finer_field.num_rows
+        )
+
+        resized_coarse_strengths = resized_coarse_field.get_strengths()
+        fine_field_strengths = finer_field.get_strengths()
+
+        # gains = Sf / (Sf + Sc)
         gains = fine_field_strengths
-        gains[fine_field_strengths != 0] /= (
-            fine_field_strengths + resized_coarse_strengths
-        )[fine_field_strengths != 0]
+        denominator = fine_field_strengths + resized_coarse_strengths
+        gains[denominator != 0] /= denominator[denominator != 0]
+
+        # Vf' = Vc + Sf / (Sf + Sc) * (Vf - Vc)
         merged_field = resized_coarse_field.add(
-            other.subtract(resized_coarse_field).scalar_field_multiply(gains)
+            finer_field.subtract(resized_coarse_field).scalar_field_multiply(gains)
         )
         return merged_field
 
     def scalar_field_multiply(self, scalar_field: ImageArray) -> OrientationField:
+        """Returns the orientation field mulitplied by a scalar field.
+
+        Parameters
+        ----------
+        scalar_field : ImageArray
+            The scalar field to multiply with.
+
+        Returns
+        -------
+        OrientationField
+            The multiplied orientation field.
+        """
         assert (
             len(scalar_field.shape) == 2
         ), "The scalar field must be MxN as it is scalar."
@@ -121,15 +214,41 @@ class OrientationField:
             scalar_field.shape[0] == self.num_rows
             and scalar_field.shape[1] == self.num_columns
         ), "The scalar field must have the same height and width as the OrientationField"
+
+        # Multiply each component
         result = self.field
         result[:, :, 0] *= scalar_field
         result[:, :, 1] *= scalar_field
         return OrientationField(result)
 
     def add(self, other: OrientationField) -> OrientationField:
+        """Returns the orientation field added with another field.
+
+        Parameters
+        ----------
+        other : OrientationField
+            The field to add.
+
+        Returns
+        -------
+        OrientationField
+            The sum of the two fields.
+        """
         return self._add_or_subtract(other, add=True)
 
     def subtract(self, other: OrientationField) -> OrientationField:
+        """Returns the orientation field subtracted by another field.
+
+        Parameters
+        ----------
+        other : OrientationField
+            The field to subtract.
+
+        Returns
+        -------
+        OrientationField
+            The difference of the two fields.
+        """
         return self._add_or_subtract(other, add=False)
 
     def _add_or_subtract(self, other: OrientationField, add: bool) -> OrientationField:
@@ -246,7 +365,7 @@ def generate_orientation_fields(
 
     # Merge orientation fields
     merged_field: OrientationField = reduce(
-        lambda x, y: x.merge(y),
+        lambda x, y: OrientationField.merge(x, y),
         orientation_field_levels,
     )
 
