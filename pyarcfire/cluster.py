@@ -68,25 +68,6 @@ class Cluster:
         return mask
 
 
-@dataclass
-class ClusterPair:
-    similarity: float
-    first: Cluster
-    second: Cluster
-
-    def __eq__(self, other: object) -> bool:
-        assert isinstance(
-            other, ClusterPair
-        ), f"Equality is only supported for {self.__class__}"
-        return self.similarity == other.similarity
-
-    def __lt__(self, other: object) -> bool:
-        assert isinstance(
-            other, ClusterPair
-        ), f"Less than is only supported for {self.__class__}"
-        return self.similarity > other.similarity
-
-
 # def find_clusters(
 #     orientation: OrientationField, similarity_cutoff: float = -np.inf
 # ) -> None:
