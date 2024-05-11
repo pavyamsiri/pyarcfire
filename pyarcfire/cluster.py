@@ -103,7 +103,7 @@ def generate_hac_tree(
     similarity_matrix: sparse.csr_matrix,
     image: ImageArray,
     orientation: OrientationField,
-    stop_threshold: float = 0.15,
+    stop_threshold: float,
     error_ratio_threshold: float = 2.5,
     merge_check_minimum_cluster_size: int = 25,
 ) -> Sequence[Cluster]:

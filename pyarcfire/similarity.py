@@ -18,7 +18,7 @@ log = logging.getLogger(__name__)
 
 
 def generate_similarity_matrix(
-    orientation: OrientationField, similarity_cutoff: float = -np.inf
+    orientation: OrientationField, similarity_cutoff: float
 ) -> sparse.coo_matrix:
     # Generates a sparse pixel-to-pixel similarity matrix using an orientation
     #   field derived from the input image.
@@ -49,7 +49,7 @@ def generate_similarity_matrix(
     assert is_hollow, "Similarity matrix has non-zero diagonal values!"
     is_symmetric = (
         similarity_matrix - similarity_matrix.transpose()
-    ).count_nonzero() == 0
+    ).count_nonzero() == 0  # type:ignore
     assert is_symmetric, "Similarity matrix is not symmetric!"
     return similarity_matrix
 

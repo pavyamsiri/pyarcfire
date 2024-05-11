@@ -49,8 +49,9 @@ def main(raw_args: Sequence[str]) -> None:
     # 4. Merge clusters and arcs by considering compatible arcs
     # 5. Color arcs red for S-wise and cyan for Z-wise
 
-    matrix = generate_similarity_matrix(field)
-    clusters = generate_hac_tree(matrix.tocsr(), contrast_image, field)  # type:ignore
+    stop_threshold: float = 0.15
+    matrix = generate_similarity_matrix(field, stop_threshold)
+    clusters = generate_hac_tree(matrix.tocsr(), contrast_image, field, stop_threshold)  # type:ignore
     clusters = sorted(clusters, key=lambda x: x.size, reverse=True)
     cluster_sizes = np.array([cluster.size for cluster in clusters])
     cluster_bins = np.logspace(0, np.log10(max(cluster_sizes)), 10)
