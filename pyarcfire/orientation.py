@@ -13,6 +13,7 @@ from functools import reduce
 # External libraries
 import numpy as np
 from numpy import typing as npt
+from numpy._typing import NDArray
 from rich import progress as rprogress
 from scipy import signal
 from skimage import transform
@@ -234,7 +235,13 @@ class OrientationField:
         OrientationField
             The sum of the two fields.
         """
-        return self._add_or_subtract(other, add=True)
+        vector_sum, vector_difference, sum_greater = OrientationField._prepare_sum(
+            self, other
+        )
+        result = np.zeros_like(vector_sum)
+        result[sum_greater] = vector_sum[sum_greater]
+        result[~sum_greater] = vector_difference[~sum_greater]
+        return OrientationField(result)
 
     def subtract(self, other: OrientationField) -> OrientationField:
         """Returns the orientation field subtracted by another field.
@@ -249,29 +256,54 @@ class OrientationField:
         OrientationField
             The difference of the two fields.
         """
-        return self._add_or_subtract(other, add=False)
+        vector_sum, vector_difference, sum_greater = OrientationField._prepare_sum(
+            self, other
+        )
+        result = np.zeros_like(vector_sum)
+        result[~sum_greater] = vector_sum[~sum_greater]
+        result[sum_greater] = vector_difference[sum_greater]
+        return OrientationField(result)
 
-    def _add_or_subtract(self, other: OrientationField, add: bool) -> OrientationField:
-        negative_vertical = other.y < 0
-        b = other.field
+    @staticmethod
+    def _prepare_sum(
+        left: OrientationField, right: OrientationField
+    ) -> tuple[ImageArray, ImageArray, npt.NDArray[np.bool_]]:
+        """Calculate the necessary components to perform an orientation field sum or difference.
+
+        Parameters
+        ----------
+        left : OrientationField
+            The left hand side of the sum/difference.
+        right : OrientationField
+            The right hand side of the sum/difference.
+
+        Returns
+        -------
+        vector_sum : ImageArray
+            The vector sum of the two fields.
+        vector_difference : ImageArray
+            The vector difference of the two fields.
+        sum_greater : npt.NDArray[np.bool_]
+            The mask where true indicates that the norm of vector sum is greater than the
+            norm of vector difference.
+        """
+        negative_vertical = right.y < 0
+        b = right.field
         b[negative_vertical, 0] = -b[negative_vertical, 0]
         b[negative_vertical, 1] = -b[negative_vertical, 1]
-        vector_sum = self.field + b
-        vector_difference = self.field - b
+        # Vector sum
+        vector_sum = left.field + b
         vector_sum_lengths = np.sqrt(np.sum(np.square(vector_sum), axis=2))
+
+        # Vector difference
+        vector_difference = left.field - b
         vector_difference_lengths = np.sqrt(
             np.sum(np.square(vector_difference), axis=2)
         )
+
         sum_greater = vector_sum_lengths > vector_difference_lengths
         sum_greater = np.repeat(sum_greater[:, :, np.newaxis], 2, axis=2)
-        result = np.zeros_like(self.field)
-        if add:
-            result[sum_greater] = vector_sum[sum_greater]
-            result[~sum_greater] = vector_difference[~sum_greater]
-        else:
-            result[~sum_greater] = vector_sum[~sum_greater]
-            result[sum_greater] = vector_difference[sum_greater]
-        return OrientationField(result)
+        return (vector_sum, vector_difference, sum_greater)
 
     def denoise(self, neighbour_distance: int = 5) -> OrientationField:
         # Performs the orientation field de-noising described in the PhD thesis
