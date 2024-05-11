@@ -404,6 +404,61 @@ class OrientationField:
         # Create denoised field
         return OrientationField(denoised)
 
+    # TODO: Do more thorough testing with non-vectorised version
+    def denoise_vectorised(self, neighbour_distance: int = 5) -> OrientationField:
+        """Returns a denoised orientation field.
+
+        Parameters
+        ----------
+        neighbour_distance : int, optional
+            The distance between a pixel and its four cardinal neighbours.
+
+        Returns
+        -------
+        OrientationField
+            The denoised field.
+        """
+        SUBTRACT_AMOUNT: float = np.cos(np.pi / 4)
+        # Allocate new field
+        denoised = np.zeros(self.shape)
+
+        neighbour_arrays: list[ImageArray] = [
+            np.roll(self.field, -neighbour_distance, axis=1),
+            np.roll(self.field, neighbour_distance, axis=1),
+            np.roll(self.field, -neighbour_distance, axis=0),
+            np.roll(self.field, neighbour_distance, axis=0),
+        ]
+        neighbour_masks = np.ones((self.num_rows, self.num_columns, 4), dtype=np.bool_)
+        neighbour_masks[:, -neighbour_distance:, 0] = False
+        neighbour_masks[:, :neighbour_distance, 1] = False
+        neighbour_masks[-neighbour_distance:, :, 2] = False
+        neighbour_masks[:neighbour_distance, :, 3] = False
+        vector_norm = np.linalg.norm(self.field, axis=2)
+        neighbour_strengths = np.zeros((self.num_rows, self.num_columns, 4))
+        for neighbour_idx, neighbour in enumerate(neighbour_arrays):
+            product_norm = vector_norm * np.linalg.norm(neighbour, axis=2)
+            current_strength = np.maximum(
+                (neighbour * self.field).sum(axis=2) - SUBTRACT_AMOUNT, 0
+            )
+            current_strength[product_norm != 0] /= product_norm[product_norm != 0]
+            current_strength[np.isnan(current_strength)] = 0
+            current_strength[~neighbour_masks[:, :, neighbour_idx]] = np.nan
+            neighbour_strengths[:, :, neighbour_idx] = current_strength
+        median_strength = np.nanmedian(neighbour_strengths, axis=2)
+        combined_mask = vector_norm != 0
+        denoised[:, :, 0][combined_mask] = (
+            self.field[:, :, 0][combined_mask]
+            / vector_norm[combined_mask]
+            * median_strength[combined_mask]
+        )
+        denoised[:, :, 1][combined_mask] = (
+            self.field[:, :, 1][combined_mask]
+            / vector_norm[combined_mask]
+            * median_strength[combined_mask]
+        )
+
+        return OrientationField(denoised)
+
 
 def generate_orientation_fields(
     image: ImageArray, num_orientation_field_levels: int = 3
@@ -452,7 +507,7 @@ def generate_orientation_fields(
     )
 
     # Denoise
-    denoised_field = merged_field.denoise()
+    denoised_field = merged_field.denoise_vectorised()
     return denoised_field
 
 
