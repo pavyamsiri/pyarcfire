@@ -279,29 +279,31 @@ def generate_orientation_filter_fxn(angle: float, radius: float = 5) -> ImageArr
     # sample [-pi, pi], in pixel middles
     max_value: float = np.pi * 2 * radius / (2 * radius + 1)
     # Not sure what cVal and rVals exactly corresponds to
-    columns, rows = np.meshgrid(
+    x, y = np.meshgrid(
         np.linspace(-max_value, max_value, num_cells),
         np.linspace(-max_value, max_value, num_cells),
     )
-    diagonals = rows * np.cos(angle) + columns * np.sin(angle)
-    diagonals_squared = np.square(diagonals)
-    laplacian_of_gaussian = (
+    # Rotate by theta
+    rotated_x = x * np.cos(angle) - y * np.sin(angle)
+    rotated_y = x * np.sin(angle) + y * np.cos(angle)
+    rotated_x_squared = np.square(rotated_x)
+    rotated_y_squared = np.square(rotated_y)
+    # Use Mexican hat wavelet as kernel
+    wavelet = (
         (2 / np.sqrt(3))
         * (np.pi ** (-1 / 4))
-        * (1 - diagonals_squared)
-        * np.exp(-diagonals_squared / 2)
+        * (1 - rotated_x_squared)
+        * np.exp(-rotated_x_squared / 2)
     )
 
+    # Attenuate using a Gaussian function with sigma = max_value / 2
     sigma = max_value / 2
-    weighted_sum = rows * np.cos(angle + np.pi / 2) + columns * np.sin(
-        angle + np.pi / 2
-    )
     gaussian_window = (1 / np.sqrt(2 * np.pi * (sigma**2))) * np.exp(
-        (-1 / (2 * (sigma**2))) * np.square(weighted_sum)
+        (-1 / (2 * (sigma**2))) * rotated_y_squared
     )
 
     # Construct filter
-    filter_matrix = laplacian_of_gaussian * gaussian_window
+    filter_matrix = wavelet * gaussian_window
     # Normalise
     filter_matrix /= np.sqrt(np.sum(np.square(filter_matrix)))
     return filter_matrix
