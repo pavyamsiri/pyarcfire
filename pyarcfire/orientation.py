@@ -262,9 +262,7 @@ def generate_orientation_filtered_images(
     return filtered_images
 
 
-def generate_orientation_filter_fxn(
-    angle: float, radius: float = 5, use_hilbert: bool = False
-) -> ImageArray:
+def generate_orientation_filter_fxn(angle: float, radius: float = 5) -> ImageArray:
     # Generates an orientation field filter matrix described in the PhD thesis
     #  "Inferring Galaxy Morphology Through Texture Analysis" (K. Au 2006).
     #  The filter is a 1D LoG filter extended in 2D along an angle theta, such
@@ -293,13 +291,6 @@ def generate_orientation_filter_fxn(
         * (1 - diagonals_squared)
         * np.exp(-diagonals_squared / 2)
     )
-
-    # TODO: Add Hilbert transform of filter
-    # if use_hilbert:
-    # filterH = imag(-cmhf(dVals)) / sqrt(3);
-    # filterH = filterH .* (sum(abs(filter(:))) / sum(abs(filterH(:))));
-    # filter = filterH;
-    _ = use_hilbert
 
     sigma = max_value / 2
     weighted_sum = rows * np.cos(angle + np.pi / 2) + columns * np.sin(
