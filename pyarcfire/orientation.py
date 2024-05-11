@@ -306,23 +306,34 @@ class OrientationField:
         return (vector_sum, vector_difference, sum_greater)
 
     def denoise(self, neighbour_distance: int = 5) -> OrientationField:
-        # Performs the orientation field de-noising described in the PhD thesis
-        # "Inferring Galaxy Morphology Through Texture Analysis" (K. Au 2006).
-        # INPUTS:
-        #   ofld: orientation field without de-noising (but already merged from 3
-        #       resolution levels if the process in the thesis is followed)
-        # OUTPUTS:
-        #   dofld: de-noised orientation field
+        """Returns a denoised orientation field.
+
+        Parameters
+        ----------
+        neighbour_distance : int, optional
+            The distance between a pixel and its four cardinal neighbours.
+
+        Returns
+        -------
+        OrientationField
+            The denoised field.
+        """
+        SUBTRACT_AMOUNT: float = np.cos(np.pi / 4)
+        # Allocate new field
         denoised = np.zeros(self.shape)
 
-        for row_idx in rprogress.track(range(self.num_rows)):
+        # Iterate through every pixel
+        for row_idx in range(self.num_rows):
             for column_idx in range(self.num_columns):
+                # Calculate the norm of the orientation vector
                 current_vector = self.get_vector_at(row_idx, column_idx)
                 current_vector_norm = np.linalg.norm(current_vector)
+                # The denoising equation requires non-zero norms
                 if current_vector_norm == 0:
                     continue
+
+                # Collect neighbours
                 neighbour_vectors = []
-                # Check that the neighbour is not past the top left corner
                 for row_offset, column_offset in (
                     (-neighbour_distance, -neighbour_distance),
                     (+neighbour_distance, -neighbour_distance),
@@ -331,6 +342,7 @@ class OrientationField:
                 ):
                     target_row = row_idx + row_offset
                     target_column = column_idx + column_offset
+                    # Only add neighbours within the image
                     if target_row < 0 or target_row >= self.num_rows:
                         continue
                     if target_column < 0 or target_column >= self.num_columns:
@@ -338,20 +350,25 @@ class OrientationField:
                     neighbour_vectors.append(
                         self.get_vector_at(target_row, target_column)
                     )
-                neighbour_sims = np.zeros(len(neighbour_vectors))
+                neighbour_strengths = np.zeros(len(neighbour_vectors))
 
-                subtract_amount = np.cos(np.pi / 4)
                 for idx, neighbour in enumerate(neighbour_vectors):
                     neighbour_norm = np.linalg.norm(neighbour)
+                    # The denoising equation requires non-zero norms
                     if neighbour_norm == 0:
                         continue
-                    neighbour_sims[idx] = max(
-                        np.dot(neighbour, current_vector) - subtract_amount, 0
+                    # max(|V dot V'| - cos(pi/4), 0) / (|V| * |V'|)
+                    neighbour_strengths[idx] = max(
+                        np.dot(neighbour, current_vector) - SUBTRACT_AMOUNT, 0
                     ) / (current_vector_norm * neighbour_norm)
 
+                # New orientation strength
+                new_strength = np.median(neighbour_strengths)
+                # Set new value
                 denoised[row_idx, column_idx, :] = (
                     current_vector / current_vector_norm
-                ) * np.median(neighbour_sims)
+                ) * new_strength
+        # Create denoised field
         return OrientationField(denoised)
 
 
