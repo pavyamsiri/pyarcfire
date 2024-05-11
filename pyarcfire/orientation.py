@@ -1,8 +1,14 @@
+"""Generates an orientation field from an image.
+The algorithms used here are adapted from:
+    1. Inferring Galaxy Morphology Through Texture Analysis (K. Au 2006).
+    2. Automated Quantification of Arbitrary Arm-Segment Structure in Spiral Galaxies (D. Davis 2014).
+and from the SpArcFiRe code [https://github.com/waynebhayes/SpArcFiRe]
+"""
+
 from __future__ import annotations
 
 # Standard libraries
 from functools import reduce
-from typing import Sequence
 
 # External libraries
 import numpy as np
@@ -225,34 +231,62 @@ def generate_orientation_fields(
 def generate_single_orientation_field_level(
     image: ImageArray,
 ) -> OrientationField:
+    """Generates the orientation field for the given image with no merging
+    or denoising steps.
+
+    Parameters
+    ----------
+    image : ImageArray
+        The image to generate an orientation field of.
+
+    Returns
+    -------
+    field : OrientationField
+        The orientation field of the image.
+
+    """
+    # Filter the images using the orientation filters
     filtered_images = generate_orientation_filtered_images(image)
 
     # Clip negative values
     filtered_images[filtered_images < 0] = 0
 
-    energies = np.square(filtered_images, dtype=np.complex64)
+    # Construct weighted sum of filtered images
+    weights = np.square(filtered_images, dtype=np.complex64)
     for idx in range(9):
-        energies[:, :, idx] = energies[:, :, idx] * np.exp(1j * 2 * idx * np.pi / 9)
-    energy = np.sum(energies, axis=2)
-    # Magnitude of complex valued energy
-    strengths = np.abs(energy)
-    # Angle of complex valued energy
-    angles = np.angle(energy) / 2
+        weights[:, :, idx] = weights[:, :, idx] * np.exp(1j * 2 * idx * np.pi / 9)
+    weighted_sum = np.sum(weights, axis=2)
 
+    # Magnitude
+    strengths = np.abs(weighted_sum)
+    # Angle
+    angles = np.angle(weighted_sum) / 2
+
+    # Construct the orientation field
     field = OrientationField.from_polar(strengths, angles)
-
     return field
 
 
 def generate_orientation_filtered_images(
     image: ImageArray,
 ) -> ImageArraySequence:
+    """Convolve the given image with 9 orientation filters and return all results.
+
+    Parameters
+    ----------
+    image : ImageArray
+        The 2D image to filter.
+
+    Returns
+    -------
+    filtered_images : ImageArraySequence
+        The 3D array of the image filtered through the 9 orientation filters.
+    """
     filtered_images = np.zeros((image.shape[0], image.shape[1], 9))
     for idx in range(9):
+        # TODO: The 9 filters are always the same so we should precompute this
         angle = (idx * np.pi) / 9
         orientation_filter = generate_orientation_filter_kernel(angle)
-        # NOTE: Matlab's conv2 and scipy's convolve2d produce different results for the same mode if the image has
-        # an odd number of rows and/or columns. Let's assume for now that they are the same.
         filtered_images[:, :, idx] = signal.convolve2d(
             image, orientation_filter, mode="same"
         )
@@ -260,26 +294,20 @@ def generate_orientation_filtered_images(
 
 
 def generate_orientation_filter_kernel(theta: float, radius: int = 5) -> ImageArray:
-    """Generates an orientation field filter kernel as described in the PhD thesis
-    "Inferring Galaxy Morphology Through Texture Analysis" (K. Au 2006).
-    The filter is a 1D LoG filter extended in 2D along an angle theta, such
+    """The filter is a 1D Ricker wavelet filter extended in 2D along an angle theta, such
     that the filter response is strongest for that angle.
 
     Parameters
     ----------
     theta : float
         The angle in radians at which the filter is strongest.
-    radius: int, optional
+    radius : int, optional
         The radius of the kernel in pixels. Default is 5 pixels.
 
     Returns
     -------
     kernel : ImageArray
         The filter kernel of size [2 * radius + 1, 2 * radius + 1]
-
-    Notes
-    -----
-    Adapted from the SpArcFiRe codebase [https://github.com/waynebhayes/SpArcFiRe].
     """
     assert radius > 0, f"Radius must be positive but it is instead {radius}"
 
