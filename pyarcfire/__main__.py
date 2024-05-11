@@ -27,6 +27,7 @@ def main(raw_args: Sequence[str]) -> None:
     args = _parse_args(raw_args)
     # Load image
     image = np.asarray(Image.open(args.input_path).convert("L"))
+    image = transform.resize(image, (IMAGE_SIZE, IMAGE_SIZE))
 
     UNSHARP_MASK_RADIUS: float = 25
     UNSHARP_MASK_AMOUNT: float = 6
@@ -34,7 +35,6 @@ def main(raw_args: Sequence[str]) -> None:
         image, radius=UNSHARP_MASK_RADIUS, amount=UNSHARP_MASK_AMOUNT
     )
 
-    contrast_image = transform.resize(contrast_image, (IMAGE_SIZE, IMAGE_SIZE))
     field = generate_orientation_fields(contrast_image)
     strengths = field.get_strengths()
     nonzero_cells = np.count_nonzero(strengths)
