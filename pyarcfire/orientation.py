@@ -285,7 +285,7 @@ def generate_orientation_filter_fxn(angle: float, radius: float = 5) -> ImageArr
     )
     diagonals = rows * np.cos(angle) + columns * np.sin(angle)
     diagonals_squared = np.square(diagonals)
-    filter_matrix = (
+    laplacian_of_gaussian = (
         (2 / np.sqrt(3))
         * (np.pi ** (-1 / 4))
         * (1 - diagonals_squared)
@@ -300,7 +300,8 @@ def generate_orientation_filter_fxn(angle: float, radius: float = 5) -> ImageArr
         (-1 / (2 * (sigma**2))) * np.square(weighted_sum)
     )
 
-    filter_matrix *= gaussian_window
-    # Normalise matrix
+    # Construct filter
+    filter_matrix = laplacian_of_gaussian * gaussian_window
+    # Normalise
     filter_matrix /= np.sqrt(np.sum(np.square(filter_matrix)))
     return filter_matrix
