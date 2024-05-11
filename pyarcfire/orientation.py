@@ -262,48 +262,53 @@ def generate_orientation_filtered_images(
     return filtered_images
 
 
-def generate_orientation_filter_fxn(angle: float, radius: float = 5) -> ImageArray:
-    # Generates an orientation field filter matrix described in the PhD thesis
-    #  "Inferring Galaxy Morphology Through Texture Analysis" (K. Au 2006).
-    #  The filter is a 1D LoG filter extended in 2D along an angle theta, such
-    #  that the filter response is strongest for that angle.
-    # INPUTS:
-    #   theta: angle of the filter orientation
-    #   radius: optional parameter specifying where to truncate the filter
-    #    values; matrix size will be 2*radius+1
-    #   hilbt: whether to use the Hilbert transform of the filter instead
+def generate_orientation_filter_fxn(theta: float, radius: int = 5) -> ImageArray:
+    """Generates an orientation field filter kernel as described in the PhD thesis
+    "Inferring Galaxy Morphology Through Texture Analysis" (K. Au 2006).
+    The filter is a 1D LoG filter extended in 2D along an angle theta, such
+    that the filter response is strongest for that angle.
+
+    Parameters
+    ----------
+    theta : float
+        The angle in radians at which the filter is strongest.
+    radius: int, optional
+        The radius of the kernel in pixels. Default is 5 pixels.
+
+    Returns
+    -------
+    kernel : ImageArray
+        The filter kernel of size [2 * radius + 1, 2 * radius + 1]
+
+    Notes
+    -----
+    Adapted from the SpArcFiRe codebase [https://github.com/waynebhayes/SpArcFiRe].
+    """
     assert radius > 0, f"Radius must be positive but it is instead {radius}"
 
-    # Mesh size in cells
-    num_cells: int = int(2 * np.ceil(radius) + 1)
-    # sample [-pi, pi], in pixel middles
+    # Mesh size in pixels
+    num_pixels: int = int(2 * np.ceil(radius) + 1)
+    # Sample from pixel centres
     max_value: float = np.pi * 2 * radius / (2 * radius + 1)
-    # Not sure what cVal and rVals exactly corresponds to
+    # Sample from [-pi, pi] to create the filter
     x, y = np.meshgrid(
-        np.linspace(-max_value, max_value, num_cells),
-        np.linspace(-max_value, max_value, num_cells),
+        np.linspace(-max_value, max_value, num_pixels),
+        np.linspace(-max_value, max_value, num_pixels),
     )
     # Rotate by theta
-    rotated_x = x * np.cos(angle) - y * np.sin(angle)
-    rotated_y = x * np.sin(angle) + y * np.cos(angle)
+    rotated_x = x * np.cos(theta) - y * np.sin(theta)
+    rotated_y = x * np.sin(theta) + y * np.cos(theta)
     rotated_x_squared = np.square(rotated_x)
     rotated_y_squared = np.square(rotated_y)
     # Use Mexican hat wavelet as kernel
-    wavelet = (
-        (2 / np.sqrt(3))
-        * (np.pi ** (-1 / 4))
-        * (1 - rotated_x_squared)
-        * np.exp(-rotated_x_squared / 2)
-    )
+    wavelet = (1 - rotated_x_squared) * np.exp(-1 / 2 * rotated_x_squared)
 
     # Attenuate using a Gaussian function with sigma = max_value / 2
     sigma = max_value / 2
-    gaussian_window = (1 / np.sqrt(2 * np.pi * (sigma**2))) * np.exp(
-        (-1 / (2 * (sigma**2))) * rotated_y_squared
-    )
+    gaussian_window = np.exp((-1 / (2 * (sigma**2))) * rotated_y_squared)
 
     # Construct filter
-    filter_matrix = wavelet * gaussian_window
+    kernel = wavelet * gaussian_window
     # Normalise
-    filter_matrix /= np.sqrt(np.sum(np.square(filter_matrix)))
-    return filter_matrix
+    kernel /= np.sqrt(np.sum(np.square(kernel)))
+    return kernel
