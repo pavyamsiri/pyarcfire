@@ -25,8 +25,9 @@ def fit_spiral_to_image(
     image: ImageArray,
 ) -> LogSpiralFitResult:
     row_indices, column_indices = image.nonzero()
-    row_offset = image.shape[0] // 2
-    column_offset = image.shape[1] // 2
+    # Subpixel centering
+    row_offset = image.shape[0] / 2 + 0.5
+    column_offset = image.shape[1] / 2 + 0.5
     x = column_indices - column_offset
     y = row_indices - row_offset
     radii = np.sqrt(np.square(x) + np.square(y))
