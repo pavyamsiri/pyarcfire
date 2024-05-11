@@ -224,14 +224,11 @@ def generate_orientation_fields(
 
 def generate_single_orientation_field_level(
     image: ImageArray,
-    light_dark: int = 1,
 ) -> OrientationField:
     filtered_images = generate_orientation_filtered_images(image)
 
-    if light_dark > 0:
-        filtered_images[filtered_images < 0] = 0
-    elif light_dark < 0:
-        filtered_images[filtered_images > 0] = 0
+    # Clip negative values
+    filtered_images[filtered_images < 0] = 0
 
     energies = np.square(filtered_images, dtype=np.complex64)
     for idx in range(9):
