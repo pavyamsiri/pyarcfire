@@ -29,6 +29,13 @@ class OrientationField:
     """
 
     def __init__(self, field: ImageArray) -> None:
+        """Initiliases an orientation field from an array.
+
+        Parameters
+        ----------
+        field : ImageArray
+            The orientation field array. This is a 3D array of size MxNx2.
+        """
         assert (
             len(field.shape) == 3 and field.shape[2] == 2
         ), "OrientationFields are MxNx2 arrays."
@@ -40,15 +47,43 @@ class OrientationField:
 
     @staticmethod
     def from_cartesian(x: ImageArray, y: ImageArray) -> OrientationField:
+        """Creates an orientation field given the x and y components of the orientation field.
+
+        Parameters
+        ----------
+        x : ImageArray
+            The x-component of the orientation field.
+        y : ImageArray
+            The y-component of the orientation field.
+
+        Returns
+        -------
+        OrientationField
+            The orientation field.
+        """
         field: ImageArray = np.zeros((x.shape[0], x.shape[1], 2))
         field[:, :, 0] = x
         field[:, :, 1] = y
         return OrientationField(field)
 
     @staticmethod
-    def from_polar(magnitudes: ImageArray, angles: ImageArray) -> OrientationField:
-        x = magnitudes * np.cos(angles)
-        y = magnitudes * np.sin(angles)
+    def from_polar(strengths: ImageArray, directions: ImageArray) -> OrientationField:
+        """Creates an orientation field given orientation strengths and directions.
+
+        Parameters
+        ----------
+        strengths : ImageArray
+            A scalar array of orientation field strengths.
+        directions: ImageArray
+            A 2D vector array of orientation field directions.
+
+        Returns
+        -------
+        OrientationField
+            The orientation field.
+        """
+        x = strengths * np.cos(directions)
+        y = strengths * np.sin(directions)
         return OrientationField.from_cartesian(x, y)
 
     def __str__(self) -> str:
