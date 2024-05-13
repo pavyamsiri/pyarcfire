@@ -44,7 +44,6 @@ def fit_spiral_to_image(
         initial_offset = (lower_bound + upper_bound) / 2
         res = optimize.least_squares(
             calculate_log_spiral_error_from_pitch_angle,
-            jac=calculate_log_spiral_jacobian_from_pitch_angle,  # type:ignore
             x0=0,
             args=(radii, theta, weights, initial_offset),
         )
@@ -119,27 +118,6 @@ def calculate_log_spiral_error_from_pitch_angle(
         radii, theta, weights, offset, pitch_angle, initial_radius
     )
     return residuals
-
-
-def calculate_log_spiral_jacobian_from_pitch_angle(
-    pitch_angle: float,
-    radii: FloatArray1D,
-    theta: FloatArray1D,
-    weights: FloatArray1D,
-    offset: float,
-) -> FloatArray1D:
-    initial_radius = calculate_best_initial_radius(
-        radii, theta, weights, offset, pitch_angle
-    )
-    angles = (theta - offset) % (2 * np.pi)
-    # NOTE: Not sure where this comes from. The partial derivative would not have sqrt(weights)
-    # it would be -angles * log_spiral(...)
-    jac = -angles * log_spiral(theta, offset, pitch_angle, initial_radius)
-    from_matlab = True
-    if from_matlab:
-        jac *= -np.sqrt(weights)
-    jac = jac.reshape((len(jac), 1))
-    return jac
 
 
 def log_spiral[T: (float, FloatArray1D)](
