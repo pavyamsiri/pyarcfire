@@ -25,6 +25,17 @@ IMAGE_SIZE: int = 256
 
 def main(raw_args: Sequence[str]) -> None:
     args = _parse_args(raw_args)
+
+    match args.command:
+        case "image":
+            process_from_image(args)
+        case "cluster":
+            process_cluster(args)
+        case _ as command:
+            log.critical(f"Command {command} is unrecognised or not yet supported!")
+
+
+def process_from_image(args: argparse.Namespace) -> None:
     # Load image
     image = np.asarray(Image.open(args.input_path).convert("L"))
     image = transform.resize(image, (IMAGE_SIZE, IMAGE_SIZE))
@@ -58,6 +69,16 @@ def main(raw_args: Sequence[str]) -> None:
     num_rows = field.num_rows
     num_columns = field.num_columns
     log.debug(f"Cluster sizes = {cluster_sizes[:5]}")
+
+    if args.cluster_path is not None:
+        cluster_arrays = []
+        for cluster in clusters[: min(len(clusters), 5)]:
+            cluster_arrays.append(cluster.get_masked_image(image))
+        combined_array = np.dstack(cluster_arrays)
+        np.save(args.cluster_path, combined_array)
+        log.info(
+            f"Saved {combined_array.shape[2]} clusters to [magenta]{args.cluster_path}[/magenta]"
+        )
 
     fig = plt.figure()
     original_axis = fig.add_subplot(231)
@@ -100,11 +121,38 @@ def main(raw_args: Sequence[str]) -> None:
     plt.close()
 
 
+def process_cluster(args: argparse.Namespace) -> None:
+    log.debug(args.input_path)
+
+
 def _parse_args(args: Sequence[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         prog="pyarcfire",
         description="Python port of SpArcFiRe, a program that finds and reports spiral features in images.",
     )
+    subparsers = parser.add_subparsers(dest="command")
+    from_image_parser = subparsers.add_parser("image", help="Process an image.")
+    _configure_image_command_parser(from_image_parser)
+    from_cluster_parser = subparsers.add_parser(
+        "cluster", help="Process a cluster stored in as a data array."
+    )
+    __add_input_path_to_parser(from_cluster_parser)
+    return parser.parse_args(args)
+
+
+def _configure_image_command_parser(parser: argparse.ArgumentParser) -> None:
+    __add_input_path_to_parser(parser)
+    parser.add_argument(
+        "-co",
+        "--co",
+        type=str,
+        dest="cluster_path",
+        help="Path to output data array of clusters.",
+        required=False,
+    )
+
+
+def __add_input_path_to_parser(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "-i",
         "--i",
@@ -113,7 +161,6 @@ def _parse_args(args: Sequence[str]) -> argparse.Namespace:
         help="Path to the input image.",
         required=True,
     )
-    return parser.parse_args(args)
 
 
 if __name__ == "__main__":
