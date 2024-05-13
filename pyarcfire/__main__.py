@@ -42,6 +42,7 @@ def process_from_image(args: argparse.Namespace) -> None:
     # Load image
     image = np.asarray(Image.open(args.input_path).convert("L"))
     image = transform.resize(image, (IMAGE_SIZE, IMAGE_SIZE))
+    width: float = image.shape[0] / 2 + 0.5
 
     UNSHARP_MASK_RADIUS: float = 25
     UNSHARP_MASK_AMOUNT: float = 6
@@ -112,7 +113,18 @@ def process_from_image(args: argparse.Namespace) -> None:
         mask = cluster.get_mask(num_rows, num_columns)
         cluster_mask = np.zeros((contrast_image.shape[0], contrast_image.shape[1], 4))
         cluster_mask[mask, :] = color_map(idx / len(clusters))
-        cluster_axis.imshow(cluster_mask)
+        cluster_axis.imshow(cluster_mask, extent=(-width, width, -width, width))
+        spiral_fit = fit_spiral_to_image(cluster.get_masked_image(image))
+        start_angle = spiral_fit.offset
+        end_angle = start_angle + spiral_fit.arc_bounds[1]
+
+        theta = np.linspace(start_angle, end_angle, 100)
+        radii = log_spiral(
+            theta, spiral_fit.offset, spiral_fit.pitch_angle, spiral_fit.initial_radius
+        )
+        x = radii * np.cos(theta)
+        y = radii * np.sin(theta)
+        cluster_axis.plot(x, y)
 
     cluster_size_axis = fig.add_subplot(235)
     cluster_size_axis.set_title("Cluster size")
