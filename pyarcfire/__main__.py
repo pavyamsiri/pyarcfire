@@ -7,7 +7,6 @@ from typing import Sequence
 # External libraries
 import matplotlib as mpl
 from matplotlib import pyplot as plt
-from matplotlib import patches
 import numpy as np
 from PIL import Image
 import scipy.io
@@ -18,6 +17,7 @@ from .arc import fit_spiral_to_image, log_spiral
 from .cluster import generate_hac_tree
 from .log_utils import setup_logging
 from .similarity import generate_similarity_matrix
+from .merge import calculate_arc_merge_error
 from .orientation import generate_orientation_fields
 
 log = logging.getLogger(__name__)
@@ -143,9 +143,12 @@ def process_cluster(args: argparse.Namespace) -> None:
     log.debug(f"Loaded {num_clusters} clusters")
 
     first_cluster_array = arr[:, :, 0]
+    second_cluster_array = arr[:, :, 1]
     width = first_cluster_array.shape[0] / 2 + 0.5
     spiral_fit = fit_spiral_to_image(first_cluster_array)
+    merge_error = calculate_arc_merge_error(first_cluster_array, second_cluster_array)
     log.debug(f"Fitted parameters = {spiral_fit}")
+    log.debug(f"Merge error = {merge_error}")
     start_angle = spiral_fit.offset
     end_angle = start_angle + spiral_fit.arc_bounds[1]
 

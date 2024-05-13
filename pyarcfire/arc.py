@@ -57,11 +57,9 @@ def fit_spiral_to_image(
     )
     square_residuals = np.square(residuals)
     error = square_residuals.sum()
-    log.debug(f"SSE = {error}")
     # Rotate back
     theta = (theta + rotation_amount) % (2 * np.pi)
     initial_offset += rotation_amount
-    log.debug(f"phi = {initial_offset} (after rotation)")
     offset = initial_offset
     arc_size = 2 * np.pi - (upper_bound - lower_bound)
     arc_start = np.min(
@@ -74,15 +72,10 @@ def fit_spiral_to_image(
         )
         % (2 * np.pi)
     )
-    log.debug(f"Arc start = {arc_start}")
-    log.debug(f"Arc size = {arc_size}")
     arc_bounds = (float(arc_start), float(arc_start) + arc_size)
 
     # ZERO THETA START
-    old_theta = theta
     theta = (theta - initial_offset) % (2 * np.pi) + initial_offset
-    log.debug(f"theta[0] = {old_theta[0]} -> {theta[0]}")
-    log.debug(f"Did theta change? {not np.all(np.isclose(theta, old_theta))}")
     offset_shift = arc_start
     new_offset = initial_offset + offset_shift
     theta += new_offset - np.min(theta)
@@ -99,7 +92,9 @@ def fit_spiral_to_image(
     )
     new_error = np.sum(np.square(residuals))
     square_err_difference_per_pixel = abs(new_error - error) / len(theta)
-    assert np.isclose(square_err_difference_per_pixel, 0), f"Inconsistent fit when eliminating theta offset; difference = {square_err_difference_per_pixel}"
+    assert np.isclose(
+        square_err_difference_per_pixel, 0
+    ), f"Inconsistent fit when eliminating theta offset; difference = {square_err_difference_per_pixel}"
 
     result = LogSpiralFitResult(
         offset=offset,
