@@ -24,10 +24,12 @@ def calculate_arc_merge_error(
     first_cluster_array *= total_sum / first_sum
     second_cluster_array *= total_sum / second_sum
 
+    # Fit spirals to each cluster individually
     first_fit = fit_spiral_to_image(first_cluster_array)
     second_fit = fit_spiral_to_image(second_cluster_array)
 
     combined_cluster_array = first_cluster_array + second_cluster_array
+    # Fit a spiral to both clusters at the same time
     first_merged_fit = fit_spiral_to_image(
         combined_cluster_array, initial_pitch_angle=first_fit.pitch_angle
     )
@@ -40,14 +42,18 @@ def calculate_arc_merge_error(
         merged_fit = second_merged_fit
 
     first_cluster_indices = (first_cluster_array > 0)[combined_cluster_array > 0]
+    # Get the error of the merged spiral for each individual cluster
     first_cluster_errors = merged_fit.errors[first_cluster_indices].sum()
     second_cluster_errors = merged_fit.errors[~first_cluster_indices].sum()
 
+    # Readjust errors from normalised cluster arrays
     first_cluster_error_weighted = first_fit.total_error / first_sum
     second_cluster_error_weighted = second_fit.total_error / second_sum
 
+    # Calculate the arc merge error ratio for each cluster
     ratios = (
         ((first_cluster_errors / first_sum) / first_cluster_error_weighted),
         ((second_cluster_errors / second_sum) / second_cluster_error_weighted),
     )
+    # Return the worst error ratio
     return max(ratios)
