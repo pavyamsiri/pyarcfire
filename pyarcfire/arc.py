@@ -49,7 +49,7 @@ def fit_spiral_to_image(
             args=(radii, theta, weights, initial_offset),
         )
         assert res.success, "Failed to fit pitch angle"
-        pitch_angle = res.x
+        pitch_angle = res.x[0]
     initial_radius = calculate_best_initial_radius(
         radii, theta, weights, initial_offset, pitch_angle
     )
