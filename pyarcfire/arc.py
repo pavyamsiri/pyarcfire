@@ -57,9 +57,11 @@ def fit_spiral_to_image(
     )
     square_residuals = np.square(residuals)
     error = square_residuals.sum()
+    log.debug(f"SSE = {error}")
     # Rotate back
     theta = (theta + rotation_amount) % (2 * np.pi)
     initial_offset += rotation_amount
+    log.debug(f"phi = {initial_offset} (after rotation)")
     offset = initial_offset
     arc_size = 2 * np.pi - (upper_bound - lower_bound)
     arc_start = np.min(
@@ -72,33 +74,39 @@ def fit_spiral_to_image(
         )
         % (2 * np.pi)
     )
+    log.debug(f"Arc start = {arc_start}")
+    log.debug(f"Arc size = {arc_size}")
     arc_bounds = (float(arc_start), float(arc_start) + arc_size)
+
+    # ZERO THETA START
+    old_theta = theta
     theta = (theta - initial_offset) % (2 * np.pi) + initial_offset
-    offset_shift = arc_bounds[0]
+    log.debug(f"theta[0] = {old_theta[0]} -> {theta[0]}")
+    log.debug(f"Did theta change? {not np.all(np.isclose(theta, old_theta))}")
+    offset_shift = arc_start
     new_offset = initial_offset + offset_shift
-    theta = theta + new_offset - np.min(theta)
+    theta += new_offset - np.min(theta)
     initial_radius = calculate_best_initial_radius(
         radii, theta, weights, new_offset, pitch_angle
     )
     offset = new_offset
     arc_bounds = (
-        arc_bounds[0] - offset_shift + offset,
-        arc_bounds[1] - offset_shift + offset,
+        arc_bounds[0] - arc_start,
+        arc_bounds[1] - arc_start,
     )
     residuals = calculate_log_spiral_residual_vector(
         radii, theta, weights, offset, pitch_angle, initial_radius
     )
-    error = np.sum(np.square(residuals))
-
-    error_diagnostic = np.abs(np.sum(residuals) - error) / len(residuals)
-    # assert error_diagnostic < 1e-4, "Total error is too high!"
+    new_error = np.sum(np.square(residuals))
+    square_err_difference_per_pixel = abs(new_error - error) / len(theta)
+    assert np.isclose(square_err_difference_per_pixel, 0), f"Inconsistent fit when eliminating theta offset; difference = {square_err_difference_per_pixel}"
 
     result = LogSpiralFitResult(
         offset=offset,
         pitch_angle=pitch_angle,
         initial_radius=initial_radius,
         arc_bounds=arc_bounds,
-        error=error,
+        error=new_error,
     )
 
     return result
@@ -136,10 +144,8 @@ def calculate_log_spiral_residual_vector(
     pitch_angle: float,
     initial_radius: float,
 ) -> FloatArray1D:
-    result = (
-        np.sqrt(weights)
-        * (radii - log_spiral(theta, offset, pitch_angle, initial_radius))
-        / weights.sum()
+    result = np.sqrt(weights) * (
+        radii - log_spiral(theta, offset, pitch_angle, initial_radius)
     )
     return result
 

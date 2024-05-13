@@ -146,8 +146,10 @@ def process_cluster(args: argparse.Namespace) -> None:
     width = first_cluster_array.shape[0] / 2 + 0.5
     spiral_fit = fit_spiral_to_image(first_cluster_array)
     log.debug(f"Fitted parameters = {spiral_fit}")
+    start_angle = spiral_fit.offset
+    end_angle = start_angle + spiral_fit.arc_bounds[1]
 
-    theta = np.linspace(0, 2 * np.pi, 100)
+    theta = np.linspace(start_angle, end_angle, 100)
     radii = log_spiral(
         theta, spiral_fit.offset, spiral_fit.pitch_angle, spiral_fit.initial_radius
     )
