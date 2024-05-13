@@ -29,7 +29,7 @@ def fit_spiral_to_image(
     row_offset = image.shape[0] / 2 + 0.5
     column_offset = image.shape[1] / 2 + 0.5
     x = column_indices - column_offset
-    y = row_indices - row_offset
+    y = -(row_indices - row_offset)
     radii = np.sqrt(np.square(x) + np.square(y))
     theta = (np.arctan2(y, x) + 2 * np.pi) % (2 * np.pi)
     weights = image[row_indices, column_indices]
