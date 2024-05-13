@@ -7,6 +7,7 @@ from typing import Sequence
 # External libraries
 import matplotlib as mpl
 from matplotlib import pyplot as plt
+from matplotlib import patches
 import numpy as np
 from PIL import Image
 import scipy.io
@@ -142,7 +143,25 @@ def process_cluster(args: argparse.Namespace) -> None:
     log.debug(f"Loaded {num_clusters} clusters")
 
     first_cluster_array = arr[:, :, 0]
-    fit_spiral_to_image(first_cluster_array)
+    width = first_cluster_array.shape[0] / 2 + 0.5
+    spiral_fit = fit_spiral_to_image(first_cluster_array)
+
+    theta = np.linspace(0, 2 * np.pi, 100)
+    radii = log_spiral(
+        theta, spiral_fit.offset, spiral_fit.pitch_angle, spiral_fit.initial_radius
+    )
+    x = radii * np.cos(theta)
+    y = radii * np.sin(theta)
+
+    fig = plt.figure()
+    axis = fig.add_subplot(111)
+    axis.imshow(first_cluster_array, extent=(-width, width, -width, width))
+    axis.plot(x, y)
+    axis.set_xlim(-width, width)
+    axis.set_ylim(-width, width)
+
+    plt.show()
+    plt.close()
 
 
 def _parse_args(args: Sequence[str]) -> argparse.Namespace:
