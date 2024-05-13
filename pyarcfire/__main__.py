@@ -1,6 +1,7 @@
 # Standard libraries
 import argparse
 import logging
+import os
 from typing import Sequence
 
 # External libraries
@@ -8,6 +9,7 @@ import matplotlib as mpl
 from matplotlib import pyplot as plt
 import numpy as np
 from PIL import Image
+import scipy.io
 from skimage import filters, transform
 
 # Internal libraries
@@ -122,7 +124,25 @@ def process_from_image(args: argparse.Namespace) -> None:
 
 
 def process_cluster(args: argparse.Namespace) -> None:
-    log.debug(args.input_path)
+    input_path: str = args.input_path
+    _, ext = os.path.splitext(input_path)
+    match ext.lstrip("."):
+        case "npy":
+            log.info("Loading npy...")
+            arr = np.load(input_path)
+        case "mat":
+            log.info("Loading mat...")
+            data = scipy.io.loadmat(input_path)
+            arr = data["image"]
+            arr = arr.reshape((arr.shape[0], arr.shape[1], 1))
+        case _:
+            log.critical(f"The {ext} data format is not valid or is not yet supported!")
+            return
+    num_clusters = arr.shape[2]
+    log.debug(f"Loaded {num_clusters} clusters")
+
+    first_cluster_array = arr[:, :, 0]
+    fit_spiral_to_image(first_cluster_array)
 
 
 def _parse_args(args: Sequence[str]) -> argparse.Namespace:
