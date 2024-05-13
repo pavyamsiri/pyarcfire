@@ -18,11 +18,13 @@ class LogSpiralFitResult:
     pitch_angle: float
     initial_radius: float
     arc_bounds: tuple[float, float]
-    error: float
+    total_error: float
+    errors: FloatArray1D
 
 
 def fit_spiral_to_image(
     image: ImageArray,
+    initial_pitch_angle: float = 0,
 ) -> LogSpiralFitResult:
     row_indices, column_indices = image.nonzero()
     # Subpixel centering
@@ -101,7 +103,8 @@ def fit_spiral_to_image(
         pitch_angle=pitch_angle,
         initial_radius=initial_radius,
         arc_bounds=arc_bounds,
-        error=new_error,
+        total_error=new_error,
+        errors=np.square(residuals),
     )
 
     return result

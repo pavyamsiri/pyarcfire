@@ -1,6 +1,8 @@
 # Standard libraries
 import logging
 
+# External libraries
+import numpy as np
 
 # Internal libraries
 from .arc import fit_spiral_to_image
@@ -13,8 +15,6 @@ log = logging.getLogger(__name__)
 def calculate_arc_merge_error(
     first_cluster_array: ImageArray, second_cluster_array: ImageArray
 ) -> float:
-    first_fit = fit_spiral_to_image(first_cluster_array)
-    second_fit = fit_spiral_to_image(second_cluster_array)
     first_sum = first_cluster_array.sum()
     second_sum = second_cluster_array.sum()
     assert first_sum > 0
@@ -23,9 +23,31 @@ def calculate_arc_merge_error(
     # Adjust weights
     first_cluster_array *= total_sum / first_sum
     second_cluster_array *= total_sum / second_sum
-    combined_cluster_array = first_cluster_array + second_cluster_array
-    merged_fit = fit_spiral_to_image(combined_cluster_array)
 
-    first_merge_error = merged_fit.error / first_fit.error
-    second_merge_error = merged_fit.error / second_fit.error
-    return max(first_merge_error, second_merge_error)
+    first_fit = fit_spiral_to_image(first_cluster_array)
+    second_fit = fit_spiral_to_image(second_cluster_array)
+
+    combined_cluster_array = first_cluster_array + second_cluster_array
+    first_merged_fit = fit_spiral_to_image(
+        combined_cluster_array, initial_pitch_angle=first_fit.pitch_angle
+    )
+    second_merged_fit = fit_spiral_to_image(
+        combined_cluster_array, initial_pitch_angle=second_fit.pitch_angle
+    )
+    if first_merged_fit.total_error <= second_merged_fit.total_error:
+        merged_fit = first_merged_fit
+    else:
+        merged_fit = second_merged_fit
+
+    first_cluster_indices = (first_cluster_array > 0)[combined_cluster_array > 0]
+    first_cluster_errors = merged_fit.errors[first_cluster_indices].sum()
+    second_cluster_errors = merged_fit.errors[~first_cluster_indices].sum()
+
+    first_cluster_error_weighted = first_fit.total_error / first_sum
+    second_cluster_error_weighted = second_fit.total_error / second_sum
+
+    ratios = (
+        ((first_cluster_errors / first_sum) / first_cluster_error_weighted),
+        ((second_cluster_errors / second_sum) / second_cluster_error_weighted),
+    )
+    return max(ratios)
