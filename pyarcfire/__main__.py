@@ -14,10 +14,11 @@ from skimage import filters, transform
 
 # Internal libraries
 from .arc import fit_spiral_to_image, log_spiral
-from .cluster import generate_hac_tree
+from .cluster import Cluster, generate_hac_tree
 from .log_utils import setup_logging
 from .similarity import generate_similarity_matrix
 from .merge import calculate_arc_merge_error
+from .merge_fit import merge_clusters_by_fit
 from .orientation import generate_orientation_fields
 
 log = logging.getLogger(__name__)
@@ -68,21 +69,32 @@ def process_from_image(args: argparse.Namespace) -> None:
     matrix = generate_similarity_matrix(field, stop_threshold)
     clusters = generate_hac_tree(matrix.tocsr(), contrast_image, field, stop_threshold)  # type:ignore
     clusters = sorted(clusters, key=lambda x: x.size, reverse=True)
-    cluster_sizes = np.array([cluster.size for cluster in clusters])
+    cluster_sizes = np.array(
+        [cluster.size for cluster in clusters if cluster.size > 150]
+    )
     cluster_bins = np.logspace(0, np.log10(max(cluster_sizes)), 10)
-    num_rows = field.num_rows
-    num_columns = field.num_columns
-    log.debug(f"Cluster sizes = {cluster_sizes[:5]}")
+    log.debug(f"Cluster sizes = {cluster_sizes}")
+
+    cluster_arrays = Cluster.list_to_array(
+        [cluster for cluster in clusters if cluster.size > 150], image
+    )
+    cluster_arrays = merge_clusters_by_fit(cluster_arrays)
 
     if args.cluster_path is not None:
-        cluster_arrays = []
-        for cluster in clusters[: min(len(clusters), 5)]:
-            cluster_arrays.append(cluster.get_masked_image(image))
-        combined_array = np.dstack(cluster_arrays)
-        np.save(args.cluster_path, combined_array)
-        log.info(
-            f"Saved {combined_array.shape[2]} clusters to [magenta]{args.cluster_path}[/magenta]"
-        )
+        extension = os.path.splitext(args.cluster_path)[1].lstrip(".")
+        match extension:
+            case "npy":
+                np.save(args.cluster_path, cluster_arrays)
+                log.info(
+                    f"Saved {cluster_arrays.shape[2]} clusters to [magenta]{args.cluster_path}[/magenta]"
+                )
+            case "mat":
+                scipy.io.savemat(args.cluster_path, {"image": cluster_arrays})
+                log.info(
+                    f"Saved {cluster_arrays.shape[2]} clusters to [magenta]{args.cluster_path}[/magenta]"
+                )
+            case _:
+                log.warn("Unsupported file extension for cluster data!")
 
     fig = plt.figure()
     original_axis = fig.add_subplot(231)
@@ -107,23 +119,16 @@ def process_from_image(args: argparse.Namespace) -> None:
 
     cluster_axis = fig.add_subplot(234)
     cluster_axis.set_title("Clusters")
-    clusters = [cluster for cluster in clusters if cluster.size >= 150]
     color_map = mpl.colormaps["hsv"]
-    for idx, cluster in enumerate(clusters):
-        mask = cluster.get_mask(num_rows, num_columns)
-        cluster_mask = np.zeros((contrast_image.shape[0], contrast_image.shape[1], 4))
-        cluster_mask[mask, :] = color_map(idx / len(clusters))
+    num_clusters: int = cluster_arrays.shape[2]
+    for cluster_idx in range(num_clusters):
+        current_array = cluster_arrays[:, :, cluster_idx]
+        mask = current_array > 0
+        cluster_mask = np.zeros((current_array.shape[0], current_array.shape[1], 4))
+        cluster_mask[mask, :] = color_map(cluster_idx / num_clusters)
         cluster_axis.imshow(cluster_mask, extent=(-width, width, -width, width))
-        spiral_fit = fit_spiral_to_image(cluster.get_masked_image(image))
-        start_angle = spiral_fit.offset
-        end_angle = start_angle + spiral_fit.arc_bounds[1]
-
-        theta = np.linspace(start_angle, end_angle, 100)
-        radii = log_spiral(
-            theta, spiral_fit.offset, spiral_fit.pitch_angle, spiral_fit.initial_radius
-        )
-        x = radii * np.cos(theta)
-        y = radii * np.sin(theta)
+        spiral_fit = fit_spiral_to_image(current_array)
+        x, y = spiral_fit.calculate_cartesian_coordinates(100)
         cluster_axis.plot(x, y)
 
     cluster_size_axis = fig.add_subplot(235)
@@ -156,27 +161,28 @@ def process_cluster(args: argparse.Namespace) -> None:
     num_clusters = arr.shape[2]
     log.debug(f"Loaded {num_clusters} clusters")
 
-    first_cluster_array = arr[:, :, 0]
-    second_cluster_array = arr[:, :, 1]
-    width = first_cluster_array.shape[0] / 2 + 0.5
-    spiral_fit = fit_spiral_to_image(first_cluster_array)
-    merge_error = calculate_arc_merge_error(first_cluster_array, second_cluster_array)
-    log.debug(f"Fitted parameters = {spiral_fit}")
-    log.debug(f"Merge error = {merge_error}")
-    start_angle = spiral_fit.offset
-    end_angle = start_angle + spiral_fit.arc_bounds[1]
-
-    theta = np.linspace(start_angle, end_angle, 100)
-    radii = log_spiral(
-        theta, spiral_fit.offset, spiral_fit.pitch_angle, spiral_fit.initial_radius
-    )
-    x = radii * np.cos(theta)
-    y = radii * np.sin(theta)
+    width = arr.shape[0] / 2 + 0.5
+    cluster_arrays = merge_clusters_by_fit(arr)
 
     fig = plt.figure()
     axis = fig.add_subplot(111)
-    axis.imshow(first_cluster_array, extent=(-width, width, -width, width))
-    axis.plot(x, y)
+    color_map = mpl.colormaps["hsv"]
+    num_clusters: int = cluster_arrays.shape[2]
+    for cluster_idx in range(num_clusters):
+        current_array = arr[:, :, cluster_idx]
+        mask = current_array > 0
+        cluster_mask = np.zeros((current_array.shape[0], current_array.shape[1], 4))
+        cluster_mask[mask, :] = color_map((cluster_idx + 0.5) / num_clusters)
+        axis.imshow(cluster_mask, extent=(-width, width, -width, width))
+        spiral_fit = fit_spiral_to_image(current_array)
+        x, y = spiral_fit.calculate_cartesian_coordinates(100)
+        axis.plot(
+            x,
+            y,
+            color=color_map((num_clusters - cluster_idx + 0.5) / num_clusters),
+            label=f"Cluster {cluster_idx}",
+        )
+    axis.legend()
     axis.set_xlim(-width, width)
     axis.set_ylim(-width, width)
 

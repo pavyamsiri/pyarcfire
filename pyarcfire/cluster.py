@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 # Standard libraries
-from dataclasses import dataclass
 import logging
 from typing import Sequence
 
@@ -11,7 +10,7 @@ from numpy import typing as npt
 from scipy import sparse
 
 # Internal libraries
-from .definitions import ImageArray
+from .definitions import ImageArray, ImageArraySequence
 from .merge import calculate_arc_merge_error
 from .orientation import OrientationField
 
@@ -31,6 +30,26 @@ class Cluster:
 
     def __repr__(self) -> str:
         return str(self)
+
+    @staticmethod
+    def from_2d_array(array: ImageArray) -> Cluster:
+        (points,) = np.nonzero(array.flatten())
+        return Cluster(list(points.astype(int)))
+
+    @staticmethod
+    def from_3d_array(array: ImageArraySequence) -> Sequence[Cluster]:
+        num_clusters: int = array.shape[2]
+        clusters = []
+        for cluster_idx in range(num_clusters):
+            clusters.append(Cluster.from_2d_array(array[:, :, cluster_idx]))
+        return clusters
+
+    @staticmethod
+    def list_to_array(
+        clusters: Sequence[Cluster], image: ImageArray
+    ) -> ImageArraySequence:
+        array_list = [cluster.get_masked_image(image) for cluster in clusters]
+        return np.dstack(array_list)
 
     @staticmethod
     def combine(first: Cluster, second: Cluster) -> Cluster:

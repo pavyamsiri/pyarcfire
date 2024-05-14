@@ -2,7 +2,6 @@
 import logging
 
 # External libraries
-import numpy as np
 
 # Internal libraries
 from .arc import fit_spiral_to_image
