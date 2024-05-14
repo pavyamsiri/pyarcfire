@@ -147,7 +147,9 @@ def process_cluster(args: argparse.Namespace) -> None:
             log.info("Loading mat...")
             data = scipy.io.loadmat(input_path)
             arr = data["image"]
-            arr = arr.reshape((arr.shape[0], arr.shape[1], 1))
+            if len(arr.shape) == 2:
+                arr = arr.reshape((arr.shape[0], arr.shape[1], 1))
+            assert len(arr.shape) == 3
         case _:
             log.critical(f"The {ext} data format is not valid or is not yet supported!")
             return
