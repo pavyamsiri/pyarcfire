@@ -150,11 +150,7 @@ def generate_hac_tree(
             merge_error = calculate_arc_merge_error(
                 first_cluster_array, second_cluster_array
             )
-            log.debug(
-                f"Merging cluster {first_cluster} and {second_cluster} has merge error of {merge_error}"
-            )
             if merge_error > error_ratio_threshold:
-                log.debug("Abort cluster merge!")
                 merge_stop_count += 1
                 similarity_matrix[first_idx, second_idx] = 0
                 similarity_matrix[second_idx, first_idx] = 0
