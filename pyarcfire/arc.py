@@ -46,7 +46,7 @@ def fit_spiral_to_image(
         initial_offset = (lower_bound + upper_bound) / 2
         res = optimize.least_squares(
             calculate_log_spiral_error_from_pitch_angle,
-            x0=0,
+            x0=initial_pitch_angle,
             args=(radii, theta, weights, initial_offset),
         )
         assert res.success, "Failed to fit pitch angle"
