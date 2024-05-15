@@ -12,7 +12,6 @@ from scipy import sparse
 # Internal libraries
 from .definitions import ImageArray, ImageArraySequence
 from .merge import calculate_arc_merge_error
-from .orientation import OrientationField
 
 log = logging.getLogger(__name__)
 
