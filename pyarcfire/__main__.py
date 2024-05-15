@@ -12,12 +12,12 @@ from PIL import Image
 import scipy.io
 from skimage import transform
 
-from pyarcfire.spiral import detect_spirals_in_image
 
 # Internal libraries
-from .arc import fit_spiral_to_image
+from .arc import fit_spiral_to_image, identify_inner_and_outer_spiral
 from .log_utils import setup_logging
 from .merge_fit import merge_clusters_by_fit
+from .spiral import detect_spirals_in_image
 
 log = logging.getLogger(__name__)
 
@@ -130,6 +130,9 @@ def process_cluster(args: argparse.Namespace) -> None:
             return
     num_clusters = arr.shape[2]
     log.debug(f"Loaded {num_clusters} clusters")
+
+    log.debug(f"Total sum = {arr[:, :, 0].sum()}")
+    res = identify_inner_and_outer_spiral(arr[:, :, 0])
 
     width = arr.shape[0] / 2 + 0.5
     cluster_arrays = merge_clusters_by_fit(arr)

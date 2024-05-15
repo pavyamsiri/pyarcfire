@@ -1,11 +1,15 @@
 # Standard libraries
 from dataclasses import dataclass
+import functools
 import logging
+from typing import Sequence
 
 # External libraries
 import numpy as np
+from numpy import typing as npt
 from scipy import optimize
 from scipy import ndimage
+from skimage import transform
 
 # Internal libraries
 from .definitions import FloatArray1D, ImageArray
@@ -61,6 +65,7 @@ def fit_spiral_to_image(
     else:
         need_multiple_revolutions = True
         log.debug("IMPLEMENT idInnerOuterSpiral")
+        identify_inner_and_outer_spiral(image)
         # [isInner, gapFail] = idInnerOuterSpiral(img, ctrR, ctrC, plotFlag);
         # nInner = sum(isInner);
         # failed2rev = gapFail;
@@ -284,4 +289,90 @@ def cluster_has_no_endpoints_or_contains_origin(
         ndimage.binary_closing(in_cluster, structure=structure_element)
     )
     assert is_hole_or_cluster is not None
+    # NOTE: Check if is_hole_or_cluster is not already a binary array
     return is_hole_or_cluster[central_row, central_column] > 0
+
+
+def identify_inner_and_outer_spiral(image: ImageArray) -> None:
+    num_radii = int(np.ceil(max((image.shape[0], image.shape[1])) / 2))
+    num_theta: int = 360
+    log.debug(
+        f"Number of radial points = {num_radii} and number of theta points = {num_theta}"
+    )
+    theta_bin_values = np.arange(1, num_theta) * 2 * np.pi / num_theta
+
+    min_acceptable_length = 5 * np.ceil(num_theta / 360)
+    log.debug(f"Minimum acceptable length {min_acceptable_length}")
+    polar_image = np.flip(
+        image_transform_from_cartesian_to_polar(image, num_radii, num_theta), axis=1
+    )
+    polar_image = np.nan_to_num(polar_image, nan=0)
+
+    dilated_polar_image = ndimage.binary_dilation(
+        polar_image, structure=np.ones((3, 3))
+    )
+
+    # Pad columns with zeros
+    theta_diff = np.diff(dilated_polar_image, prepend=0, append=0, axis=0)
+    # Theta bins which only have a single start and end point
+    # i.e. ray from centre only hits the cluster once and not multiple times
+    can_be_single_revolution = np.logical_and(
+        np.sum(theta_diff == -1, axis=0) == 1,
+        np.sum(theta_diff == 1, axis=0) == 1,
+    )
+    # Radial index for every point in the polar image
+    radial_locations = np.tile(np.arange(1, num_radii + 1), (num_theta, 1)).T
+
+    polar_image_for_min = dilated_polar_image.astype(np.float32)
+    polar_image_for_min[polar_image_for_min == 0] = np.inf
+    min_locations = np.min(polar_image_for_min * radial_locations, axis=0)
+    min_locations[np.isinf(min_locations)] = 0
+    max_locations = np.max(
+        dilated_polar_image.astype(np.float32) * radial_locations, axis=0
+    )
+    neighbour_max_location_left = np.roll(max_locations, 1)
+    neighbour_max_location_right = np.roll(max_locations, -1)
+    neighbour_min_location_left = np.roll(min_locations, 1)
+    neighbour_min_location_right = np.roll(min_locations, -1)
+    conditions: Sequence[npt.NDArray[np.bool_]] = (
+        can_be_single_revolution,
+        np.logical_or(
+            min_locations <= neighbour_max_location_left,
+            neighbour_max_location_left == 0,
+        ),
+        np.logical_or(
+            min_locations <= neighbour_max_location_right,
+            neighbour_max_location_right == 0,
+        ),
+        np.logical_or(
+            max_locations >= neighbour_min_location_left,
+            neighbour_min_location_left == 0,
+        ),
+        np.logical_or(
+            max_locations >= neighbour_min_location_right,
+            neighbour_min_location_right == 0,
+        ),
+    )
+    can_be_single_revolution = functools.reduce(
+        lambda x, y: np.logical_and(x, y), conditions
+    )
+
+
+def image_transform_from_cartesian_to_polar(
+    image: ImageArray, num_radii: int, num_theta: int
+) -> ImageArray:
+    centre_x = image.shape[1] / 2 + 0.5
+    centre_y = image.shape[0] / 2 + 0.5 - 1
+
+    # Calculate maximum radius value
+    row_indices, column_indices = image.nonzero()
+    dx = max(centre_x, (column_indices - centre_x).max())
+    dy = max(centre_y, (row_indices - centre_y).max())
+    max_radius = np.sqrt(dx**2 + dy**2)
+
+    return transform.warp_polar(
+        image,
+        center=(centre_x, centre_y),
+        radius=max_radius,
+        output_shape=(num_theta, num_radii),
+    ).T
