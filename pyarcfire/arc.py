@@ -91,15 +91,15 @@ def fit_spiral_to_image(
     # ZERO THETA START
     theta = (theta - initial_offset) % (2 * np.pi) + initial_offset
     offset_shift = arc_start
-    new_offset = initial_offset + offset_shift
+    new_offset = float(initial_offset + offset_shift)
     theta += new_offset - np.min(theta)
     initial_radius = calculate_best_initial_radius(
         radii, theta, weights, new_offset, pitch_angle
     )
     offset = new_offset
     arc_bounds = (
-        arc_bounds[0] - arc_start,
-        arc_bounds[1] - arc_start,
+        float(arc_bounds[0] - arc_start),
+        float(arc_bounds[1] - arc_start),
     )
     residuals = calculate_log_spiral_residual_vector(
         radii, theta, weights, offset, pitch_angle, initial_radius

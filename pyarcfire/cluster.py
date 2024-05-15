@@ -89,53 +89,36 @@ class Cluster:
         return mask
 
 
-# def find_clusters(
-#     orientation: OrientationField, similarity_cutoff: float = -np.inf
-# ) -> None:
-#     useMex = stgs.useMex
-#     stopThres = stgs.stopThres
-#     colorThres = stgs.clusSizeCutoff
-#
-#     simls = generate_similarity_matrix(orientation, similarity_cutoff)
-#     clusters = generate_hac_tree(simls, img, barInfo, stgs)
-#     return clusters
-
-
 def generate_hac_tree(
-    similarity_matrix: sparse.csr_matrix,
+    similarity_matrix: sparse.csr_matrix | sparse.csc_matrix,
     image: ImageArray,
-    orientation: OrientationField,
     stop_threshold: float,
     error_ratio_threshold: float = 2.5,
     merge_check_minimum_cluster_size: int = 25,
+    minimum_cluster_size: int = 150,
 ) -> Sequence[Cluster]:
-    # Performs HAC clustering and returns the resulting dendogram
-    # INPUTS:
-    #   simlMtx: the similarity matrix to use for clustering
-    #   img: the image used to generate the similarity matrix
-    #   barInfo:
-    #   ctrR:
-    #   ctrC:
-    #   stgs: structure containing algorithm settings (see settings.m)
-    #   tracePts: optional parameter specifying points (similarity values) at
-    #       which the current clustering state should be saved as a frame in an
-    #       AVI video file (default: empty; no AVI file)
-    #   aviName: (optional) name of the AVI file, if such a file is to be saved
-    #   colorThres: minimum size for clusters to get their own color (if an AVI
-    #       is to be saved)
-    # OUTPUTS:
-    #   clusters: HAC dendogram, given as a structure array of root nodes for
-    #       each of the cluster trees.  Each node contains indices of the two
-    #       merged clusters, the similarity value between these clusters, and
-    #       all points from these clusters
+    """Performs single linkage clustering.
 
-    # NOTE: Not sure what this means yet
-    failed_to_revert = False
+    Parameters
+    ----------
+    similarity_matrix : sparse.csr_matrix | sparse.csc_matrix
+        The similarity matrix representing pixel similarities in the image.
+    image : ImageArray
+        The image.
+    stop_threshold : float
+        The minimum similarity value where cluster merging can happen.
+    # TODO: Make these parameters explicit
+    error_ratio_threshold : float, optional
+        The maximum merge error ratio allowed for a cluster merge to happen.
+    merge_check_minimum_cluster_size : float, optional
+        The minimum size for each cluster when performing a merge check.
 
-    num_rows: int = orientation.num_rows
-    num_columns: int = orientation.num_columns
-
-    # delete self-similarities
+    Returns
+    -------
+    Sequence[Cluster]
+        The resultant clusters after single linkage clustering.
+    """
+    # Delete self-similarities
     similarity_matrix.setdiag(0)
     similarity_matrix.eliminate_zeros()
 
@@ -186,14 +169,18 @@ def generate_hac_tree(
             similarity_matrix, second_idx
         )
 
+    clusters = list(clusters.values())
+    clusters = [cluster for cluster in clusters if cluster.size >= minimum_cluster_size]
     log.debug(f"Number of clusters = {len(clusters)}")
     log.debug(f"Checked {check_arc_merge_count} possible cluster arc merges")
     log.debug(f"Stopped {merge_stop_count} arc merges")
-    return list(clusters.values())
+    return clusters
 
 
 def _update_similarity_matrix(
-    similarity_matrix: sparse.csr_matrix, target_idx: int, source_idx: int
+    similarity_matrix: sparse.csr_matrix | sparse.csc_matrix,
+    target_idx: int,
+    source_idx: int,
 ) -> sparse.csr_matrix:
     # Merged cluster similarity is the maximum possible similarity from the set of cluster points
     old_similarity_values = similarity_matrix[target_idx, :]
@@ -250,7 +237,7 @@ def _update_similarity_matrix(
 
 
 def _clear_similarity_matrix_row_column(
-    similarity_matrix: sparse.csr_matrix, clear_idx: int
+    similarity_matrix: sparse.csr_matrix | sparse.csc_matrix, clear_idx: int
 ) -> sparse.csr_matrix:
     values = np.asarray(
         similarity_matrix.getrow(clear_idx)[
