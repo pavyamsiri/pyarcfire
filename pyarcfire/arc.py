@@ -5,6 +5,7 @@ import logging
 # External libraries
 import numpy as np
 from scipy import optimize
+from scipy import ndimage
 
 # Internal libraries
 from .definitions import FloatArray1D, ImageArray
@@ -48,9 +49,35 @@ def fit_spiral_to_image(
     theta = (np.arctan2(y, x) + 2 * np.pi) % (2 * np.pi)
     weights = image[row_indices, column_indices]
 
-    (lower_bound, upper_bound), rotation_amount, max_gap_size = _calculate_bounds(theta)
+    # Check if the cluster revolves more than once
+    bad_bounds, _, _, _ = _calculate_bounds(theta)
+
+    # Gap in theta is large enough to not need multiple revolutions
+    if not bad_bounds:
+        need_multiple_revolutions = False
+    # The cluster contains the origin or is closed around centre
+    elif cluster_has_no_endpoints_or_contains_origin(image):
+        need_multiple_revolutions = False
+    else:
+        need_multiple_revolutions = True
+        log.debug("IMPLEMENT idInnerOuterSpiral")
+        # [isInner, gapFail] = idInnerOuterSpiral(img, ctrR, ctrC, plotFlag);
+        # nInner = sum(isInner);
+        # failed2rev = gapFail;
+        # if gapFail || (nInner == 0) || (nInner == numel(isInner))
+        #     allowArcBeyond2pi = false;
+        # else
+        #     thAdj = removeThetaDiscontFor2rev(theta, img, isInner);
+        #     # TODO: make theta and thAdj one variable after making sure that
+        #     # bounds calculation doesn"t need a different (unaltered) value
+        #     theta = thAdj;
+    log.debug(f"Need multiple revolutions = {need_multiple_revolutions}")
+
+    bad_bounds, (lower_bound, upper_bound), rotation_amount, max_gap_size = (
+        _calculate_bounds(theta)
+    )
     theta = (theta - rotation_amount) % (2 * np.pi)
-    if max_gap_size <= 0.1:
+    if bad_bounds:
         log.warn(f"Bad bounds! Gap size = {max_gap_size}")
         initial_offset = 0
         pitch_angle = 0
@@ -177,7 +204,29 @@ def calculate_best_initial_radius(
 
 def _calculate_bounds(
     theta: FloatArray1D,
-) -> tuple[tuple[float, float], float, float]:
+) -> tuple[bool, tuple[float, float], float, float]:
+    """Calculates optimisation bounds for the theta offset.
+    If the bounds would cross the polar axis, then the bounds must be
+    split into two. To avoid this, the theta values can be rotated so that
+    the bounds can be expressed as a single bound.
+
+    Parameters
+    ----------
+    theta : FloatArray1D
+        The theta values of the cluster.
+
+    Returns
+    -------
+    bad_bounds : bool
+        This flag is true if the cluster covers a substantial portion
+        of the unit circle.
+    bounds : tuple[float, float]
+        The lower bound and the upper bound of theta offset.
+    rotation_amount : float
+        The amount to rotate the theta values so that the bounds can be singular.
+    max_gap_size : float
+        The largest gap between nearby theta values.
+    """
     sorted_theta = np.sort(theta)
     gaps = np.diff(sorted_theta)
 
@@ -192,6 +241,7 @@ def _calculate_bounds(
     # this case, we temporarily rotate the points to allievate this
     # problem, fit the log-spiral model to the set of rotated points,
     # and then reverse the rotation on the fitted model.
+    BAD_BOUNDS_THRESHOLD: float = 0.1
     if not gap_crosses_axis:
         rotation_amount = 0
         max_gap_size_idx = np.argmax(gaps)
@@ -203,7 +253,8 @@ def _calculate_bounds(
         upper_bound = 2 * np.pi
         max_gap_size = upper_bound - lower_bound
     bounds = (lower_bound, upper_bound)
-    return (bounds, rotation_amount, max_gap_size)
+    bad_bounds = max_gap_size <= BAD_BOUNDS_THRESHOLD
+    return (bad_bounds, bounds, rotation_amount, max_gap_size)
 
 
 def _calculate_angle_distance(
@@ -213,3 +264,24 @@ def _calculate_angle_distance(
     distance = to_angle - from_angle
     distance[is_wrapping] += 2 * np.pi
     return distance
+
+
+def cluster_has_no_endpoints_or_contains_origin(
+    image: ImageArray, max_half_gap_fill_for_undefined_bounds: int = 3
+) -> bool:
+    # See if the cluster has actual spiral endpoints by seeing if it is
+    # possible to "escape" from the center point to the image boundary,
+    # considering non-cluster pixels as empty pixels.
+    central_row: int = image.shape[0] // 2
+    central_column: int = image.shape[1] // 2
+    centre_in_cluster = image[central_row, central_column] != 0
+    if centre_in_cluster:
+        return True
+    in_cluster = image > 0
+    structure_element_size = 2 * max_half_gap_fill_for_undefined_bounds + 1
+    structure_element = np.ones((structure_element_size, structure_element_size))
+    is_hole_or_cluster = ndimage.binary_fill_holes(
+        ndimage.binary_closing(in_cluster, structure=structure_element)
+    )
+    assert is_hole_or_cluster is not None
+    return is_hole_or_cluster[central_row, central_column] > 0
