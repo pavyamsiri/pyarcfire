@@ -132,7 +132,7 @@ def process_cluster(args: argparse.Namespace) -> None:
     log.debug(f"Loaded {num_clusters} clusters")
 
     log.debug(f"Total sum = {arr[:, :, 0].sum()}")
-    res = identify_inner_and_outer_spiral(arr[:, :, 0])
+    res = identify_inner_and_outer_spiral(arr[:, :, 0], shrink_amount=5)
 
     width = arr.shape[0] / 2 + 0.5
     cluster_arrays = merge_clusters_by_fit(arr)

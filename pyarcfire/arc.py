@@ -65,7 +65,7 @@ def fit_spiral_to_image(
     else:
         need_multiple_revolutions = True
         log.debug("IMPLEMENT idInnerOuterSpiral")
-        identify_inner_and_outer_spiral(image)
+        identify_inner_and_outer_spiral(image, shrink_amount=5)
         # [isInner, gapFail] = idInnerOuterSpiral(img, ctrR, ctrC, plotFlag);
         # nInner = sum(isInner);
         # failed2rev = gapFail;
@@ -293,16 +293,29 @@ def cluster_has_no_endpoints_or_contains_origin(
     return is_hole_or_cluster[central_row, central_column] > 0
 
 
-def identify_inner_and_outer_spiral(image: ImageArray) -> None:
-    num_radii = int(np.ceil(max((image.shape[0], image.shape[1])) / 2))
+def identify_inner_and_outer_spiral(image: ImageArray, shrink_amount: int) -> None:
     num_theta: int = 360
-    log.debug(
-        f"Number of radial points = {num_radii} and number of theta points = {num_theta}"
+    # Find theta bins which contain only a single revolution
+    can_be_single_revolution = find_single_revolution_regions(
+        image, num_theta, shrink_amount
+    )
+
+    # Find the start and end of each region
+    single_revolution_differences = np.diff(can_be_single_revolution.astype(np.float32))
+    start_indices: npt.NDArray[np.int32] = (
+        single_revolution_differences == 1
+    ).nonzero()[0].astype(np.int32) + 1
+    end_indices: npt.NDArray[np.int32] = (
+        (single_revolution_differences == -1).nonzero()[0].astype(np.int32)
     )
     theta_bin_values = np.arange(1, num_theta) * 2 * np.pi / num_theta
 
+def find_single_revolution_regions(
+    image: ImageArray, num_theta: int, shrink_amount: int
+) -> npt.NDArray[np.bool_]:
+    num_radii = int(np.ceil(max((image.shape[0], image.shape[1])) / 2))
     min_acceptable_length = 5 * np.ceil(num_theta / 360)
-    log.debug(f"Minimum acceptable length {min_acceptable_length}")
+    assert shrink_amount <= min_acceptable_length
     polar_image = np.flip(
         image_transform_from_cartesian_to_polar(image, num_radii, num_theta), axis=1
     )
@@ -356,6 +369,17 @@ def identify_inner_and_outer_spiral(image: ImageArray) -> None:
     can_be_single_revolution = functools.reduce(
         lambda x, y: np.logical_and(x, y), conditions
     )
+
+    conditions = (
+        can_be_single_revolution,
+        np.roll(can_be_single_revolution, shrink_amount),
+        np.roll(can_be_single_revolution, -shrink_amount),
+    )
+
+    can_be_single_revolution = functools.reduce(
+        lambda x, y: np.logical_and(x, y), conditions
+    )
+    return can_be_single_revolution
 
 
 def image_transform_from_cartesian_to_polar(
