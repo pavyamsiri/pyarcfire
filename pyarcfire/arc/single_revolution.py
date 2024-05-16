@@ -14,7 +14,7 @@ import skimage.measure
 from skimage import transform
 
 # Internal libraries
-from .definitions import FloatArray1D, ImageArray
+from pyarcfire.definitions import FloatArray1D, ImageArray
 
 log = logging.getLogger(__name__)
 
