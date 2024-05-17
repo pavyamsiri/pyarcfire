@@ -45,6 +45,8 @@ def merge_clusters_by_fit(
             second_cluster_array = cluster_dict[second_idx][1]
             combined_cluster_array = first_cluster_array + second_cluster_array
             del cluster_dict[second_idx]
+            cluster_distances[:, second_idx] = np.inf
+            cluster_distances[second_idx, :] = np.inf
             num_merges += 1
             new_fit = fit_spiral_to_image(combined_cluster_array)
             cluster_dict[first_idx] = (new_fit, combined_cluster_array)
