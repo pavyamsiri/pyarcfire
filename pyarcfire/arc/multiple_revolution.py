@@ -1,4 +1,5 @@
 # Standard libraries
+from dataclasses import dataclass
 import functools
 import logging
 from typing import Sequence
@@ -12,7 +13,8 @@ import skimage
 import skimage.measure
 
 # Internal libraries
-from pyarcfire.definitions import ImageArray
+from pyarcfire.definitions import FloatArray1D, ImageArray, IntegerArray1D, BoolArray1D
+from pyarcfire.debug_utils import _debug_plot_image
 from .common import LogSpiralFitResult
 from .functions import (
     calculate_best_initial_radius,
@@ -27,6 +29,15 @@ from .utils import (
 )
 
 log = logging.getLogger(__name__)
+
+
+@dataclass
+class WrapData:
+    start_length: int
+    end_length: int
+    length: int
+    start: int
+    end: int
 
 
 def fit_spiral_to_image_multiple_revolution(
@@ -47,8 +58,16 @@ def fit_spiral_to_image_multiple_revolution(
         need_multiple_revolutions = False
     else:
         need_multiple_revolutions = True
-        log.debug("IMPLEMENT idInnerOuterSpiral")
-        identify_inner_and_outer_spiral(image, shrink_amount=5)
+        identify_result = identify_inner_and_outer_spiral(image, shrink_amount=5)
+        if (
+            identify_result is None
+            or identify_result.sum() == 0
+            or identify_result.sum() == len(identify_result)
+        ):
+            log.debug("Don't need multiple revolutions")
+            need_multiple_revolutions = False
+        else:
+            pass
         # [isInner, gapFail] = idInnerOuterSpiral(img, ctrR, ctrC, plotFlag);
         # nInner = sum(isInner);
         # failed2rev = gapFail;
@@ -150,7 +169,7 @@ def __cluster_has_no_endpoints_or_contains_origin(
 
 def identify_inner_and_outer_spiral(
     image: ImageArray, shrink_amount: int, max_diagonal_distance: float = 1.5
-) -> None:
+) -> BoolArray1D | None:
     num_radii = int(np.ceil(max((image.shape[0], image.shape[1])) / 2))
     num_theta: int = 360
 
@@ -162,15 +181,16 @@ def identify_inner_and_outer_spiral(
 
     # Find the start and end of each region
     single_revolution_differences = np.diff(can_be_single_revolution.astype(np.float32))
-    start_indices: npt.NDArray[np.int32] = (
-        single_revolution_differences == 1
-    ).nonzero()[0].astype(np.int32) + 1
-    end_indices: npt.NDArray[np.int32] = (
+    start_indices: IntegerArray1D = (single_revolution_differences == 1).nonzero()[
+        0
+    ].astype(np.int32) + 1
+    end_indices: IntegerArray1D = (
         (single_revolution_differences == -1).nonzero()[0].astype(np.int32)
     )
 
     # No start and end
     if len(start_indices) == 0 and len(end_indices) == 0:
+        log.debug("[red]No start or end[/red]")
         # Single revolution for the entire theta-range, so no endpoints picked up
         # (this could be a ring, but more likely it"s a cluster in the
         # center)
@@ -180,139 +200,50 @@ def identify_inner_and_outer_spiral(
         else:
             assert not np.any(can_be_single_revolution)
             log.warn("No single revolution regions in entire theta-range")
-            # isInner = true(size(find(img)))
-            # gapFail = true
-            assert False
+            return None
 
-    has_wrapped: bool = False
-    wrap_start: int | None = None
-    wrap_end: int | None = None
-    # Region ends but either doesn't start or it wraps
-    if len(end_indices) > 0 and (
-        len(start_indices) == 0 or start_indices[0] > end_indices[0]
-    ):
-        has_wrapped = True
-        wrap_end = end_indices[0]
-        end_indices = end_indices[1:]
-        assert (
-            len(start_indices) == 0
-            or len(end_indices) == 0
-            or start_indices[0] <= end_indices[0]
-        )
-    # Region starts but either doesn't end or it wraps
-    if len(start_indices) > 0 and (
-        len(end_indices) == 0 or start_indices[-1] > end_indices[-1]
-    ):
-        has_wrapped = True
-        wrap_start = start_indices[-1]
-        start_indices = start_indices[:-1]
-        assert (
-            len(start_indices) == 0
-            or len(end_indices) == 0
-            or start_indices[-1] <= end_indices[-1]
-        )
-    assert len(start_indices) == len(end_indices)
-
-    wrap_lengths: tuple[int, int, int] | None = None
-    if has_wrapped:
-        # Last continuous single revolution region is at the beginning, but doesn"t
-        # actually wrap around
-        if wrap_start is None:
-            assert (
-                wrap_end is not None
-            ), "Other branch must be executed as this has wrapped"
-            start_indices = np.insert(start_indices, 0, 0)
-            end_indices = np.insert(end_indices, 0, wrap_end)
-            has_wrapped = False
-        # Last continuous single revolution region is at the end, but doesn"t
-        # actually wrap around
-        elif wrap_end is None:
-            assert (
-                wrap_start is not None
-            ), "Other branch must be executed as this has wrapped"
-            start_indices = np.insert(start_indices, 0, wrap_start)
-            end_indices = np.insert(end_indices, 0, len(can_be_single_revolution) - 1)
-            has_wrapped = False
-        # Wrap does happen
-        else:
-            # Length of region from start to edge
-            wrap_start_length = len(can_be_single_revolution) - wrap_start + 1
-            # Length of region from end to end
-            wrap_end_length = wrap_end
-            wrap_lengths = (
-                wrap_start_length,
-                wrap_end_length,
-                wrap_start_length + wrap_end_length,
-            )
+    start_indices, end_indices, wrap_data = __calculate_wrap(
+        can_be_single_revolution, start_indices, end_indices
+    )
+    log.debug(f"After wrap: start indices = {start_indices}")
+    log.debug(f"After wrap: end indices = {end_indices}")
 
     theta_bin_values = np.arange(1, num_theta) * 2 * np.pi / num_theta
     row_indices, column_indices = image.nonzero()
-    point_index_to_image_index = np.ravel_multi_index(
-        (row_indices, column_indices), image.shape
+    cluster_mask = np.zeros_like(image, dtype=np.bool_)
+    cluster_mask[row_indices, column_indices] = True
+    image_index_to_point_index = np.full(
+        (image.shape[0], image.shape[1]), -1, dtype=np.int32
     )
-    image_index_to_point_index = np.zeros_like(image, dtype=np.int32)
     image_index_to_point_index[image > 0] = np.arange(len(row_indices))
-    log.debug(f"Point idx to image idx = {point_index_to_image_index.shape}")
-    _, theta, _ = _get_polar_coordinates(image)
+    radii, theta, _ = _get_polar_coordinates(image)
 
-    start_indices = np.array([])
-    end_indices = np.array([])
-    region_lengths = end_indices - start_indices + 1
-    max_region_length: int | None = (
-        region_lengths.max() if len(region_lengths) > 0 else None
+    first_region, second_region, max_length = __split_regions(
+        start_indices, end_indices, theta, theta_bin_values, wrap_data
     )
-    only_wrap_exists: bool = max_region_length is None
-    wrap_larger_than_all_regions: bool = False
-    if wrap_lengths is not None and max_region_length is not None:
-        wrap_larger_than_all_regions = wrap_lengths[2] > max_region_length
-    if only_wrap_exists or wrap_larger_than_all_regions:
-        # Only wrap exists
-        assert wrap_lengths is not None
-        wrap_start_length, wrap_end_length, wrap_length = wrap_lengths
-        max_length = wrap_length
-        wrap_mid_length = np.round(wrap_length / 2)
-        theta_start = theta_bin_values[wrap_start]
-        theta_end = theta_bin_values[wrap_end]
-        inner_region = np.logical_or(theta >= theta_start, theta < theta_end)
-        if wrap_start_length >= wrap_mid_length:
-            split_theta_idx = int(wrap_start + wrap_mid_length - 1)
-        else:
-            split_theta_idx = int(wrap_mid_length - wrap_start_length - 1)
-        split_theta = theta_bin_values[split_theta_idx]
-        first_inner_region = np.logical_and(
-            inner_region, np.logical_and(theta >= theta_start, theta < split_theta)
-        )
-        second_inner_region = np.logical_and(inner_region, ~first_inner_region)
-    else:
-        assert max_region_length is not None
-        max_length = max_region_length
-        max_index = region_lengths.argmax()
-        theta_start = theta_bin_values[start_indices[max_index]]
-        theta_end = theta_bin_values[start_indices[max_index]]
-        split_theta = theta_bin_values[
-            round((start_indices[max_index] + end_indices[max_index]) / 2)
-        ]
-        first_inner_region = np.logical_and(theta >= theta_start, theta < split_theta)
-        second_inner_region = np.logical_and(theta >= split_theta, theta < theta_end)
 
     if max_length < min_acceptable_length:
         log.warn(
             f"Warning:idInnerOuterSpiral:longest sgl-rev region length ({max_length}) is below the minimum length {min_acceptable_length}"
         )
-        assert False
-        # isInner = true(size(find(img)));
-        # gapFail = true;
+        return None
+
+    log.debug("Returning something")
 
     first_region_mask = np.zeros_like(image, dtype=np.bool_)
-    first_region_mask[
-        row_indices[first_inner_region], column_indices[first_inner_region]
-    ] = True
+    first_region_mask[row_indices[first_region], column_indices[first_region]] = True
     second_region_mask = np.zeros_like(image, dtype=np.bool_)
-    second_region_mask[
-        row_indices[second_inner_region], column_indices[second_inner_region]
-    ] = True
-    non_region_mask = np.zeros_like(image, dtype=np.bool_)
-    non_region_mask[np.logical_and(~first_region_mask, ~second_region_mask)] = True
+    second_region_mask[row_indices[second_region], column_indices[second_region]] = True
+    non_region_mask = np.zeros_like(image, dtype=np.int32)
+    non_region_mask[
+        np.logical_and(
+            cluster_mask, np.logical_and(~first_region_mask, ~second_region_mask)
+        )
+    ] = 1
+
+    log.debug("After split")
+    log.debug(f"First region contains {first_region.sum()} points")
+    log.debug(f"Second region contains {second_region.sum()} points")
 
     first_region_distance = ndimage.distance_transform_edt(
         ~first_region_mask, return_distances=True
@@ -332,6 +263,8 @@ def identify_inner_and_outer_spiral(
         point_indices = image_index_to_point_index[
             current_row_indices, current_column_indices
         ]
+        if 0 in point_indices:
+            log.debug("Considering point 0...")
         first_distance = first_region_distance[
             current_row_indices, current_column_indices
         ].min()
@@ -339,21 +272,106 @@ def identify_inner_and_outer_spiral(
             current_row_indices, current_column_indices
         ].min()
         if first_distance < max_diagonal_distance:
-            first_inner_region[point_indices] = True
+            log.debug("Assigning to first region")
+            first_region[point_indices] = True
         elif second_distance < max_diagonal_distance:
-            second_inner_region[point_indices] = True
+            log.debug("Assigning to second region")
+            second_region[point_indices] = True
+        log.debug("")
+
+    log.debug("Diagonal distances")
+    log.debug(f"First region contains {first_region.sum()} points")
+    log.debug(f"Second region contains {second_region.sum()} points")
 
     # Use updated regions
     first_region_mask = np.zeros_like(image, dtype=np.bool_)
-    first_region_mask[
-        row_indices[first_inner_region], column_indices[first_inner_region]
-    ] = True
+    first_region_mask[row_indices[first_region], column_indices[first_region]] = True
     second_region_mask = np.zeros_like(image, dtype=np.bool_)
-    second_region_mask[
-        row_indices[second_inner_region], column_indices[second_inner_region]
-    ] = True
-    non_region_mask = np.zeros_like(image, dtype=np.bool_)
-    non_region_mask[np.logical_and(~first_region_mask, ~second_region_mask)] = True
+    second_region_mask[row_indices[second_region], column_indices[second_region]] = True
+    non_region_mask = np.zeros_like(image, dtype=np.int32)
+    non_region_mask[
+        np.logical_and(
+            cluster_mask, np.logical_and(~first_region_mask, ~second_region_mask)
+        )
+    ] = 1
+    log.debug(f"Is in? {non_region_mask[row_indices[0], column_indices[0]]}")
+
+    # Combine
+
+    # Assign the remaining pixels according to closest distance to one of the
+    # two regions
+
+    first_region_distance = ndimage.distance_transform_edt(
+        ~first_region_mask, return_distances=True
+    )
+    assert isinstance(first_region_distance, np.ndarray)
+    second_region_distance = ndimage.distance_transform_edt(
+        ~second_region_mask, return_distances=True
+    )
+    assert isinstance(second_region_distance, np.ndarray)
+    connected_components = skimage.measure.label(non_region_mask)
+    assert isinstance(connected_components, np.ndarray)
+    labels = set(list(connected_components.flatten()))
+    log.debug(f"Number of components = {len(labels)}")
+    log.debug(
+        f"Number of non region masks = {np.count_nonzero(np.logical_and(~first_region_mask, ~second_region_mask))}"
+    )
+    _debug_plot_image(non_region_mask.astype(np.float32))
+    for label in labels:
+        current_row_indices, current_column_indices = (
+            connected_components == label
+        ).nonzero()
+        point_indices = image_index_to_point_index[
+            current_row_indices, current_column_indices
+        ]
+        if 0 in point_indices:
+            log.debug("Considering point 0...")
+        first_distances = first_region_distance[
+            current_row_indices, current_column_indices
+        ]
+        second_distances = second_region_distance[
+            current_row_indices, current_column_indices
+        ]
+        if first_distances.min() < second_distances.min():
+            log.debug("Assigning to first region")
+            first_region[point_indices] = True
+            first_region_mask = np.zeros_like(image, dtype=np.bool_)
+            first_region_mask[
+                row_indices[first_region], column_indices[first_region]
+            ] = True
+            first_region_distance = ndimage.distance_transform_edt(
+                ~first_region_mask, return_distances=True
+            )
+            assert isinstance(first_region_distance, np.ndarray)
+        else:
+            log.debug("Assigning to second region")
+            second_region[point_indices] = True
+            second_region_mask = np.zeros_like(image, dtype=np.bool_)
+            second_region_mask[
+                row_indices[second_region], column_indices[second_region]
+            ] = True
+            second_region_distance = ndimage.distance_transform_edt(
+                ~second_region_mask, return_distances=True
+            )
+            assert isinstance(second_region_distance, np.ndarray)
+        log.debug("")
+
+    log.debug(f"First region = {first_region[0]}")
+    log.debug(f"Second region = {second_region[0]}")
+    assert np.all(
+        np.logical_xor(first_region, second_region)
+    ), f"After closeness, XOR = {(~np.logical_xor(first_region, second_region)).nonzero()}"
+
+    # Find innermost region
+    first_radii = radii[first_region]
+    second_radii = radii[second_region]
+    first_mean_radius = np.mean(first_radii) if len(first_radii) > 0 else np.inf
+    second_mean_radius = np.mean(second_radii) if len(second_radii) > 0 else np.inf
+    assert not (np.isinf(first_mean_radius) and np.isinf(second_mean_radius))
+    if first_mean_radius < second_mean_radius:
+        return first_region
+    else:
+        return second_region
 
 
 def __find_single_revolution_regions(
@@ -448,3 +466,121 @@ def __image_transform_from_cartesian_to_polar(
         radius=max_radius,
         output_shape=(num_theta, num_radii),
     ).T
+
+
+def __split_regions(
+    start_indices: IntegerArray1D,
+    end_indices: IntegerArray1D,
+    theta: FloatArray1D,
+    theta_bin_centres: FloatArray1D,
+    wrap_data: WrapData | None,
+) -> tuple[BoolArray1D, BoolArray1D, int]:
+    region_lengths = end_indices - start_indices + 1
+    max_region_length: int | None = (
+        region_lengths.max() if len(region_lengths) > 0 else None
+    )
+    only_wrap_exists: bool = max_region_length is None
+    wrap_larger_than_all_regions: bool = False
+    if wrap_data is not None and max_region_length is not None:
+        wrap_length = wrap_data.length
+        wrap_larger_than_all_regions = wrap_length > max_region_length
+    if only_wrap_exists or wrap_larger_than_all_regions:
+        log.debug("Wrap happens")
+        # Only wrap exists
+        assert wrap_data is not None
+        max_length = wrap_data.length
+        wrap_mid_length = np.round(wrap_data.length / 2)
+        theta_start = theta_bin_centres[wrap_data.start]
+        theta_end = theta_bin_centres[wrap_data.end]
+        inner_region = np.logical_or(theta >= theta_start, theta < theta_end)
+        if wrap_data.start_length >= wrap_mid_length:
+            split_theta_idx = int(wrap_data.start + wrap_mid_length - 1)
+        else:
+            split_theta_idx = int(wrap_mid_length - wrap_data.start_length - 1)
+        split_theta = theta_bin_centres[split_theta_idx]
+        first_region = np.logical_and(
+            inner_region, np.logical_and(theta >= theta_start, theta < split_theta)
+        )
+        second_region = np.logical_and(inner_region, ~first_region)
+    else:
+        log.debug("No wrap")
+        assert max_region_length is not None
+        max_length = max_region_length
+        max_index = region_lengths.argmax()
+        theta_start = theta_bin_centres[start_indices[max_index]]
+        theta_end = theta_bin_centres[start_indices[max_index]]
+        split_theta = theta_bin_centres[
+            round((start_indices[max_index] + end_indices[max_index]) / 2)
+        ]
+        first_region = np.logical_and(theta >= theta_start, theta < split_theta)
+        second_region = np.logical_and(theta >= split_theta, theta < theta_end)
+    log.debug(f"Max length = {max_length}")
+    return first_region, second_region, max_length
+
+
+def __calculate_wrap(
+    can_be_single_revolution: BoolArray1D,
+    start_indices: IntegerArray1D,
+    end_indices: IntegerArray1D,
+) -> tuple[IntegerArray1D, IntegerArray1D, WrapData | None]:
+    has_wrapped: bool = False
+    wrap_start: int | None = None
+    wrap_end: int | None = None
+    # Region ends but either doesn't start or it wraps
+    if len(end_indices) > 0 and (
+        len(start_indices) == 0 or start_indices[0] > end_indices[0]
+    ):
+        has_wrapped = True
+        wrap_end = end_indices[0]
+        end_indices = end_indices[1:]
+        assert (
+            len(start_indices) == 0
+            or len(end_indices) == 0
+            or start_indices[0] <= end_indices[0]
+        )
+    # Region starts but either doesn't end or it wraps
+    if len(start_indices) > 0 and (
+        len(end_indices) == 0 or start_indices[-1] > end_indices[-1]
+    ):
+        has_wrapped = True
+        wrap_start = start_indices[-1]
+        start_indices = start_indices[:-1]
+        assert (
+            len(start_indices) == 0
+            or len(end_indices) == 0
+            or start_indices[-1] <= end_indices[-1]
+        )
+    assert len(start_indices) == len(end_indices)
+
+    wrap_data: WrapData | None = None
+    if has_wrapped:
+        # Last continuous single revolution region is at the beginning, but doesn"t
+        # actually wrap around
+        if wrap_start is None:
+            assert (
+                wrap_end is not None
+            ), "Other branch must be executed as this has wrapped"
+            start_indices = np.insert(start_indices, 0, 0)
+            end_indices = np.insert(end_indices, 0, wrap_end)
+        # Last continuous single revolution region is at the end, but doesn"t
+        # actually wrap around
+        elif wrap_end is None:
+            assert (
+                wrap_start is not None
+            ), "Other branch must be executed as this has wrapped"
+            start_indices = np.insert(start_indices, 0, wrap_start)
+            end_indices = np.insert(end_indices, 0, len(can_be_single_revolution) - 1)
+        # Wrap does happen
+        else:
+            # Length of region from start to edge
+            wrap_start_length = len(can_be_single_revolution) - wrap_start + 1
+            # Length of region from end to end
+            wrap_end_length = wrap_end
+            wrap_data = WrapData(
+                start_length=wrap_start_length,
+                end_length=wrap_end_length,
+                length=wrap_start_length + wrap_end_length,
+                start=wrap_start,
+                end=wrap_end,
+            )
+    return (start_indices, end_indices, wrap_data)

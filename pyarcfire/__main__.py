@@ -131,11 +131,16 @@ def process_cluster(args: argparse.Namespace) -> None:
     num_clusters = arr.shape[2]
     log.debug(f"Loaded {num_clusters} clusters")
 
-    log.debug(f"Total sum = {arr[:, :, 0].sum()}")
-    res = identify_inner_and_outer_spiral(arr[:, :, 0], shrink_amount=5)
+    log.debug("Identify...")
+    res = identify_inner_and_outer_spiral(arr[:, :, 1], shrink_amount=5)
+    if res is not None:
+        log.debug(f"Inner region has {res.sum()} points")
+        log.debug(f"Outer region has {(~res).sum()} points")
 
     width = arr.shape[0] / 2 + 0.5
-    cluster_arrays = merge_clusters_by_fit(arr)
+
+    for cluster_idx in range(num_clusters):
+        log.debug(f"Cluster {cluster_idx} sums to = {arr[:, :, cluster_idx].sum()}")
 
     if not args.plot_flag:
         return
@@ -143,7 +148,6 @@ def process_cluster(args: argparse.Namespace) -> None:
     fig = plt.figure()
     axis = fig.add_subplot(111)
     color_map = mpl.colormaps["hsv"]
-    num_clusters: int = cluster_arrays.shape[2]
     for cluster_idx in range(num_clusters):
         current_array = arr[:, :, cluster_idx]
         mask = current_array > 0
