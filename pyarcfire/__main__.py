@@ -137,6 +137,9 @@ def process_cluster(args: argparse.Namespace) -> None:
     width = arr.shape[0] / 2 + 0.5
     cluster_arrays = merge_clusters_by_fit(arr)
 
+    if not args.plot_flag:
+        return
+
     fig = plt.figure()
     axis = fig.add_subplot(111)
     color_map = mpl.colormaps["hsv"]
@@ -174,7 +177,7 @@ def _parse_args(args: Sequence[str]) -> argparse.Namespace:
     from_cluster_parser = subparsers.add_parser(
         "cluster", help="Process a cluster stored in as a data array."
     )
-    __add_input_path_to_parser(from_cluster_parser)
+    _configure_cluster_command_parser(from_cluster_parser)
     return parser.parse_args(args)
 
 
@@ -186,6 +189,18 @@ def _configure_image_command_parser(parser: argparse.ArgumentParser) -> None:
         type=str,
         dest="cluster_path",
         help="Path to output data array of clusters.",
+        required=False,
+    )
+
+
+def _configure_cluster_command_parser(parser: argparse.ArgumentParser) -> None:
+    __add_input_path_to_parser(parser)
+    parser.add_argument(
+        "-plot",
+        "--plot",
+        action="store_true",
+        dest="plot_flag",
+        help="Turn on plotting.",
         required=False,
     )
 
