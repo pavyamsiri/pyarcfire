@@ -8,7 +8,7 @@ import scipy.io
 from skimage import filters
 
 # Internal libraries
-from .definitions import ImageArray, ImageArraySequence
+from .definitions import ImageFloatArray, ImageArraySequence
 from .orientation import OrientationField, generate_orientation_fields
 from .similarity import generate_similarity_matrix
 from .cluster import Cluster, generate_hac_tree
@@ -18,13 +18,13 @@ from .merge_fit import merge_clusters_by_fit
 class ClusterSpiralResult:
     def __init__(
         self,
-        image: ImageArray,
-        unsharp_image: ImageArray,
+        image: ImageFloatArray,
+        unsharp_image: ImageFloatArray,
         field: OrientationField,
         arrays: ImageArraySequence,
     ) -> None:
-        self._image: ImageArray = image
-        self._unsharp_image: ImageArray = unsharp_image
+        self._image: ImageFloatArray = image
+        self._unsharp_image: ImageFloatArray = unsharp_image
         self._arrays: ImageArraySequence = arrays
         self._field: OrientationField = field
         self._sizes: Sequence[int] = tuple(
@@ -34,10 +34,10 @@ class ClusterSpiralResult:
             ]
         )
 
-    def get_image(self) -> ImageArray:
+    def get_image(self) -> ImageFloatArray:
         return self._image
 
-    def get_unsharp_image(self) -> ImageArray:
+    def get_unsharp_image(self) -> ImageFloatArray:
         return self._unsharp_image
 
     def get_field(self) -> OrientationField:
@@ -46,7 +46,7 @@ class ClusterSpiralResult:
     def get_sizes(self) -> Sequence[int]:
         return self._sizes
 
-    def get_cluster_array(self, cluster_idx: int) -> tuple[ImageArray, int]:
+    def get_cluster_array(self, cluster_idx: int) -> tuple[ImageFloatArray, int]:
         assert cluster_idx in range(self._arrays.shape[2])
         return (self._arrays[:, :, cluster_idx], self._sizes[cluster_idx])
 
@@ -65,7 +65,7 @@ class ClusterSpiralResult:
 
 
 def detect_spirals_in_image(
-    image: ImageArray,
+    image: ImageFloatArray,
     unsharp_mask_radius: float,
     unsharp_mask_amount: float,
     stop_threshold: float,

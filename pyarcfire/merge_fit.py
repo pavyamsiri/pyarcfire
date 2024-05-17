@@ -8,7 +8,7 @@ from scipy.ndimage import distance_transform_edt
 
 # Internal libraries
 from .arc import LogSpiralFitResult, fit_spiral_to_image
-from .definitions import ImageArray, ImageArraySequence
+from .definitions import ImageFloatArray, ImageArraySequence
 from .merge import calculate_arc_merge_error
 
 log = logging.getLogger(__name__)
@@ -20,7 +20,7 @@ def merge_clusters_by_fit(
     max_pixel_distance = (
         np.mean([clusters.shape[0], clusters.shape[1]]).astype(float) / 20
     )
-    cluster_dict: dict[int, tuple[LogSpiralFitResult, ImageArray]] = {}
+    cluster_dict: dict[int, tuple[LogSpiralFitResult, ImageFloatArray]] = {}
     num_clusters: int = clusters.shape[2]
     for cluster_idx in range(num_clusters):
         fit = fit_spiral_to_image(clusters[:, :, cluster_idx])
@@ -72,8 +72,8 @@ def merge_clusters_by_fit(
 
 
 def _calculate_cluster_distance(
-    first_cluster_array: ImageArray,
-    second_cluster_array: ImageArray,
+    first_cluster_array: ImageFloatArray,
+    second_cluster_array: ImageFloatArray,
     max_pixel_distance: float,
 ) -> float:
     distances = distance_transform_edt(first_cluster_array == 0, return_distances=True)

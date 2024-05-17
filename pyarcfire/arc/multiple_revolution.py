@@ -13,7 +13,12 @@ import skimage
 import skimage.measure
 
 # Internal libraries
-from pyarcfire.definitions import FloatArray1D, ImageArray, IntegerArray1D, BoolArray1D
+from pyarcfire.definitions import (
+    FloatArray1D,
+    ImageFloatArray,
+    IntegerArray1D,
+    BoolArray1D,
+)
 from pyarcfire.debug_utils import _debug_plot_image
 from .common import LogSpiralFitResult
 from .functions import (
@@ -41,7 +46,7 @@ class WrapData:
 
 
 def fit_spiral_to_image_multiple_revolution(
-    image: ImageArray,
+    image: ImageFloatArray,
     initial_pitch_angle: float = 0,
 ) -> LogSpiralFitResult:
     # Convert to polar coordinates
@@ -146,7 +151,7 @@ def fit_spiral_to_image_multiple_revolution(
 
 
 def __cluster_has_no_endpoints_or_contains_origin(
-    image: ImageArray, max_half_gap_fill_for_undefined_bounds: int = 3
+    image: ImageFloatArray, max_half_gap_fill_for_undefined_bounds: int = 3
 ) -> bool:
     # See if the cluster has actual spiral endpoints by seeing if it is
     # possible to "escape" from the center point to the image boundary,
@@ -168,7 +173,7 @@ def __cluster_has_no_endpoints_or_contains_origin(
 
 
 def identify_inner_and_outer_spiral(
-    image: ImageArray, shrink_amount: int, max_diagonal_distance: float = 1.5
+    image: ImageFloatArray, shrink_amount: int, max_diagonal_distance: float = 1.5
 ) -> BoolArray1D | None:
     num_radii = int(np.ceil(max((image.shape[0], image.shape[1])) / 2))
     num_theta: int = 360
@@ -190,7 +195,6 @@ def identify_inner_and_outer_spiral(
 
     # No start and end
     if len(start_indices) == 0 and len(end_indices) == 0:
-        log.debug("[red]No start or end[/red]")
         # Single revolution for the entire theta-range, so no endpoints picked up
         # (this could be a ring, but more likely it"s a cluster in the
         # center)
@@ -205,9 +209,6 @@ def identify_inner_and_outer_spiral(
     start_indices, end_indices, wrap_data = __calculate_wrap(
         can_be_single_revolution, start_indices, end_indices
     )
-    log.debug(f"After wrap: start indices = {start_indices}")
-    log.debug(f"After wrap: end indices = {end_indices}")
-
     theta_bin_values = np.arange(1, num_theta) * 2 * np.pi / num_theta
     row_indices, column_indices = image.nonzero()
     cluster_mask = np.zeros_like(image, dtype=np.bool_)
@@ -228,8 +229,6 @@ def identify_inner_and_outer_spiral(
         )
         return None
 
-    log.debug("Returning something")
-
     first_region_mask = np.zeros_like(image, dtype=np.bool_)
     first_region_mask[row_indices[first_region], column_indices[first_region]] = True
     second_region_mask = np.zeros_like(image, dtype=np.bool_)
@@ -240,10 +239,6 @@ def identify_inner_and_outer_spiral(
             cluster_mask, np.logical_and(~first_region_mask, ~second_region_mask)
         )
     ] = 1
-
-    log.debug("After split")
-    log.debug(f"First region contains {first_region.sum()} points")
-    log.debug(f"Second region contains {second_region.sum()} points")
 
     first_region_distance = ndimage.distance_transform_edt(
         ~first_region_mask, return_distances=True
@@ -263,8 +258,6 @@ def identify_inner_and_outer_spiral(
         point_indices = image_index_to_point_index[
             current_row_indices, current_column_indices
         ]
-        if 0 in point_indices:
-            log.debug("Considering point 0...")
         first_distance = first_region_distance[
             current_row_indices, current_column_indices
         ].min()
@@ -272,16 +265,9 @@ def identify_inner_and_outer_spiral(
             current_row_indices, current_column_indices
         ].min()
         if first_distance < max_diagonal_distance:
-            log.debug("Assigning to first region")
             first_region[point_indices] = True
         elif second_distance < max_diagonal_distance:
-            log.debug("Assigning to second region")
             second_region[point_indices] = True
-        log.debug("")
-
-    log.debug("Diagonal distances")
-    log.debug(f"First region contains {first_region.sum()} points")
-    log.debug(f"Second region contains {second_region.sum()} points")
 
     # Use updated regions
     first_region_mask = np.zeros_like(image, dtype=np.bool_)
@@ -294,7 +280,6 @@ def identify_inner_and_outer_spiral(
             cluster_mask, np.logical_and(~first_region_mask, ~second_region_mask)
         )
     ] = 1
-    log.debug(f"Is in? {non_region_mask[row_indices[0], column_indices[0]]}")
 
     # Combine
 
@@ -312,11 +297,6 @@ def identify_inner_and_outer_spiral(
     connected_components = skimage.measure.label(non_region_mask)
     assert isinstance(connected_components, np.ndarray)
     labels = set(list(connected_components.flatten()))
-    log.debug(f"Number of components = {len(labels)}")
-    log.debug(
-        f"Number of non region masks = {np.count_nonzero(np.logical_and(~first_region_mask, ~second_region_mask))}"
-    )
-    _debug_plot_image(non_region_mask.astype(np.float32))
     for label in labels:
         current_row_indices, current_column_indices = (
             connected_components == label
@@ -324,8 +304,6 @@ def identify_inner_and_outer_spiral(
         point_indices = image_index_to_point_index[
             current_row_indices, current_column_indices
         ]
-        if 0 in point_indices:
-            log.debug("Considering point 0...")
         first_distances = first_region_distance[
             current_row_indices, current_column_indices
         ]
@@ -333,7 +311,6 @@ def identify_inner_and_outer_spiral(
             current_row_indices, current_column_indices
         ]
         if first_distances.min() < second_distances.min():
-            log.debug("Assigning to first region")
             first_region[point_indices] = True
             first_region_mask = np.zeros_like(image, dtype=np.bool_)
             first_region_mask[
@@ -344,7 +321,6 @@ def identify_inner_and_outer_spiral(
             )
             assert isinstance(first_region_distance, np.ndarray)
         else:
-            log.debug("Assigning to second region")
             second_region[point_indices] = True
             second_region_mask = np.zeros_like(image, dtype=np.bool_)
             second_region_mask[
@@ -354,10 +330,7 @@ def identify_inner_and_outer_spiral(
                 ~second_region_mask, return_distances=True
             )
             assert isinstance(second_region_distance, np.ndarray)
-        log.debug("")
 
-    log.debug(f"First region = {first_region[0]}")
-    log.debug(f"Second region = {second_region[0]}")
     assert np.all(
         np.logical_xor(first_region, second_region)
     ), f"After closeness, XOR = {(~np.logical_xor(first_region, second_region)).nonzero()}"
@@ -375,7 +348,7 @@ def identify_inner_and_outer_spiral(
 
 
 def __find_single_revolution_regions(
-    image: ImageArray,
+    image: ImageFloatArray,
     num_radii: int,
     num_theta: int,
     min_acceptable_length: int,
@@ -449,8 +422,8 @@ def __find_single_revolution_regions(
 
 
 def __image_transform_from_cartesian_to_polar(
-    image: ImageArray, num_radii: int, num_theta: int
-) -> ImageArray:
+    image: ImageFloatArray, num_radii: int, num_theta: int
+) -> ImageFloatArray:
     centre_x = image.shape[1] / 2 + 0.5
     centre_y = image.shape[0] / 2 + 0.5 - 1
 

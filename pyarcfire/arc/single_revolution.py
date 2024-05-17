@@ -6,7 +6,7 @@ import numpy as np
 from scipy import optimize
 
 # Internal libraries
-from pyarcfire.definitions import ImageArray
+from pyarcfire.definitions import ImageFloatArray
 from .common import LogSpiralFitResult
 from .functions import (
     calculate_best_initial_radius,
@@ -24,7 +24,7 @@ log = logging.getLogger(__name__)
 
 
 def fit_spiral_to_image_single_revolution(
-    image: ImageArray,
+    image: ImageFloatArray,
     initial_pitch_angle: float = 0,
 ) -> LogSpiralFitResult:
     # Convert to polar coordinates

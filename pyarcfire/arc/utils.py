@@ -2,11 +2,11 @@
 import numpy as np
 
 # Internal libraries
-from pyarcfire.definitions import FloatArray1D, ImageArray
+from pyarcfire.definitions import FloatArray1D, ImageFloatArray
 
 
 def _get_polar_coordinates(
-    image: ImageArray,
+    image: ImageFloatArray,
 ) -> tuple[FloatArray1D, FloatArray1D, FloatArray1D]:
     row_indices, column_indices = image.nonzero()
     # Find centre (subpixel centering)

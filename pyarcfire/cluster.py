@@ -10,7 +10,7 @@ from numpy import typing as npt
 from scipy import sparse
 
 # Internal libraries
-from .definitions import ImageArray, ImageArraySequence
+from .definitions import ImageFloatArray, ImageArraySequence
 from .merge import calculate_arc_merge_error
 
 log = logging.getLogger(__name__)
@@ -31,7 +31,7 @@ class Cluster:
         return str(self)
 
     @staticmethod
-    def from_2d_array(array: ImageArray) -> Cluster:
+    def from_2d_array(array: ImageFloatArray) -> Cluster:
         (points,) = np.nonzero(array.flatten())
         return Cluster(list(points.astype(int)))
 
@@ -45,7 +45,7 @@ class Cluster:
 
     @staticmethod
     def list_to_array(
-        clusters: Sequence[Cluster], image: ImageArray
+        clusters: Sequence[Cluster], image: ImageFloatArray
     ) -> ImageArraySequence:
         array_list = [cluster.get_masked_image(image) for cluster in clusters]
         return np.dstack(array_list)
@@ -68,7 +68,7 @@ class Cluster:
         ), "Clusters must have a set of points i.e. no duplicates"
         self._points.append(seed)
 
-    def get_masked_image(self, image: ImageArray) -> ImageArray:
+    def get_masked_image(self, image: ImageFloatArray) -> ImageFloatArray:
         num_rows, num_columns = image.shape
         row_indices, column_indices = np.unravel_index(
             self.get_points(), (num_rows, num_columns)
@@ -90,7 +90,7 @@ class Cluster:
 
 def generate_hac_tree(
     similarity_matrix: sparse.csr_matrix | sparse.csc_matrix,
-    image: ImageArray,
+    image: ImageFloatArray,
     stop_threshold: float,
     error_ratio_threshold: float = 2.5,
     merge_check_minimum_cluster_size: int = 25,
