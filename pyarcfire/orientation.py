@@ -483,7 +483,7 @@ def generate_orientation_fields(
     """
     assert num_orientation_field_levels >= 1, "The number of levels must be at least 1."
     # The dimensions of the image must be divisible by the largest shrink factor
-    maximum_shrink_factor: int = 2 ** (num_orientation_field_levels - 1)
+    maximum_shrink_factor: int = 2**num_orientation_field_levels
     assert (
         image.shape[0] % maximum_shrink_factor == 0
     ), f"Image height must be divisible by {maximum_shrink_factor}"
