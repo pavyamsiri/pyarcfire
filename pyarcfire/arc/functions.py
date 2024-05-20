@@ -10,7 +10,9 @@ from pyarcfire.definitions import FloatArray1D
 def log_spiral[T: (float, FloatArray1D)](
     theta: T, offset: float, pitch_angle: float, initial_radius: float
 ) -> T:
-    angles = (theta - offset) % (2 * np.pi)
+    angles = theta - offset
+    # TODO: For single rev, we need to mod but multi rev should not mod
+    angles %= 2 * np.pi
     result: T = initial_radius * np.exp(-pitch_angle * angles)  # type:ignore
     return result
 
