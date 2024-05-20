@@ -110,7 +110,7 @@ def _calculate_bounds(
         upper_bound = sorted_theta[max_gap_size_idx + 1]
     else:
         rotation_amount = sorted_theta[0]
-        lower_bound = sorted_theta[-1] - rotation_amount % (2 * np.pi)
+        lower_bound = (sorted_theta[-1] - rotation_amount) % (2 * np.pi)
         upper_bound = 2 * np.pi
         max_gap_size = upper_bound - lower_bound
     bounds = (lower_bound, upper_bound)
