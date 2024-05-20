@@ -131,11 +131,7 @@ def process_cluster(args: argparse.Namespace) -> None:
     num_clusters = arr.shape[2]
     log.debug(f"Loaded {num_clusters} clusters")
 
-    log.debug("Identify...")
-    res = identify_inner_and_outer_spiral(arr[:, :, 1], shrink_amount=5)
-    if res is not None:
-        log.debug(f"Inner region has {res.sum()} points")
-        log.debug(f"Outer region has {(~res).sum()} points")
+    fit_spiral_to_image(arr.sum(axis=2))
 
     width = arr.shape[0] / 2 + 0.5
 

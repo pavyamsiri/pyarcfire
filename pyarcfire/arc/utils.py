@@ -9,9 +9,10 @@ def _get_polar_coordinates(
     image: ImageFloatArray,
 ) -> tuple[FloatArray1D, FloatArray1D, FloatArray1D]:
     row_indices, column_indices = image.nonzero()
+    # NOTE: Have to add 1 to be compliant with MatLab's 1-index arrays
     # Find centre (subpixel centering)
-    row_offset = image.shape[0] / 2 + 0.5
-    column_offset = image.shape[1] / 2 + 0.5
+    row_offset = image.shape[0] / 2 + 1.5
+    column_offset = image.shape[1] / 2 + 1.5
     x = column_indices - column_offset
     y = -(row_indices - row_offset)
 

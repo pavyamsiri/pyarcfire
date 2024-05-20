@@ -479,7 +479,7 @@ def __split_regions(
             split_theta_idx = int(wrap_mid_length - wrap_data.start_length - 1)
         split_theta = theta_bin_centres[split_theta_idx]
         first_region = np.logical_and(
-            inner_region, np.logical_and(theta >= theta_start, theta < split_theta)
+            inner_region, np.logical_and(theta >= split_theta, theta < theta_end)
         )
         second_region = np.logical_and(inner_region, ~first_region)
     else:
