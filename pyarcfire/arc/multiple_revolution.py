@@ -44,6 +44,15 @@ class WrapData:
     end: int
 
 
+@dataclass
+class InternalLogSpiralFitResult:
+    theta: FloatArray1D
+    offset: float
+    pitch_angle: float
+    arc_bounds: tuple[float, float]
+    error: float
+
+
 def fit_spiral_to_image_multiple_revolution(
     image: ImageFloatArray,
     initial_pitch_angle: float = 0,
@@ -54,14 +63,11 @@ def fit_spiral_to_image_multiple_revolution(
     # Check if the cluster revolves more than once
     bad_bounds, _, _, _ = _calculate_bounds(theta)
 
-    # Gap in theta is large enough to not need multiple revolutions
-    if not bad_bounds:
-        need_multiple_revolutions = False
-    # The cluster contains the origin or is closed around centre
-    elif __cluster_has_no_endpoints_or_contains_origin(image):
-        need_multiple_revolutions = False
-    else:
-        need_multiple_revolutions = True
+    inner_region: BoolArray1D | None = None
+
+    # Gap in theta is not large enough to not need multiple revolutions
+    # and the cluster does not contain the origin or is not closed around centre
+    if bad_bounds or not __cluster_has_no_endpoints_or_contains_origin(image):
         inner_region = identify_inner_and_outer_spiral(image, shrink_amount=5)
         if (
             inner_region is None
@@ -69,46 +75,26 @@ def fit_spiral_to_image_multiple_revolution(
             or inner_region.sum() == len(inner_region)
         ):
             log.debug("Don't need multiple revolutions")
-            need_multiple_revolutions = False
+            inner_region = None
         else:
             theta = _remove_theta_discontinuities(theta, image, inner_region)
-    log.debug(f"Need multiple revolutions = {need_multiple_revolutions}")
-
-    # Find suitable bounds for the offset parameter
-    bad_bounds, (lower_bound, upper_bound), rotation_amount, max_gap_size = (
-        _calculate_bounds(theta)
-    )
-    theta = (theta - rotation_amount) % (2 * np.pi)
-
-    # Perform a fit to get the pitch angle
-    if bad_bounds:
-        log.warn(f"Bad bounds! Gap size = {max_gap_size}")
-        offset = 0
-        pitch_angle = 0
-    else:
-        offset = (lower_bound + upper_bound) / 2
-        res = optimize.least_squares(
-            calculate_log_spiral_error_from_pitch_angle,
-            x0=initial_pitch_angle,
-            args=(radii, theta, weights, offset),
+            log.debug(f"Adjusted theta = [{theta.min()}, {theta.max()}]")
+    log.debug(f"Need multiple revolutions = {inner_region is not None}")
+    need_multiple_revolutions: bool = inner_region is not None
+    if need_multiple_revolutions:
+        fit_result = _fit_spiral_to_image_multiple_revolution_core(
+            radii, theta, weights, initial_pitch_angle, inner_region
         )
-        assert res.success, "Failed to fit pitch angle"
-        pitch_angle = res.x[0]
+    else:
+        fit_result = _fit_spiral_to_image_single_revolution_core(
+            radii, theta, weights, initial_pitch_angle
+        )
 
-    # Calculate the error from the fit
-    initial_radius = calculate_best_initial_radius(
-        radii, theta, weights, offset, pitch_angle
-    )
-    error, _ = calculate_log_spiral_error(
-        radii, theta, weights, offset, pitch_angle, initial_radius
-    )
-
-    # Rotate back
-    theta = (theta + rotation_amount) % (2 * np.pi)
-    offset += rotation_amount
-
-    # Get arc bounds
-    arc_bounds = _get_arc_bounds(offset, rotation_amount, lower_bound, upper_bound)
+    arc_bounds = fit_result.arc_bounds
+    offset = fit_result.offset
+    pitch_angle = fit_result.pitch_angle
+    error = fit_result.error
+    theta = fit_result.theta
 
     # Adjust so that arc bounds is relative to theta
     (theta, arc_bounds, offset) = _adjust_theta_to_zero(theta, arc_bounds, offset)
@@ -137,6 +123,161 @@ def fit_spiral_to_image_multiple_revolution(
     )
 
     return result
+
+
+def _fit_spiral_to_image_single_revolution_core(
+    radii: FloatArray1D,
+    theta: FloatArray1D,
+    weights: FloatArray1D,
+    initial_pitch_angle: float,
+) -> InternalLogSpiralFitResult:
+    # Find suitable bounds for the offset parameter
+    bad_bounds, (lower_bound, upper_bound), rotation_amount, max_gap_size = (
+        _calculate_bounds(theta)
+    )
+    rotated_theta = (theta - rotation_amount) % (2 * np.pi)
+
+    # Perform a fit to get the pitch angle
+    if bad_bounds:
+        log.warn(f"Bad bounds! Gap size = {max_gap_size}")
+        offset = 0
+        pitch_angle = 0
+    else:
+        offset = (lower_bound + upper_bound) / 2
+        res = optimize.least_squares(
+            calculate_log_spiral_error_from_pitch_angle,
+            x0=initial_pitch_angle,
+            args=(radii, rotated_theta, weights, offset),
+        )
+        assert res.success, "Failed to fit pitch angle"
+        pitch_angle = res.x[0]
+
+    # Calculate the error from the fit
+    initial_radius = calculate_best_initial_radius(
+        radii, rotated_theta, weights, offset, pitch_angle
+    )
+    error, _ = calculate_log_spiral_error(
+        radii, rotated_theta, weights, offset, pitch_angle, initial_radius
+    )
+
+    # Rotate back
+    offset += rotation_amount
+
+    theta_adjust = (theta - offset) % (2 * np.pi) + offset
+    # Get arc bounds
+    arc_bounds = _get_arc_bounds(offset, rotation_amount, lower_bound, upper_bound)
+    fit_result = InternalLogSpiralFitResult(
+        theta=theta_adjust,
+        offset=offset,
+        pitch_angle=pitch_angle,
+        arc_bounds=arc_bounds,
+        error=error,
+    )
+    return fit_result
+
+
+def _fit_spiral_to_image_multiple_revolution_core(
+    radii: FloatArray1D,
+    theta: FloatArray1D,
+    weights: FloatArray1D,
+    initial_pitch_angle: float,
+    inner_region: BoolArray1D,
+) -> InternalLogSpiralFitResult:
+    # fitting depends on the arc bounds, but we don't know what the arc
+    # bounds are (i.e., whether to calculate the bounds from the inner or
+    # outer points) until we know the chirality.  Since we only know the
+    # chirality after the fit, we do two fits, one assuming CW and the
+    # other assuming CCW, and take the one with the better error.
+
+    # For the >2*pi case, we don't do mod 2*pi in the rotations because
+    # theta-values can be outside the range [0, 2*pi], and discontinuities
+    # in theta-values can severely impact the fitting.
+
+    min_theta: float = float(np.min(theta))
+    max_theta: float = float(np.max(theta))
+
+    # TODO: Pitch angle optimisation is totally wrong
+    # Assume chirality is clockwise and fit a spiral
+    cw_rotated_theta, cw_offset, cw_pitch_angle, cw_error = (
+        __fit_multiple_revolution_spiral(
+            radii, theta, weights, ~inner_region, initial_pitch_angle, clockwise=True
+        )
+    )
+    # Assume chirality is counter clockwise and fit a spiral
+    ccw_rotated_theta, ccw_offset, ccw_pitch_angle, ccw_error = (
+        __fit_multiple_revolution_spiral(
+            radii, theta, weights, inner_region, initial_pitch_angle, clockwise=False
+        )
+    )
+
+    if cw_error < ccw_error:
+        adjusted_theta = cw_rotated_theta
+        offset = cw_offset
+        pitch_angle = cw_pitch_angle
+        error = cw_error
+    else:
+        adjusted_theta = ccw_rotated_theta
+        offset = ccw_offset
+        pitch_angle = ccw_pitch_angle
+        error = ccw_error
+
+    # Construct arc bounds
+    if offset > min_theta:
+        arc_bounds = (min_theta - offset, max_theta - offset)
+    else:
+        arc_bounds = (min_theta - offset + 2 * np.pi, max_theta - offset + 2 * np.pi)
+
+    result = InternalLogSpiralFitResult(
+        theta=adjusted_theta,
+        offset=offset,
+        pitch_angle=pitch_angle,
+        arc_bounds=arc_bounds,
+        error=error,
+    )
+    return result
+
+
+def __fit_multiple_revolution_spiral(
+    radii: FloatArray1D,
+    theta: FloatArray1D,
+    weights: FloatArray1D,
+    region: BoolArray1D,
+    initial_pitch_angle: float,
+    clockwise: bool,
+) -> tuple[FloatArray1D, float, float, float]:
+    bad_bounds, (lower_bound, upper_bound), rotation_amount, _ = _calculate_bounds(
+        theta[region]
+    )
+    assert not bad_bounds
+    rotated_theta = theta - rotation_amount
+    offset = (lower_bound + upper_bound) / 2
+    pitch_angle_bounds = (0, np.inf) if clockwise else (-np.inf, 0)
+    res = optimize.least_squares(
+        calculate_log_spiral_error_from_pitch_angle,
+        x0=initial_pitch_angle,
+        bounds=pitch_angle_bounds,
+        args=(radii, rotated_theta, weights, offset),
+    )
+    assert res.success, "Failed to fit pitch angle"
+    pitch_angle = res.x[0]
+
+    # Calculate the error from the fit
+    initial_radius = calculate_best_initial_radius(
+        radii, rotated_theta, weights, offset, pitch_angle
+    )
+    error, _ = calculate_log_spiral_error(
+        radii,
+        rotated_theta,
+        weights,
+        offset,
+        pitch_angle,
+        initial_radius,
+    )
+
+    # Rotate back
+    offset = (offset + rotation_amount) % (2 * np.pi)
+
+    return (rotated_theta, offset, pitch_angle, error)
 
 
 def __cluster_has_no_endpoints_or_contains_origin(
@@ -621,8 +762,8 @@ def _adjust_theta_for_gap(
         min_theta = sorted_theta[max_gap_idx + 1]
         bottom_half = np.logical_and(region, theta >= min_theta)
 
-        negative_image = np.ones_like(image, dtype=np.bool_)
-        negative_image[row_indices[region], row_indices[region]] = False
+        negative_image = np.zeros_like(image, dtype=np.bool_)
+        negative_image[row_indices[region], column_indices[region]] = True
 
         negative_distances = ndimage.distance_transform_edt(
             negative_image, return_distances=True
