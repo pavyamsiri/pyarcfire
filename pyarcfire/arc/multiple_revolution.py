@@ -19,7 +19,6 @@ from pyarcfire.definitions import (
     IntegerArray1D,
     BoolArray1D,
 )
-from pyarcfire.debug_utils import _debug_plot_image
 from .common import LogSpiralFitResult
 from .functions import (
     calculate_best_initial_radius,
@@ -248,7 +247,7 @@ def identify_inner_and_outer_spiral(
         ~second_region_mask, return_distances=True
     )
     assert isinstance(second_region_distance, np.ndarray)
-    connected_components, num_components = skimage.measure.label(
+    connected_components, num_components = skimage.measure.label(  # type:ignore
         non_region_mask, return_num=True
     )
     assert isinstance(connected_components, np.ndarray)
@@ -295,7 +294,7 @@ def identify_inner_and_outer_spiral(
         ~second_region_mask, return_distances=True
     )
     assert isinstance(second_region_distance, np.ndarray)
-    connected_components, num_components = skimage.measure.label(
+    connected_components, num_components = skimage.measure.label(  # type:ignore
         non_region_mask, return_num=True
     )
     assert isinstance(connected_components, np.ndarray)
