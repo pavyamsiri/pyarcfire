@@ -183,8 +183,6 @@ def identify_inner_and_outer_spiral(
     can_be_single_revolution = _find_single_revolution_regions(
         image, num_radii, num_theta, min_acceptable_length, shrink_amount
     )
-    log.debug(f"Single revolution region = {can_be_single_revolution}")
-    log.debug(f"Single revolution number of cells = {can_be_single_revolution.sum()}")
 
     # Find the start and end of each region
     single_revolution_differences = np.diff(can_be_single_revolution.astype(np.float32))
@@ -250,10 +248,11 @@ def identify_inner_and_outer_spiral(
         ~second_region_mask, return_distances=True
     )
     assert isinstance(second_region_distance, np.ndarray)
-    connected_components = skimage.measure.label(non_region_mask)
+    connected_components, num_components = skimage.measure.label(
+        non_region_mask, return_num=True
+    )
     assert isinstance(connected_components, np.ndarray)
-    labels = set(list(connected_components.flatten()))
-    for label in labels:
+    for label in range(1, num_components + 1):
         current_row_indices, current_column_indices = (
             connected_components == label
         ).nonzero()
@@ -296,10 +295,11 @@ def identify_inner_and_outer_spiral(
         ~second_region_mask, return_distances=True
     )
     assert isinstance(second_region_distance, np.ndarray)
-    connected_components = skimage.measure.label(non_region_mask)
+    connected_components, num_components = skimage.measure.label(
+        non_region_mask, return_num=True
+    )
     assert isinstance(connected_components, np.ndarray)
-    labels = set(list(connected_components.flatten()))
-    for label in labels:
+    for label in range(1, num_components + 1):
         current_row_indices, current_column_indices = (
             connected_components == label
         ).nonzero()
