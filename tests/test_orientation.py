@@ -1,7 +1,4 @@
-import pytest  # type:ignore
-
 # Standard libraries
-from typing import Any
 
 # External libraries
 import numpy as np

@@ -2,7 +2,6 @@
 
 # External libraries
 import numpy as np
-from numpy import typing as npt
 from numpy import testing as nptesting
 
 # Testing libraries
