@@ -62,26 +62,16 @@ def fit_spiral_to_image_multiple_revolution(
         need_multiple_revolutions = False
     else:
         need_multiple_revolutions = True
-        identify_result = identify_inner_and_outer_spiral(image, shrink_amount=5)
+        inner_region = identify_inner_and_outer_spiral(image, shrink_amount=5)
         if (
-            identify_result is None
-            or identify_result.sum() == 0
-            or identify_result.sum() == len(identify_result)
+            inner_region is None
+            or inner_region.sum() == 0
+            or inner_region.sum() == len(inner_region)
         ):
             log.debug("Don't need multiple revolutions")
             need_multiple_revolutions = False
         else:
-            pass
-        # [isInner, gapFail] = idInnerOuterSpiral(img, ctrR, ctrC, plotFlag);
-        # nInner = sum(isInner);
-        # failed2rev = gapFail;
-        # if gapFail || (nInner == 0) || (nInner == numel(isInner))
-        #     allowArcBeyond2pi = false;
-        # else
-        #     thAdj = removeThetaDiscontFor2rev(theta, img, isInner);
-        #     # TODO: make theta and thAdj one variable after making sure that
-        #     # bounds calculation doesn"t need a different (unaltered) value
-        #     theta = thAdj;
+            theta = _remove_theta_discontinuities(theta, image, inner_region)
     log.debug(f"Need multiple revolutions = {need_multiple_revolutions}")
 
     # Find suitable bounds for the offset parameter
@@ -564,3 +554,90 @@ def __calculate_wrap(
                 end=wrap_end,
             )
     return (start_indices, end_indices, wrap_data)
+
+
+def _remove_theta_discontinuities(
+    theta: FloatArray1D, image: ImageFloatArray, inner_region: BoolArray1D
+) -> FloatArray1D:
+    assert np.count_nonzero(inner_region) > 0
+    adjusted_theta = np.copy(theta)
+    inner_adjusted_theta = _adjust_theta_for_gap(theta, image, inner_region)
+    if inner_adjusted_theta is not None:
+        adjusted_theta = inner_adjusted_theta
+
+    outer_adjusted_theta = _adjust_theta_for_gap(theta, image, ~inner_region)
+    if outer_adjusted_theta is not None:
+        adjusted_theta = outer_adjusted_theta
+
+    modded_adjusted_theta = adjusted_theta % (2 * np.pi)
+
+    min_theta_index = np.argmin(modded_adjusted_theta)
+    min_theta = modded_adjusted_theta[min_theta_index]
+
+    max_theta_index = np.argmax(modded_adjusted_theta)
+    max_theta = modded_adjusted_theta[max_theta_index]
+
+    min_theta_multiple = int(np.floor(min_theta / (2 * np.pi)))
+    max_theta_multiple = int(np.floor(max_theta / (2 * np.pi)))
+
+    if min_theta_multiple != max_theta_multiple:
+        log.warn("Theta-discontinuity through x-axis!")
+        assert inner_adjusted_theta is None and outer_adjusted_theta is None
+        if inner_region[min_theta_index]:
+            assert not inner_region[max_theta_index]
+            adjusted_theta[inner_region] = modded_adjusted_theta[inner_region] + (
+                2 * np.pi
+            ) * (max_theta_multiple + 1)
+        else:
+            assert inner_region[max_theta_index]
+            adjusted_theta[~inner_region] = modded_adjusted_theta[~inner_region] + (
+                2 * np.pi
+            ) * (max_theta_multiple + 1)
+
+    return adjusted_theta
+
+
+def _adjust_theta_for_gap(
+    theta: FloatArray1D, image: ImageFloatArray, region: BoolArray1D
+) -> FloatArray1D | None:
+    row_indices, column_indices = image.nonzero()
+    assert len(row_indices) == len(column_indices)
+    assert len(region) == len(row_indices)
+
+    sorted_theta = np.sort(theta[region])
+    gaps = np.diff(sorted_theta)
+    max_gap_idx = np.argmax(gaps)
+    max_gap_size = gaps[max_gap_idx]
+    end_gap = sorted_theta[0] + 2 * np.pi - sorted_theta[-1]
+    # Gap in points doesn't go through zero so some points will need to
+    # be adjusted for continuity
+    if end_gap < max_gap_size:
+        adjusted_theta = np.copy(theta)
+        # Split points into points above and below x-axis
+        # Theta value before gap
+        max_theta = sorted_theta[max_gap_idx]
+        top_half = np.logical_and(region, theta <= max_theta)
+        # Theta value after gap
+        min_theta = sorted_theta[max_gap_idx + 1]
+        bottom_half = np.logical_and(region, theta >= min_theta)
+
+        negative_image = np.ones_like(image, dtype=np.bool_)
+        negative_image[row_indices[region], row_indices[region]] = False
+
+        negative_distances = ndimage.distance_transform_edt(
+            negative_image, return_distances=True
+        )
+        assert isinstance(negative_distances, np.ndarray)
+
+        min_top_distance = np.min(
+            negative_distances[row_indices[top_half], column_indices[top_half]]
+        )
+        min_bottom_distance = np.min(
+            negative_distances[row_indices[bottom_half], column_indices[bottom_half]]
+        )
+        if min_top_distance > min_bottom_distance:
+            adjusted_theta[top_half] += 2 * np.pi
+        else:
+            adjusted_theta[bottom_half] -= 2 * np.pi
+        return adjusted_theta
+    return None
