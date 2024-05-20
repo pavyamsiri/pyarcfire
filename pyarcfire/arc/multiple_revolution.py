@@ -15,6 +15,7 @@ import skimage.measure
 # Internal libraries
 from pyarcfire.definitions import (
     FloatArray1D,
+    ImageBoolArray,
     ImageFloatArray,
     IntegerArray1D,
     BoolArray1D,
@@ -180,9 +181,11 @@ def identify_inner_and_outer_spiral(
 
     min_acceptable_length = 5 * np.ceil(num_theta / 360)
     # Find theta bins which contain only a single revolution
-    can_be_single_revolution = __find_single_revolution_regions(
+    can_be_single_revolution = _find_single_revolution_regions(
         image, num_radii, num_theta, min_acceptable_length, shrink_amount
     )
+    log.debug(f"Single revolution region = {can_be_single_revolution}")
+    log.debug(f"Single revolution number of cells = {can_be_single_revolution.sum()}")
 
     # Find the start and end of each region
     single_revolution_differences = np.diff(can_be_single_revolution.astype(np.float32))
@@ -347,7 +350,7 @@ def identify_inner_and_outer_spiral(
         return second_region
 
 
-def __find_single_revolution_regions(
+def _find_single_revolution_regions(
     image: ImageFloatArray,
     num_radii: int,
     num_theta: int,
@@ -360,12 +363,20 @@ def __find_single_revolution_regions(
     )
     polar_image = np.nan_to_num(polar_image, nan=0)
 
-    dilated_polar_image = ndimage.binary_dilation(
+    dilated_polar_image: ImageBoolArray = ndimage.binary_dilation(  # type:ignore
         polar_image, structure=np.ones((3, 3))
     )
 
+    return _find_single_revolution_regions_polar(dilated_polar_image, shrink_amount)
+
+
+def _find_single_revolution_regions_polar(
+    polar_image: ImageBoolArray, shrink_amount: int
+) -> npt.NDArray[np.bool_]:
+    num_radii: int = polar_image.shape[0]
+    num_theta: int = polar_image.shape[1]
     # Pad columns with zeros
-    theta_diff = np.diff(dilated_polar_image, prepend=0, append=0, axis=0)
+    theta_diff = np.diff(polar_image, prepend=0, append=0, axis=0)
     # Theta bins which only have a single start and end point
     # i.e. ray from centre only hits the cluster once and not multiple times
     can_be_single_revolution = np.logical_and(
@@ -375,13 +386,11 @@ def __find_single_revolution_regions(
     # Radial index for every point in the polar image
     radial_locations = np.tile(np.arange(1, num_radii + 1), (num_theta, 1)).T
 
-    polar_image_for_min = dilated_polar_image.astype(np.float32)
+    polar_image_for_min = polar_image.astype(np.float32)
     polar_image_for_min[polar_image_for_min == 0] = np.inf
     min_locations = np.min(polar_image_for_min * radial_locations, axis=0)
     min_locations[np.isinf(min_locations)] = 0
-    max_locations = np.max(
-        dilated_polar_image.astype(np.float32) * radial_locations, axis=0
-    )
+    max_locations = np.max(polar_image.astype(np.float32) * radial_locations, axis=0)
     neighbour_max_location_left = np.roll(max_locations, 1)
     neighbour_max_location_right = np.roll(max_locations, -1)
     neighbour_min_location_left = np.roll(min_locations, 1)
