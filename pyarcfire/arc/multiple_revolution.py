@@ -6,7 +6,6 @@ from typing import Sequence
 
 # External libraries
 import numpy as np
-from numpy import typing as npt
 from scipy import ndimage
 from scipy import optimize
 import skimage
@@ -356,7 +355,7 @@ def _find_single_revolution_regions(
     num_theta: int,
     min_acceptable_length: int,
     shrink_amount: int,
-) -> npt.NDArray[np.bool_]:
+) -> BoolArray1D:
     assert shrink_amount <= min_acceptable_length
     polar_image = np.flip(
         __image_transform_from_cartesian_to_polar(image, num_radii, num_theta), axis=1
@@ -372,7 +371,7 @@ def _find_single_revolution_regions(
 
 def _find_single_revolution_regions_polar(
     polar_image: ImageBoolArray, shrink_amount: int
-) -> npt.NDArray[np.bool_]:
+) -> BoolArray1D:
     num_radii: int = polar_image.shape[0]
     num_theta: int = polar_image.shape[1]
     # Pad columns with zeros
@@ -395,7 +394,7 @@ def _find_single_revolution_regions_polar(
     neighbour_max_location_right = np.roll(max_locations, -1)
     neighbour_min_location_left = np.roll(min_locations, 1)
     neighbour_min_location_right = np.roll(min_locations, -1)
-    conditions: Sequence[npt.NDArray[np.bool_]] = (
+    conditions: Sequence[BoolArray1D] = (
         can_be_single_revolution,
         np.logical_or(
             min_locations <= neighbour_max_location_left,
