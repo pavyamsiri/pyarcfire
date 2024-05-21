@@ -24,9 +24,13 @@ def _get_polar_coordinates(
 
 
 def _adjust_theta_to_zero(
-    theta: FloatArray1D, arc_bounds: tuple[float, float], offset: float
+    theta: FloatArray1D,
+    arc_bounds: tuple[float, float],
+    offset: float,
+    use_modulo: bool,
 ) -> tuple[FloatArray1D, tuple[float, float], float]:
-    theta = (theta - offset) % (2 * np.pi) + offset
+    if use_modulo:
+        theta = (theta - offset) % (2 * np.pi) + offset
     arc_start, _ = arc_bounds
     new_offset = float(offset + arc_start)
     theta += new_offset - np.min(theta)

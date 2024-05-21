@@ -99,14 +99,27 @@ def fit_spiral_to_image_multiple_revolution(
     theta = fit_result.theta
 
     # Adjust so that arc bounds is relative to theta
-    (theta, arc_bounds, offset) = _adjust_theta_to_zero(theta, arc_bounds, offset)
+    (theta, arc_bounds, offset) = _adjust_theta_to_zero(
+        theta, arc_bounds, offset, not need_multiple_revolutions
+    )
 
     # Recalculate initial radius and error after adjustment
     initial_radius = calculate_best_initial_radius(
-        radii, theta, weights, offset, pitch_angle
+        radii,
+        theta,
+        weights,
+        offset,
+        pitch_angle,
+        use_modulo=not need_multiple_revolutions,
     )
     new_error, residuals = calculate_log_spiral_error(
-        radii, theta, weights, offset, pitch_angle, initial_radius
+        radii,
+        theta,
+        weights,
+        offset,
+        pitch_angle,
+        initial_radius,
+        use_modulo=not need_multiple_revolutions,
     )
 
     # Ensure consistency
@@ -149,17 +162,23 @@ def _fit_spiral_to_image_single_revolution_core(
         res = optimize.least_squares(
             calculate_log_spiral_error_from_pitch_angle,
             x0=initial_pitch_angle,
-            args=(radii, rotated_theta, weights, offset),
+            args=(radii, rotated_theta, weights, offset, True),
         )
         assert res.success, "Failed to fit pitch angle"
         pitch_angle = res.x[0]
 
     # Calculate the error from the fit
     initial_radius = calculate_best_initial_radius(
-        radii, rotated_theta, weights, offset, pitch_angle
+        radii, rotated_theta, weights, offset, pitch_angle, use_modulo=True
     )
     error, _ = calculate_log_spiral_error(
-        radii, rotated_theta, weights, offset, pitch_angle, initial_radius
+        radii,
+        rotated_theta,
+        weights,
+        offset,
+        pitch_angle,
+        initial_radius,
+        use_modulo=True,
     )
 
     # Rotate back
@@ -258,7 +277,7 @@ def __fit_multiple_revolution_spiral(
         calculate_log_spiral_error_from_pitch_angle,
         x0=initial_pitch_angle,
         bounds=pitch_angle_bounds,
-        args=(radii, rotated_theta, weights, offset),
+        args=(radii, rotated_theta, weights, offset, False),
         ftol=MULTIPLE_REVOLUTION_TOLERANCE,
         gtol=MULTIPLE_REVOLUTION_TOLERANCE,
         xtol=MULTIPLE_REVOLUTION_TOLERANCE,
@@ -268,7 +287,7 @@ def __fit_multiple_revolution_spiral(
 
     # Calculate the error from the fit
     initial_radius = calculate_best_initial_radius(
-        radii, rotated_theta, weights, offset, pitch_angle
+        radii, rotated_theta, weights, offset, pitch_angle, use_modulo=False
     )
     error, _ = calculate_log_spiral_error(
         radii,
@@ -277,6 +296,7 @@ def __fit_multiple_revolution_spiral(
         offset,
         pitch_angle,
         initial_radius,
+        use_modulo=False,
     )
 
     # Rotate back
