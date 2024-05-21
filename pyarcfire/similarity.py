@@ -7,7 +7,6 @@ import logging
 # External libraries
 import numpy as np
 from numpy import typing as npt
-from rich import progress as rprogress
 from scipy import sparse
 
 
@@ -106,7 +105,7 @@ def calculate_pixel_similarities(
     add_neighbour_column = maximum_distance * np.array([-1, 0, +1, -1, +1, -1, 0, +1])
 
     fill_idx: int = 0
-    for idx in rprogress.track(nonzero_indices):
+    for idx in nonzero_indices:
         # Compute similarity values for each neighbour
         row_idx, column_idx = np.unravel_index(idx, (num_rows, num_columns))
         neighbour_row_indices = row_idx + add_neighbour_row
