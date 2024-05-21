@@ -28,6 +28,9 @@ IMAGE_SIZE: int = 256
 def main(raw_args: Sequence[str]) -> None:
     args = _parse_args(raw_args)
 
+    if not args.debug_flag:
+        logging.getLogger("pyarcfire").setLevel("CRITICAL")
+
     match args.command:
         case "image":
             process_from_image(args)
@@ -171,11 +174,25 @@ def _parse_args(args: Sequence[str]) -> argparse.Namespace:
         prog="pyarcfire",
         description="Python port of SpArcFiRe, a program that finds and reports spiral features in images.",
     )
+
+    base_subparser = argparse.ArgumentParser(add_help=False)
+    base_subparser.add_argument(
+        "-debug",
+        "--debug",
+        action="store_true",
+        dest="debug_flag",
+        help="Turns on debug statements.",
+    )
+
     subparsers = parser.add_subparsers(dest="command")
-    from_image_parser = subparsers.add_parser("image", help="Process an image.")
+    from_image_parser = subparsers.add_parser(
+        "image", help="Process an image.", parents=(base_subparser,)
+    )
     _configure_image_command_parser(from_image_parser)
     from_cluster_parser = subparsers.add_parser(
-        "cluster", help="Process a cluster stored in as a data array."
+        "cluster",
+        help="Process a cluster stored in as a data array.",
+        parents=(base_subparser,),
     )
     _configure_cluster_command_parser(from_cluster_parser)
     return parser.parse_args(args)
