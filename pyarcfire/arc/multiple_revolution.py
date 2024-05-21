@@ -32,6 +32,8 @@ from .utils import (
     _get_arc_bounds,
 )
 
+MULTIPLE_REVOLUTION_TOLERANCE: float = 1e-12
+
 log = logging.getLogger(__name__)
 
 
@@ -257,6 +259,9 @@ def __fit_multiple_revolution_spiral(
         x0=initial_pitch_angle,
         bounds=pitch_angle_bounds,
         args=(radii, rotated_theta, weights, offset),
+        ftol=MULTIPLE_REVOLUTION_TOLERANCE,
+        gtol=MULTIPLE_REVOLUTION_TOLERANCE,
+        xtol=MULTIPLE_REVOLUTION_TOLERANCE,
     )
     assert res.success, "Failed to fit pitch angle"
     pitch_angle = res.x[0]
