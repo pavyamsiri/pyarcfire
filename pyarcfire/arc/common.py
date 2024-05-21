@@ -17,6 +17,7 @@ class LogSpiralFitResult:
     arc_bounds: tuple[float, float]
     total_error: float
     errors: FloatArray1D
+    has_multiple_revolutions: bool
 
     def calculate_cartesian_coordinates(
         self, num_points: int
@@ -25,7 +26,13 @@ class LogSpiralFitResult:
         end_angle = start_angle + self.arc_bounds[1]
 
         theta = np.linspace(start_angle, end_angle, num_points)
-        radii = log_spiral(theta, self.offset, self.pitch_angle, self.initial_radius)
+        radii = log_spiral(
+            theta,
+            self.offset,
+            self.pitch_angle,
+            self.initial_radius,
+            use_modulo=not self.has_multiple_revolutions,
+        )
         x = radii * np.cos(theta)
         y = radii * np.sin(theta)
         return (x, y)

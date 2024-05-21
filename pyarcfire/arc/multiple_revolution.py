@@ -135,6 +135,7 @@ def fit_spiral_to_image_multiple_revolution(
         arc_bounds=arc_bounds,
         total_error=new_error,
         errors=np.square(residuals),
+        has_multiple_revolutions=need_multiple_revolutions,
     )
 
     return result
