@@ -77,12 +77,9 @@ def fit_spiral_to_image_multiple_revolution(
             or inner_region.sum() == 0
             or inner_region.sum() == len(inner_region)
         ):
-            log.debug("Don't need multiple revolutions")
             inner_region = None
         else:
             theta = _remove_theta_discontinuities(theta, image, inner_region)
-            log.debug(f"Adjusted theta = [{theta.min()}, {theta.max()}]")
-    log.debug(f"Need multiple revolutions = {inner_region is not None}")
     need_multiple_revolutions: bool = inner_region is not None
     if need_multiple_revolutions:
         fit_result = _fit_spiral_to_image_multiple_revolution_core(
@@ -127,9 +124,13 @@ def fit_spiral_to_image_multiple_revolution(
 
     # Ensure consistency
     square_err_difference_per_pixel = abs(new_error - error) / len(theta)
-    # assert np.isclose(
-    #     square_err_difference_per_pixel, 0
-    # ), f"Inconsistent fit when eliminating theta offset; difference = {square_err_difference_per_pixel}"
+    inconsistent_fit_after_adjustment = not np.isclose(
+        square_err_difference_per_pixel, 0
+    )
+    if inconsistent_fit_after_adjustment:
+        log.warn(
+            f"Inconsistent fit when eliminating theta offset. Difference = {square_err_difference_per_pixel}"
+        )
 
     result = LogSpiralFitResult(
         offset=offset,
@@ -151,14 +152,14 @@ def _fit_spiral_to_image_single_revolution_core(
     initial_pitch_angle: float,
 ) -> InternalLogSpiralFitResult:
     # Find suitable bounds for the offset parameter
-    bad_bounds, (lower_bound, upper_bound), rotation_amount, max_gap_size = (
-        _calculate_bounds(theta)
+    bad_bounds, (lower_bound, upper_bound), rotation_amount, _ = _calculate_bounds(
+        theta
     )
     rotated_theta = (theta - rotation_amount) % (2 * np.pi)
 
     # Perform a fit to get the pitch angle
     if bad_bounds:
-        log.warn(f"Bad bounds! Gap size = {max_gap_size}")
+        log.warn("Single revolution: Bad bounds!")
         offset = 0
         pitch_angle = 0
     else:
@@ -391,7 +392,7 @@ def identify_inner_and_outer_spiral(
 
     if max_length < min_acceptable_length:
         log.warn(
-            f"Warning:idInnerOuterSpiral:longest sgl-rev region length ({max_length}) is below the minimum length {min_acceptable_length}"
+            f"Longest single revolution region length {max_length} is below the minimum length {min_acceptable_length}"
         )
         return None
 
@@ -632,7 +633,6 @@ def __split_regions(
         wrap_length = wrap_data.length
         wrap_larger_than_all_regions = wrap_length > max_region_length
     if only_wrap_exists or wrap_larger_than_all_regions:
-        log.debug("Wrap happens")
         # Only wrap exists
         assert wrap_data is not None
         max_length = wrap_data.length
@@ -650,7 +650,6 @@ def __split_regions(
         )
         second_region = np.logical_and(inner_region, ~first_region)
     else:
-        log.debug("No wrap")
         assert max_region_length is not None
         max_length = max_region_length
         max_index = region_lengths.argmax()
@@ -661,7 +660,6 @@ def __split_regions(
         ]
         first_region = np.logical_and(theta >= theta_start, theta < split_theta)
         second_region = np.logical_and(theta >= split_theta, theta < theta_end)
-    log.debug(f"Max length = {max_length}")
     return first_region, second_region, max_length
 
 
