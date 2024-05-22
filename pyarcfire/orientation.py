@@ -16,7 +16,9 @@ from numpy import typing as npt
 from scipy import signal
 from skimage import transform
 
+
 # Internal libraries
+from .debug_utils import benchmark
 from .definitions import ImageFloatArray, ImageArraySequence
 
 
@@ -462,6 +464,7 @@ class OrientationField:
         return OrientationField(denoised)
 
 
+@benchmark
 def generate_orientation_fields(
     image: ImageFloatArray, num_orientation_field_levels: int = 3
 ) -> OrientationField:

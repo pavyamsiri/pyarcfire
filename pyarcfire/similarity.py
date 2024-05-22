@@ -11,11 +11,13 @@ from scipy import sparse
 
 
 # Internal libraries
+from .debug_utils import benchmark
 from .orientation import OrientationField
 
 log = logging.getLogger(__name__)
 
 
+@benchmark
 def generate_similarity_matrix(
     orientation: OrientationField, similarity_cutoff: float
 ) -> sparse.coo_matrix:

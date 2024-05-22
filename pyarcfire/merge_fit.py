@@ -8,12 +8,14 @@ from scipy.ndimage import distance_transform_edt
 
 # Internal libraries
 from .arc import LogSpiralFitResult, fit_spiral_to_image
+from .debug_utils import benchmark
 from .definitions import ImageFloatArray, ImageArraySequence
 from .merge import calculate_arc_merge_error
 
 log = logging.getLogger(__name__)
 
 
+@benchmark
 def merge_clusters_by_fit(
     clusters: ImageArraySequence, stop_threshold: float = 2.5
 ) -> ImageArraySequence:

@@ -10,6 +10,7 @@ from numpy import typing as npt
 from scipy import sparse
 
 # Internal libraries
+from .debug_utils import benchmark
 from .definitions import ImageFloatArray, ImageArraySequence
 from .merge import calculate_arc_merge_error
 
@@ -88,6 +89,7 @@ class Cluster:
         return mask
 
 
+@benchmark
 def generate_hac_tree(
     similarity_matrix: sparse.csr_matrix | sparse.csc_matrix,
     image: ImageFloatArray,

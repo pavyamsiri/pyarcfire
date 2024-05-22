@@ -8,6 +8,7 @@ import scipy.io
 from skimage import filters
 
 # Internal libraries
+from .debug_utils import benchmark
 from .definitions import ImageFloatArray, ImageArraySequence
 from .orientation import OrientationField, generate_orientation_fields
 from .similarity import generate_similarity_matrix
@@ -64,6 +65,7 @@ class ClusterSpiralResult:
                 pass
 
 
+@benchmark
 def detect_spirals_in_image(
     image: ImageFloatArray,
     unsharp_mask_radius: float,
