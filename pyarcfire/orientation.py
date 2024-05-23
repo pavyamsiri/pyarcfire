@@ -359,73 +359,6 @@ class OrientationField:
         # Allocate new field
         denoised = np.zeros(self.shape)
 
-        # Iterate through every pixel
-        for row_idx in range(self.num_rows):
-            for column_idx in range(self.num_columns):
-                # Calculate the norm of the orientation vector
-                current_vector = self.get_vector_at(row_idx, column_idx)
-                current_vector_norm = np.linalg.norm(current_vector)
-                # The denoising equation requires non-zero norms
-                if current_vector_norm == 0:
-                    continue
-
-                # Collect neighbours
-                neighbour_vectors = []
-                for row_offset, column_offset in (
-                    (-neighbour_distance, -neighbour_distance),
-                    (+neighbour_distance, -neighbour_distance),
-                    (-neighbour_distance, +neighbour_distance),
-                    (+neighbour_distance, +neighbour_distance),
-                ):
-                    target_row = row_idx + row_offset
-                    target_column = column_idx + column_offset
-                    # Only add neighbours within the image
-                    if target_row < 0 or target_row >= self.num_rows:
-                        continue
-                    if target_column < 0 or target_column >= self.num_columns:
-                        continue
-                    neighbour_vectors.append(
-                        self.get_vector_at(target_row, target_column)
-                    )
-                neighbour_strengths = np.zeros(len(neighbour_vectors))
-
-                for idx, neighbour in enumerate(neighbour_vectors):
-                    neighbour_norm = np.linalg.norm(neighbour)
-                    # The denoising equation requires non-zero norms
-                    if neighbour_norm == 0:
-                        continue
-                    # max(|V dot V'| - cos(pi/4), 0) / (|V| * |V'|)
-                    neighbour_strengths[idx] = max(
-                        np.dot(neighbour, current_vector) - SUBTRACT_AMOUNT, 0
-                    ) / (current_vector_norm * neighbour_norm)
-
-                # New orientation strength
-                new_strength = np.median(neighbour_strengths)
-                # Set new value
-                denoised[row_idx, column_idx, :] = (
-                    current_vector / current_vector_norm
-                ) * new_strength
-        # Create denoised field
-        return OrientationField(denoised)
-
-    # TODO: Do more thorough testing with non-vectorised version
-    def denoise_vectorised(self, neighbour_distance: int = 5) -> OrientationField:
-        """Returns a denoised orientation field.
-
-        Parameters
-        ----------
-        neighbour_distance : int, optional
-            The distance between a pixel and its four cardinal neighbours.
-
-        Returns
-        -------
-        OrientationField
-            The denoised field.
-        """
-        SUBTRACT_AMOUNT: float = np.cos(np.pi / 4)
-        # Allocate new field
-        denoised = np.zeros(self.shape)
-
         neighbour_arrays: list[ImageFloatArray] = [
             np.roll(self.field, -neighbour_distance, axis=1),
             np.roll(self.field, neighbour_distance, axis=1),
@@ -512,7 +445,7 @@ def generate_orientation_fields(
     )
 
     # Denoise
-    denoised_field = merged_field.denoise_vectorised()
+    denoised_field = merged_field.denoise()
     return denoised_field
 
 
