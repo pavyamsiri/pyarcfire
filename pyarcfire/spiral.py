@@ -1,4 +1,5 @@
 # Standard libraries
+import logging
 import os
 from typing import Sequence
 
@@ -14,6 +15,9 @@ from .orientation import OrientationField, generate_orientation_fields
 from .similarity import generate_similarity_matrix
 from .cluster import Cluster, generate_hac_tree
 from .merge_fit import merge_clusters_by_fit
+
+
+log: logging.Logger = logging.getLogger(__name__)
 
 
 class ClusterSpiralResult:
@@ -77,6 +81,9 @@ def detect_spirals_in_image(
     )
     field = generate_orientation_fields(unsharp_image)
     matrix = generate_similarity_matrix(field, stop_threshold)
+
+    log.debug(f"Similarity matrix has {np.count_nonzero(matrix):,} nonzero elements.")
+
     clusters = generate_hac_tree(matrix.tocsr(), image, stop_threshold)  # type:ignore
     cluster_arrays = Cluster.list_to_array(clusters, image)
 
