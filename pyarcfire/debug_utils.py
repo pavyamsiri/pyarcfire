@@ -1,3 +1,5 @@
+"""This module contains useful utilities for debugging or profiling."""
+
 # Internal libraries
 from functools import wraps
 import logging
@@ -14,7 +16,20 @@ from .definitions import ImageArrayUnion
 log: logging.Logger = logging.getLogger(__name__)
 
 
-def benchmark(func: Callable):
+def benchmark(func: Callable) -> Callable:
+    """Decorator used to time functions.
+
+    Parameters
+    ----------
+    func : Callable
+        The function to time.
+
+    Returns
+    -------
+    Callable
+        The wrapped function.
+    """
+
     @wraps(func)
     def wrapper(*args, **kwargs):
         time_start = time.perf_counter()
@@ -29,7 +44,7 @@ def benchmark(func: Callable):
     return wrapper
 
 
-def _debug_plot_image(image: ImageArrayUnion | Sequence[ImageArrayUnion]) -> None:
+def debug_plot_image(image: ImageArrayUnion | Sequence[ImageArrayUnion]) -> None:
     is_sequence = isinstance(image, list) or isinstance(image, tuple)
     fig = plt.figure()
     axis = fig.add_subplot(111)
