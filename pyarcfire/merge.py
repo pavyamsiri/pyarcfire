@@ -5,14 +5,14 @@ import logging
 
 # Internal libraries
 from .arc import fit_spiral_to_image
-from .definitions import ImageFloatArray
+from .definitions import ImageArrayUnion
 
 
 log = logging.getLogger(__name__)
 
 
 def calculate_arc_merge_error(
-    first_cluster_array: ImageFloatArray, second_cluster_array: ImageFloatArray
+    first_cluster_array: ImageArrayUnion, second_cluster_array: ImageArrayUnion
 ) -> float:
     first_sum = first_cluster_array.sum()
     second_sum = second_cluster_array.sum()

@@ -13,7 +13,7 @@ from .debug_utils import benchmark
 from .definitions import ImageFloatArray, ImageFloatArraySequence
 from .orientation import OrientationField, generate_orientation_fields
 from .similarity import generate_similarity_matrix
-from .cluster import Cluster, generate_hac_tree
+from .cluster import generate_clusters
 from .merge_fit import merge_clusters_by_fit
 
 
@@ -84,8 +84,7 @@ def detect_spirals_in_image(
 
     log.debug(f"Similarity matrix has {np.count_nonzero(matrix):,} nonzero elements.")
 
-    clusters = generate_hac_tree(matrix.tocsr(), image, stop_threshold)  # type:ignore
-    cluster_arrays = Cluster.list_to_array(clusters, image)
+    cluster_arrays = generate_clusters(image, matrix.tocsr(), stop_threshold)  # type:ignore
 
     # TODO: Delete cluster containing the centre
 

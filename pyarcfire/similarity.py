@@ -29,7 +29,7 @@ def generate_similarity_matrix(
     ----------
     orientation : OrientationField
         The orientation field derived from an image.
-    similarity_cutoff : float
+    similarity_cutoff : float, optional
         The minimum threshold value for a similarity score between pixels to be non-zero.
         Values below this threshold are set to zero similarity.
 
