@@ -82,7 +82,7 @@ def detect_spirals_in_image(
     field = generate_orientation_fields(unsharp_image)
     matrix = generate_similarity_matrix(field, stop_threshold)
 
-    log.debug(f"Similarity matrix has {np.count_nonzero(matrix):,} nonzero elements.")
+    log.debug(f"Similarity matrix has {matrix.count_nonzero():,} nonzero elements.")  # type:ignore
 
     cluster_arrays = generate_clusters(image, matrix.tocsr(), stop_threshold)  # type:ignore
 

@@ -1,6 +1,6 @@
 from .common import LogSpiralFitResult
 from .fit import fit_spiral_to_image
-from .multiple_revolution import identify_inner_and_outer_spiral
+from .fit import identify_inner_and_outer_spiral
 
 
 __all__ = [

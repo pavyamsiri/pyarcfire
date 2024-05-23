@@ -15,6 +15,7 @@ from .definitions import (
     ImageFloatArray,
     ImageFloatArraySequence,
 )
+from .matrix_utils import is_sparse_matrix_symmetric
 from .merge import calculate_arc_merge_error
 
 log: logging.Logger = logging.getLogger(__name__)
@@ -152,10 +153,7 @@ def generate_clusters(
         raise ValueError("The image must be a 2D array!")
 
     # Verify symmetry and implicitly squareness
-    is_symmetric = (
-        np.count_nonzero(similarity_matrix - similarity_matrix.transpose()) == 0
-    )
-    if not is_symmetric:
+    if not is_sparse_matrix_symmetric(similarity_matrix):
         raise ValueError("Similarity matrix must be symmetric!")
 
     num_pixels_from_matrix = similarity_matrix.shape[0]
@@ -284,7 +282,7 @@ def _update_similarity_matrix(
     # AIM: Construct matrix such that when added, the target row and column is updated to the desired values
     add_matrix_values = new_similarity_values - old_similarity_values
     # The target row/column already has the right similarity values
-    if np.count_nonzero(add_matrix_values) == 0:
+    if add_matrix_values.count_nonzero() == 0:  # type:ignore
         updated_matrix = similarity_matrix
     # The target row/column must be updated
     else:
@@ -324,8 +322,7 @@ def _update_similarity_matrix(
     assert column_on_target, "Column not on target"
 
     # Sanity check for symmetry
-    is_symmetric = np.count_nonzero(updated_matrix - updated_matrix.transpose()) == 0
-    assert is_symmetric, "Similarity matrix is not symmetric!"
+    assert is_sparse_matrix_symmetric(updated_matrix)
 
     return updated_matrix
 
@@ -374,6 +371,5 @@ def _clear_similarity_matrix_row_column(
     updated_matrix = similarity_matrix - clear_matrix
 
     # Sanity check for symmetry
-    is_symmetric = np.count_nonzero(updated_matrix - updated_matrix.transpose()) == 0
-    assert is_symmetric, "Similarity matrix is not symmetric!"
+    assert is_sparse_matrix_symmetric(updated_matrix)
     return updated_matrix

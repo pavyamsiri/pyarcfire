@@ -14,6 +14,10 @@ from scipy import sparse
 
 # Internal libraries
 from .debug_utils import benchmark
+from .matrix_utils import (
+    is_sparse_matrix_hollow,
+    is_sparse_matrix_symmetric,
+)
 from .orientation import OrientationField
 
 log: logging.Logger = logging.getLogger(__name__)
@@ -54,12 +58,8 @@ def generate_similarity_matrix(
     similarity_matrix = sparse.coo_matrix(
         (similarity_values, (root_indices, child_indices)), shape=(num_vecs, num_vecs)
     )
-    is_hollow = np.allclose(similarity_matrix.diagonal(), 0)
-    assert is_hollow, "Similarity matrix has self-similarity!"
-    is_symmetric = (
-        np.count_nonzero(similarity_matrix - similarity_matrix.transpose()) == 0
-    )
-    assert is_symmetric, "Similarity matrix is not symmetric!"
+    assert is_sparse_matrix_hollow(similarity_matrix)
+    assert is_sparse_matrix_symmetric(similarity_matrix)
     return similarity_matrix
 
 

@@ -4,6 +4,7 @@
 import logging
 
 # External libraries
+import numpy as np
 
 # Internal libraries
 from .arc import fit_spiral_to_image
@@ -44,16 +45,18 @@ def calculate_arc_merge_error(
     second_cluster_array *= total_sum / second_sum
 
     # Fit spirals to each cluster individually
-    first_fit = fit_spiral_to_image(first_cluster_array)
-    second_fit = fit_spiral_to_image(second_cluster_array)
+    first_fit = fit_spiral_to_image(first_cluster_array.astype(np.float32))
+    second_fit = fit_spiral_to_image(second_cluster_array.astype(np.float32))
 
     combined_cluster_array = first_cluster_array + second_cluster_array
     # Fit a spiral to both clusters at the same time
     first_merged_fit = fit_spiral_to_image(
-        combined_cluster_array, initial_pitch_angle=first_fit.pitch_angle
+        combined_cluster_array.astype(np.float32),
+        initial_pitch_angle=first_fit.pitch_angle,
     )
     second_merged_fit = fit_spiral_to_image(
-        combined_cluster_array, initial_pitch_angle=second_fit.pitch_angle
+        combined_cluster_array.astype(np.float32),
+        initial_pitch_angle=second_fit.pitch_angle,
     )
     if first_merged_fit.total_error <= second_merged_fit.total_error:
         merged_fit = first_merged_fit
