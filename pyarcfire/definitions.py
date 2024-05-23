@@ -13,4 +13,4 @@ ImageFloatArray: TypeAlias = npt.NDArray[np.floating]
 ImageIntegerArray: TypeAlias = npt.NDArray[np.integer]
 ImageBoolArray: TypeAlias = npt.NDArray[np.bool_]
 ImageArrayUnion: TypeAlias = ImageFloatArray | ImageIntegerArray | ImageBoolArray
-ImageArraySequence: TypeAlias = npt.NDArray[np.floating]
+ImageFloatArraySequence: TypeAlias = npt.NDArray[np.floating]

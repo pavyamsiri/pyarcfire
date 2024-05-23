@@ -11,7 +11,7 @@ from scipy import sparse
 
 # Internal libraries
 from .debug_utils import benchmark
-from .definitions import ImageFloatArray, ImageArraySequence
+from .definitions import ImageFloatArray, ImageFloatArraySequence
 from .merge import calculate_arc_merge_error
 
 log = logging.getLogger(__name__)
@@ -37,7 +37,7 @@ class Cluster:
         return Cluster(list(points.astype(int)))
 
     @staticmethod
-    def from_3d_array(array: ImageArraySequence) -> Sequence[Cluster]:
+    def from_3d_array(array: ImageFloatArraySequence) -> Sequence[Cluster]:
         num_clusters: int = array.shape[2]
         clusters = []
         for cluster_idx in range(num_clusters):
@@ -47,7 +47,7 @@ class Cluster:
     @staticmethod
     def list_to_array(
         clusters: Sequence[Cluster], image: ImageFloatArray
-    ) -> ImageArraySequence:
+    ) -> ImageFloatArraySequence:
         array_list = [cluster.get_masked_image(image) for cluster in clusters]
         return np.dstack(array_list)
 

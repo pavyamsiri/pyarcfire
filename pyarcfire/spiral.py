@@ -9,7 +9,7 @@ from skimage import filters
 
 # Internal libraries
 from .debug_utils import benchmark
-from .definitions import ImageFloatArray, ImageArraySequence
+from .definitions import ImageFloatArray, ImageFloatArraySequence
 from .orientation import OrientationField, generate_orientation_fields
 from .similarity import generate_similarity_matrix
 from .cluster import Cluster, generate_hac_tree
@@ -22,11 +22,11 @@ class ClusterSpiralResult:
         image: ImageFloatArray,
         unsharp_image: ImageFloatArray,
         field: OrientationField,
-        arrays: ImageArraySequence,
+        arrays: ImageFloatArraySequence,
     ) -> None:
         self._image: ImageFloatArray = image
         self._unsharp_image: ImageFloatArray = unsharp_image
-        self._arrays: ImageArraySequence = arrays
+        self._arrays: ImageFloatArraySequence = arrays
         self._field: OrientationField = field
         self._sizes: Sequence[int] = tuple(
             [
@@ -51,7 +51,7 @@ class ClusterSpiralResult:
         assert cluster_idx in range(self._arrays.shape[2])
         return (self._arrays[:, :, cluster_idx], self._sizes[cluster_idx])
 
-    def get_cluster_arrays(self) -> ImageArraySequence:
+    def get_cluster_arrays(self) -> ImageFloatArraySequence:
         return self._arrays
 
     def dump(self, path: str) -> None:
