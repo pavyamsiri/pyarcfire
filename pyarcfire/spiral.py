@@ -47,6 +47,9 @@ class ClusterSpiralResult:
     def get_unsharp_image(self) -> Array2D:
         return self._unsharp_image
 
+    def get_unsharp_mask_properties(self) -> tuple[float, float]:
+        return (self._unsharp_radius, self._unsharp_amount)
+
     def get_field(self) -> OrientationField:
         return self._field
 

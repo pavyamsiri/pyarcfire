@@ -47,6 +47,7 @@ def process_from_image(args: argparse.Namespace) -> None:
     width: float = image.shape[0] / 2 + 0.5
 
     result = detect_spirals_in_image(image)
+    unsharp_radius, unsharp_amount = result.get_unsharp_mask_properties()
     cluster_arrays = result.get_cluster_arrays()
     cluster_sizes = result.get_sizes()
     cluster_bins = np.logspace(0, np.log10(max(cluster_sizes)), 10)
@@ -67,7 +68,7 @@ def process_from_image(args: argparse.Namespace) -> None:
     contrast_axis = fig.add_subplot(232)
     contrast_axis.imshow(contrast_image, cmap="gray")
     contrast_axis.set_title(
-        rf"Unsharp image $\text{{Radius}} = {UNSHARP_MASK_RADIUS}, \; \text{{Amount}} = {UNSHARP_MASK_AMOUNT}$"
+        rf"Unsharp image $\text{{Radius}} = {unsharp_radius}, \; \text{{Amount}} = {unsharp_amount}$"
     )
     contrast_axis.set_axis_off()
 
