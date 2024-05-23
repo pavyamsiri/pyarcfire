@@ -13,11 +13,12 @@ import skimage.measure
 
 # Internal libraries
 from pyarcfire.definitions import (
-    FloatArray1D,
-    ImageBoolArray,
-    ImageFloatArray,
-    IntegerArray1D,
+    Array2D,
     BoolArray1D,
+    BoolArray2D,
+    FloatArray1D,
+    FloatArray2D,
+    IntegerArray1D,
 )
 from .common import LogSpiralFitResult
 from .functions import (
@@ -28,14 +29,14 @@ from .functions import (
 from .utils import (
     _adjust_theta_to_zero,
     _calculate_bounds,
-    _get_polar_coordinates,
     _get_arc_bounds,
+    _get_polar_coordinates,
 )
 
 SINGLE_REVOLUTION_TOLERANCE: float = 1e-8
 MULTIPLE_REVOLUTION_TOLERANCE: float = 1e-12
 
-log = logging.getLogger(__name__)
+log: logging.Logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -58,10 +59,11 @@ class InternalLogSpiralFitResult:
 
 
 def fit_spiral_to_image(
-    image: ImageFloatArray,
+    image: Array2D,
     initial_pitch_angle: float = 0,
     force_single_revolution: bool = False,
 ) -> LogSpiralFitResult:
+    image = image.astype(np.float32)
     # Convert to polar coordinates
     radii, theta, weights = _get_polar_coordinates(image)
 
@@ -325,7 +327,7 @@ def __fit_multiple_revolution_spiral(
 
 
 def __cluster_has_no_endpoints_or_contains_origin(
-    image: ImageFloatArray, max_half_gap_fill_for_undefined_bounds: int = 3
+    image: FloatArray2D, max_half_gap_fill_for_undefined_bounds: int = 3
 ) -> bool:
     # See if the cluster has actual spiral endpoints by seeing if it is
     # possible to "escape" from the center point to the image boundary,
@@ -347,7 +349,7 @@ def __cluster_has_no_endpoints_or_contains_origin(
 
 
 def identify_inner_and_outer_spiral(
-    image: ImageFloatArray, shrink_amount: int, max_diagonal_distance: float = 1.5
+    image: FloatArray2D, shrink_amount: int, max_diagonal_distance: float = 1.5
 ) -> BoolArray1D | None:
     num_radii = int(np.ceil(max((image.shape[0], image.shape[1])) / 2))
     num_theta: int = 360
@@ -524,7 +526,7 @@ def identify_inner_and_outer_spiral(
 
 
 def _find_single_revolution_regions(
-    image: ImageFloatArray,
+    image: FloatArray2D,
     num_radii: int,
     num_theta: int,
     min_acceptable_length: int,
@@ -536,7 +538,7 @@ def _find_single_revolution_regions(
     )
     polar_image = np.nan_to_num(polar_image, nan=0)
 
-    dilated_polar_image: ImageBoolArray = ndimage.binary_dilation(  # type:ignore
+    dilated_polar_image: BoolArray2D = ndimage.binary_dilation(  # type:ignore
         polar_image, structure=np.ones((3, 3))
     )
 
@@ -544,7 +546,7 @@ def _find_single_revolution_regions(
 
 
 def _find_single_revolution_regions_polar(
-    polar_image: ImageBoolArray, shrink_amount: int
+    polar_image: BoolArray2D, shrink_amount: int
 ) -> BoolArray1D:
     num_radii: int = polar_image.shape[0]
     num_theta: int = polar_image.shape[1]
@@ -604,8 +606,8 @@ def _find_single_revolution_regions_polar(
 
 
 def __image_transform_from_cartesian_to_polar(
-    image: ImageFloatArray, num_radii: int, num_theta: int
-) -> ImageFloatArray:
+    image: FloatArray2D, num_radii: int, num_theta: int
+) -> FloatArray2D:
     centre_x = image.shape[1] / 2 + 0.5
     centre_y = image.shape[0] / 2 + 0.5 - 1
 
@@ -739,7 +741,7 @@ def __calculate_wrap(
 
 
 def _remove_theta_discontinuities(
-    theta: FloatArray1D, image: ImageFloatArray, inner_region: BoolArray1D
+    theta: FloatArray1D, image: FloatArray2D, inner_region: BoolArray1D
 ) -> FloatArray1D:
     assert np.count_nonzero(inner_region) > 0
     adjusted_theta = np.copy(theta)
@@ -780,7 +782,7 @@ def _remove_theta_discontinuities(
 
 
 def _adjust_theta_for_gap(
-    theta: FloatArray1D, image: ImageFloatArray, region: BoolArray1D
+    theta: FloatArray1D, image: FloatArray2D, region: BoolArray1D
 ) -> FloatArray1D | None:
     row_indices, column_indices = image.nonzero()
     assert len(row_indices) == len(column_indices)

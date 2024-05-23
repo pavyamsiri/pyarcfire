@@ -2,11 +2,11 @@
 import numpy as np
 
 # Internal libraries
-from pyarcfire.definitions import FloatArray1D, ImageFloatArray
+from pyarcfire.definitions import FloatArray1D, FloatArray2D
 
 
 def _get_polar_coordinates(
-    image: ImageFloatArray,
+    image: FloatArray2D,
 ) -> tuple[FloatArray1D, FloatArray1D, FloatArray1D]:
     row_indices, column_indices = image.nonzero()
     # NOTE: Have to add 1 to be compliant with MatLab's 1-index arrays

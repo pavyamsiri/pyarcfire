@@ -10,7 +10,7 @@ from skimage import filters
 
 # Internal libraries
 from .debug_utils import benchmark
-from .definitions import ImageFloatArray, ImageFloatArraySequence
+from .definitions import FloatArray2D, FloatArray3D
 from .orientation import OrientationField, generate_orientation_fields
 from .similarity import generate_similarity_matrix
 from .cluster import generate_clusters
@@ -23,14 +23,14 @@ log: logging.Logger = logging.getLogger(__name__)
 class ClusterSpiralResult:
     def __init__(
         self,
-        image: ImageFloatArray,
-        unsharp_image: ImageFloatArray,
+        image: FloatArray2D,
+        unsharp_image: FloatArray2D,
         field: OrientationField,
-        arrays: ImageFloatArraySequence,
+        arrays: FloatArray3D,
     ) -> None:
-        self._image: ImageFloatArray = image
-        self._unsharp_image: ImageFloatArray = unsharp_image
-        self._arrays: ImageFloatArraySequence = arrays
+        self._image: FloatArray2D = image
+        self._unsharp_image: FloatArray2D = unsharp_image
+        self._arrays: FloatArray3D = arrays
         self._field: OrientationField = field
         self._sizes: Sequence[int] = tuple(
             [
@@ -39,10 +39,10 @@ class ClusterSpiralResult:
             ]
         )
 
-    def get_image(self) -> ImageFloatArray:
+    def get_image(self) -> FloatArray2D:
         return self._image
 
-    def get_unsharp_image(self) -> ImageFloatArray:
+    def get_unsharp_image(self) -> FloatArray2D:
         return self._unsharp_image
 
     def get_field(self) -> OrientationField:
@@ -51,11 +51,11 @@ class ClusterSpiralResult:
     def get_sizes(self) -> Sequence[int]:
         return self._sizes
 
-    def get_cluster_array(self, cluster_idx: int) -> tuple[ImageFloatArray, int]:
+    def get_cluster_array(self, cluster_idx: int) -> tuple[FloatArray2D, int]:
         assert cluster_idx in range(self._arrays.shape[2])
         return (self._arrays[:, :, cluster_idx], self._sizes[cluster_idx])
 
-    def get_cluster_arrays(self) -> ImageFloatArraySequence:
+    def get_cluster_arrays(self) -> FloatArray3D:
         return self._arrays
 
     def dump(self, path: str) -> None:
@@ -71,7 +71,7 @@ class ClusterSpiralResult:
 
 @benchmark
 def detect_spirals_in_image(
-    image: ImageFloatArray,
+    image: FloatArray2D,
     unsharp_mask_radius: float,
     unsharp_mask_amount: float,
     stop_threshold: float,

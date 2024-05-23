@@ -13,9 +13,8 @@ from scipy import sparse
 # Internal libraries
 from .debug_utils import benchmark
 from .definitions import (
-    ImageArrayUnion,
-    ImageFloatArray,
-    ImageFloatArraySequence,
+    Array2D,
+    Array3D,
 )
 from .matrix_utils import is_sparse_matrix_symmetric
 from .merge import calculate_arc_merge_error
@@ -49,17 +48,17 @@ class Cluster:
         """int: The number of points the cluster contains."""
         return len(self._points)
 
-    def get_masked_image(self, image: ImageArrayUnion) -> ImageArrayUnion:
+    def get_masked_image(self, image: Array2D) -> Array2D:
         """Returns the given image masked by the cluster.
 
         Parameter
         ---------
-        image : ImageArrayUnion
+        image : Array2D
             The image to mask.
 
         Returns
         -------
-        masked_image : ImageArrayUnion
+        masked_image : Array2D
             The masked image.
         """
         num_rows, num_columns = image.shape
@@ -73,15 +72,13 @@ class Cluster:
         return masked_image
 
     @staticmethod
-    def list_to_array(
-        image: ImageFloatArray, clusters: Sequence[Cluster]
-    ) -> ImageFloatArraySequence:
+    def list_to_array(image: Array2D, clusters: Sequence[Cluster]) -> Array3D:
         """Converts a list of clusters and an image into an array of the same image
         masked by each different cluster.
 
         Parameters
         ----------
-        image : ImageFloatArray
+        image : Array2D
             The image to mask.
         clusters : Sequence[Cluster]
             The clusters to mask the image with.
@@ -89,11 +86,11 @@ class Cluster:
 
         Returns
         -------
-        ImageFloatArraySequence
+        Array3D
             The image masked by the different clusters.
         """
         array_list = [cluster.get_masked_image(image) for cluster in clusters]
-        return np.dstack(array_list)
+        return np.dstack(array_list)  # type:ignore
 
     @staticmethod
     def combine(left: Cluster, right: Cluster) -> Cluster:
@@ -117,13 +114,13 @@ class Cluster:
 
 @benchmark
 def generate_clusters(
-    image: ImageFloatArray,
+    image: Array2D,
     similarity_matrix: sparse.csr_matrix | sparse.csc_matrix,
     stop_threshold: float,
     error_ratio_threshold: float = 2.5,
     merge_check_minimum_cluster_size: int = 25,
     minimum_cluster_size: int = 150,
-) -> ImageFloatArraySequence:
+) -> Array3D:
     """Performs single linkage clustering on an image given its corresponding similarity matrix.
     The clusters are merged using single linkage clustering with a single modification. Sufficiently
     large cluster pairs will first be checked if their resulting merged cluster will fit a spiral
@@ -132,7 +129,7 @@ def generate_clusters(
 
     Parameters
     ----------
-    image : ImageFloatArray
+    image : Array2D
         The image to find clusters in.
     similarity_matrix : sparse.csr_matrix | sparse.csc_matrix
         The similarity matrix representing pixel similarities in the image.
@@ -147,7 +144,7 @@ def generate_clusters(
 
     Returns
     -------
-    cluster_arrays : ImageFloatArraySequence
+    cluster_arrays : Array3D
         The image masked by each cluster.
     """
     # The image must be 2D
@@ -240,7 +237,7 @@ def generate_clusters(
     log.debug(f"Number of clusters = {len(clusters)}")
     log.debug(f"Checked {check_arc_merge_count} possible cluster merges")
     log.debug(f"Stopped {merge_stop_count} cluster merges")
-    return cluster_arrays.astype(np.float32)
+    return cluster_arrays
 
 
 def _update_similarity_matrix(

@@ -4,18 +4,17 @@
 import logging
 
 # External libraries
-import numpy as np
 
 # Internal libraries
 from .arc import fit_spiral_to_image
-from .definitions import ImageArrayUnion
+from .definitions import Array2D
 
 
 log = logging.getLogger(__name__)
 
 
 def calculate_arc_merge_error(
-    first_cluster_array: ImageArrayUnion, second_cluster_array: ImageArrayUnion
+    first_cluster_array: Array2D, second_cluster_array: Array2D
 ) -> float:
     """Calculates the arc merge error ratio for two clusters. This is a measure of how
     well the merged cluster of the two clusters given fit to a log spiral compared to
@@ -23,9 +22,9 @@ def calculate_arc_merge_error(
 
     Parameters
     ----------
-    first_cluster_array : ImageArrayUnion
+    first_cluster_array : Array2D
         The first cluster in the form of an array.
-    second_cluster_array : ImageArrayUnion
+    second_cluster_array : Array2D
         The second cluster in the form of an array.
 
     Returns
@@ -45,17 +44,17 @@ def calculate_arc_merge_error(
     second_cluster_array *= total_sum / second_sum
 
     # Fit spirals to each cluster individually
-    first_fit = fit_spiral_to_image(first_cluster_array.astype(np.float32))
-    second_fit = fit_spiral_to_image(second_cluster_array.astype(np.float32))
+    first_fit = fit_spiral_to_image(first_cluster_array)
+    second_fit = fit_spiral_to_image(second_cluster_array)
 
     combined_cluster_array = first_cluster_array + second_cluster_array
     # Fit a spiral to both clusters at the same time
     first_merged_fit = fit_spiral_to_image(
-        combined_cluster_array.astype(np.float32),
+        combined_cluster_array,
         initial_pitch_angle=first_fit.pitch_angle,
     )
     second_merged_fit = fit_spiral_to_image(
-        combined_cluster_array.astype(np.float32),
+        combined_cluster_array,
         initial_pitch_angle=second_fit.pitch_angle,
     )
     if first_merged_fit.total_error <= second_merged_fit.total_error:

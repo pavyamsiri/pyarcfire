@@ -9,8 +9,8 @@ from hypothesis import given
 from hypothesis import strategies as st
 
 # Testing
-from pyarcfire.arc.multiple_revolution import _find_single_revolution_regions_polar
-from pyarcfire.definitions import BoolArray1D, ImageBoolArray
+from pyarcfire.arc.fit import _find_single_revolution_regions_polar
+from pyarcfire.definitions import BoolArray1D, BoolArray2D
 
 
 @st.composite
@@ -19,7 +19,7 @@ def valid_polar_images(
     min_size: int,
     max_size: int,
     shrink_amount: int,
-) -> tuple[ImageBoolArray, BoolArray1D, int]:
+) -> tuple[BoolArray2D, BoolArray1D, int]:
     size: int = draw(st.integers(min_size, max_size))
     double_region_size: int = draw(st.integers(0, size))
     single_region_size: int = draw(st.integers(shrink_amount, size))
@@ -43,7 +43,7 @@ def valid_polar_images(
 
 @given(valid_polar_images(min_size=5, max_size=360, shrink_amount=5))
 def test_find_single_revolution_regions_polar(
-    data: tuple[ImageBoolArray, BoolArray1D, int],
+    data: tuple[BoolArray2D, BoolArray1D, int],
 ) -> None:
     arr, expected, shrink_amount = data
     single_revolution_array = _find_single_revolution_regions_polar(arr, shrink_amount)

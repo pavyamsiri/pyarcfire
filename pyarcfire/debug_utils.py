@@ -10,7 +10,7 @@ from typing import Callable, Sequence
 from matplotlib import pyplot as plt
 
 # Internal libraries
-from .definitions import ImageArrayUnion
+from .definitions import Array2D
 
 
 log: logging.Logger = logging.getLogger(__name__)
@@ -44,7 +44,7 @@ def benchmark(func: Callable) -> Callable:
     return wrapper
 
 
-def debug_plot_image(image: ImageArrayUnion | Sequence[ImageArrayUnion]) -> None:
+def debug_plot_image(image: Array2D | Sequence[Array2D]) -> None:
     is_sequence = isinstance(image, list) or isinstance(image, tuple)
     fig = plt.figure()
     axis = fig.add_subplot(111)

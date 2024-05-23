@@ -10,28 +10,26 @@ from scipy.ndimage import distance_transform_edt
 
 # Internal libraries
 from .debug_utils import benchmark
-from .definitions import ImageFloatArray, ImageFloatArraySequence
+from .definitions import Array2D, Array3D
 from .merge import calculate_arc_merge_error
 
 log = logging.getLogger(__name__)
 
 
 @benchmark
-def merge_clusters_by_fit(
-    clusters: ImageFloatArraySequence, stop_threshold: float = 2.5
-) -> ImageFloatArraySequence:
+def merge_clusters_by_fit(clusters: Array3D, stop_threshold: float = 2.5) -> Array3D:
     """Merge clusters by if they are fit spirals decently well when combined.
 
     Parameters
     ----------
-    clusters : ImageFloatArraySequence
+    clusters : Array3D
         The clusters stored as series of masked images.
     stop_threshold : float
         The maximum allowed distance between clusters to be merged.
 
     Returns
     -------
-    merged_clusters : ImageFloatArraySequence
+    merged_clusters : Array3D
         The clusters after being merged.
     """
     # Maximum pixel distance
@@ -40,7 +38,7 @@ def merge_clusters_by_fit(
     )
 
     # Fit spirals to each cluster
-    cluster_dict: dict[int, ImageFloatArray] = {}
+    cluster_dict: dict[int, Array2D] = {}
     num_clusters: int = clusters.shape[2]
     for cluster_idx in range(num_clusters):
         cluster_dict[cluster_idx] = clusters[:, :, cluster_idx]
@@ -92,24 +90,24 @@ def merge_clusters_by_fit(
             )
     log.debug(f"Merged {num_merges} clusters")
     # Combined clusters into arrays
-    merged_clusters: ImageFloatArraySequence = np.dstack(
+    merged_clusters = np.dstack(
         [cluster_dict[cluster_idx] for cluster_idx in cluster_dict]
     )
-    return merged_clusters
+    return merged_clusters  # type:ignore
 
 
 def _calculate_cluster_distance(
-    first_cluster_array: ImageFloatArray,
-    second_cluster_array: ImageFloatArray,
+    first_cluster_array: Array2D,
+    second_cluster_array: Array2D,
     max_pixel_distance: float,
 ) -> float:
     """Calculates the "distance" between two clusters.
 
     Parameters
     ----------
-    first_cluster_array : ImageFloatArray
+    first_cluster_array : Array2D
         The first cluster in the form of an array.
-    second_cluster_array : ImageFloatArray
+    second_cluster_array : Array2D
         The second cluster in the form of an array.
     max_pixel_distance : float
         The maximum allowed distance in pixels between the two clusters for them
