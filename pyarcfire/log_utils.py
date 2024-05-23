@@ -1,3 +1,5 @@
+"""This module contains functions to help set up logging."""
+
 # Standard libraries
 import logging
 from typing import Sequence

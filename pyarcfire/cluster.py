@@ -1,3 +1,5 @@
+"""This module contains routines to generate clusters representing spiral arm segments from a similarity matrix."""
+
 from __future__ import annotations
 
 # Standard libraries

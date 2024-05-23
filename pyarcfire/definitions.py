@@ -1,3 +1,5 @@
+"""This module contains useful type definitions."""
+
 # Internal libraries
 from typing import TypeAlias
 

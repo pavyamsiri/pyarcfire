@@ -1,3 +1,5 @@
+"""This module contains functions to merge clusters together by considering how spirals will fit them."""
+
 # Standard libraries
 import logging
 

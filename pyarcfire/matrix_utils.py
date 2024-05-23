@@ -1,3 +1,5 @@
+"""This module contains utilities regarding matrices."""
+
 # Standard libraries
 
 # External libraries
