@@ -1,3 +1,5 @@
+"""This module contains functions relating to calculating merging errors."""
+
 # Standard libraries
 import logging
 
@@ -14,10 +16,28 @@ log = logging.getLogger(__name__)
 def calculate_arc_merge_error(
     first_cluster_array: ImageArrayUnion, second_cluster_array: ImageArrayUnion
 ) -> float:
+    """Calculates the arc merge error ratio for two clusters. This is a measure of how
+    well the merged cluster of the two clusters given fit to a log spiral compared to
+    fitting the two clusters separately.
+
+    Parameters
+    ----------
+    first_cluster_array : ImageArrayUnion
+        The first cluster in the form of an array.
+    second_cluster_array : ImageArrayUnion
+        The second cluster in the form of an array.
+
+    Returns
+    -------
+    merge_error_ratio : float
+        The arc merge error ratio.
+    """
+
     first_sum = first_cluster_array.sum()
     second_sum = second_cluster_array.sum()
-    assert first_sum > 0
-    assert second_sum > 0
+    # Verify we don't have division by zero or weird negative weights
+    if first_sum <= 0 or second_sum <= 0:
+        raise ValueError("The cluster arrays must sum to a positive value.")
     total_sum = first_sum + second_sum
     # Adjust weights
     first_cluster_array *= total_sum / first_sum
