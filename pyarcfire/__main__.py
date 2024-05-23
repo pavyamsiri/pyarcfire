@@ -19,7 +19,7 @@ from .log_utils import setup_logging
 from .merge_fit import merge_clusters_by_fit
 from .spiral import detect_spirals_in_image
 
-log = logging.getLogger(__name__)
+log: logging.Logger = logging.getLogger(__name__)
 
 
 IMAGE_SIZE: int = 256
@@ -46,13 +46,7 @@ def process_from_image(args: argparse.Namespace) -> None:
     image = transform.resize(image, (IMAGE_SIZE, IMAGE_SIZE))
     width: float = image.shape[0] / 2 + 0.5
 
-    UNSHARP_MASK_RADIUS: float = 25
-    UNSHARP_MASK_AMOUNT: float = 6
-
-    stop_threshold: float = 0.15
-    result = detect_spirals_in_image(
-        image, UNSHARP_MASK_RADIUS, UNSHARP_MASK_AMOUNT, stop_threshold
-    )
+    result = detect_spirals_in_image(image)
     cluster_arrays = result.get_cluster_arrays()
     cluster_sizes = result.get_sizes()
     cluster_bins = np.logspace(0, np.log10(max(cluster_sizes)), 10)

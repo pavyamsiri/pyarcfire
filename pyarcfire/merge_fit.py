@@ -13,7 +13,7 @@ from .debug_utils import benchmark
 from .definitions import Array2D, Array3D
 from .merge import calculate_arc_merge_error
 
-log = logging.getLogger(__name__)
+log: logging.Logger = logging.getLogger(__name__)
 
 
 @benchmark

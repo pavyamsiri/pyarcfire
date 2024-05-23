@@ -10,7 +10,7 @@ from .arc import fit_spiral_to_image
 from .definitions import Array2D
 
 
-log = logging.getLogger(__name__)
+log: logging.Logger = logging.getLogger(__name__)
 
 
 def calculate_arc_merge_error(
