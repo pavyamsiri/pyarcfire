@@ -79,5 +79,8 @@ def detect_spirals_in_image(
     matrix = generate_similarity_matrix(field, stop_threshold)
     clusters = generate_hac_tree(matrix.tocsr(), image, stop_threshold)  # type:ignore
     cluster_arrays = Cluster.list_to_array(clusters, image)
+
+    # TODO: Delete cluster containing the centre
+
     merged_clusters = merge_clusters_by_fit(cluster_arrays)
     return ClusterSpiralResult(image, unsharp_image, field, merged_clusters)
