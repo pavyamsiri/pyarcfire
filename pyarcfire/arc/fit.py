@@ -137,8 +137,8 @@ def fit_spiral_to_image(
         square_err_difference_per_pixel, 0
     )
     if inconsistent_fit_after_adjustment:
-        log.warn(
-            f"Inconsistent fit when eliminating theta offset. Difference = {square_err_difference_per_pixel}"
+        log.debug(
+            f"[red]SUBOPTIM[/red]: Inconsistent fit when eliminating theta offset. Difference = {square_err_difference_per_pixel}"
         )
 
     result = LogSpiralFitResult(
@@ -168,7 +168,7 @@ def _fit_spiral_to_image_single_revolution_core(
 
     # Perform a fit to get the pitch angle
     if bad_bounds:
-        log.warn("Single revolution: Bad bounds!")
+        log.debug("[red]SUBOPTIM[/red]: Single revolution: Bad bounds!")
         offset = 0
         pitch_angle = 0
     else:
@@ -379,7 +379,9 @@ def identify_inner_and_outer_spiral(
             end_indices = np.array([len(can_be_single_revolution) - 1], dtype=np.int32)
         else:
             assert not np.any(can_be_single_revolution)
-            log.warn("No single revolution regions in entire theta-range")
+            log.debug(
+                "[red]SUBOPTIM[/red]: No single revolution regions in entire theta-range"
+            )
             return None
 
     start_indices, end_indices, wrap_data = __calculate_wrap(
@@ -400,8 +402,8 @@ def identify_inner_and_outer_spiral(
     )
 
     if max_length < min_acceptable_length:
-        log.warn(
-            f"Longest single revolution region length {max_length} is below the minimum length {min_acceptable_length}"
+        log.debug(
+            f"[red]SUBOPTIM[/red]: Longest single revolution region length {max_length} is below the minimum length {min_acceptable_length}"
         )
         return None
 
@@ -765,7 +767,7 @@ def _remove_theta_discontinuities(
     max_theta_multiple = int(np.floor(max_theta / (2 * np.pi)))
 
     if min_theta_multiple != max_theta_multiple:
-        log.warn("Theta-discontinuity through x-axis!")
+        log.debug("[red]SUBOPTIM[/red]: Theta-discontinuity through x-axis!")
         assert inner_adjusted_theta is None and outer_adjusted_theta is None
         if inner_region[min_theta_index]:
             assert not inner_region[max_theta_index]

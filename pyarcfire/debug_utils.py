@@ -36,8 +36,8 @@ def benchmark(func: Callable) -> Callable:
         result = func(*args, **kwargs)
         time_end = time.perf_counter()
         time_duration = time_end - time_start
-        log.debug(
-            f"[blue underline]{func.__qualname__}[/blue underline] took {time_duration:.3f} seconds"
+        log.info(
+            f"[magenta]PROFILER[/magenta]: [blue underline]{func.__qualname__}[/blue underline] took {time_duration:.3f} seconds"
         )
         return result
 

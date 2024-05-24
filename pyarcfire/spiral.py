@@ -82,15 +82,26 @@ def detect_spirals_in_image(
     unsharp_image = filters.unsharp_mask(
         image, radius=unsharp_mask_radius, amount=unsharp_mask_amount
     )
+    log.info("[cyan]PROGRESS[/cyan]: Generating orientation field...")
     field = generate_orientation_fields(unsharp_image)
+    log.info("[cyan]PROGRESS[/cyan]: Done generating orientation field.")
+    log.info("[cyan]PROGRESS[/cyan]: Generating similarity matrix...")
     matrix = generate_similarity_matrix(field, stop_threshold)
+    log.info("[cyan]PROGRESS[/cyan]: Done generating similarity matrix.")
 
-    log.debug(f"Similarity matrix has {matrix.count_nonzero():,} nonzero elements.")  # type:ignore
+    log.info(
+        f"[green]DIAGNOST[/green]: Similarity matrix has {matrix.count_nonzero():,} nonzero elements."
+    )  # type:ignore
 
     # TODO: Delete cluster containing the centre
+    log.info("[cyan]PROGRESS[/cyan]: Generating clusters...")
     cluster_arrays = generate_clusters(image, matrix.tocsr(), stop_threshold)  # type:ignore
+    log.info("[cyan]PROGRESS[/cyan]: Done generating clusters.")
 
+    log.info("[cyan]PROGRESS[/cyan]: Merging clusters by fit...")
     merged_clusters = merge_clusters_by_fit(cluster_arrays)
+    log.info("[cyan]PROGRESS[/cyan]: Done merging clusters by fit.")
+
     return ClusterSpiralResult(
         image,
         (unsharp_image, unsharp_mask_radius, unsharp_mask_amount),

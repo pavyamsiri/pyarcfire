@@ -28,7 +28,7 @@ def main(raw_args: Sequence[str]) -> None:
     args = _parse_args(raw_args)
 
     if not args.debug_flag:
-        logging.getLogger("pyarcfire").setLevel("CRITICAL")
+        logging.getLogger("pyarcfire").setLevel("INFO")
 
     command: str = args.command
     if command == "image":
