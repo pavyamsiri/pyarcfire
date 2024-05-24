@@ -43,6 +43,9 @@ class Cluster:
     def __repr__(self) -> str:
         return str(self)
 
+    def __contains__(self, item) -> bool:
+        return item in self._points
+
     @property
     def size(self) -> int:
         """int: The number of points the cluster contains."""
@@ -120,6 +123,7 @@ def generate_clusters(
     error_ratio_threshold: float = 2.5,
     merge_check_minimum_cluster_size: int = 25,
     minimum_cluster_size: int = 150,
+    remove_central_cluster: bool = True,
 ) -> Array3D:
     """Performs single linkage clustering on an image given its corresponding similarity matrix.
     The clusters are merged using single linkage clustering with a single modification. Sufficiently
@@ -141,6 +145,8 @@ def generate_clusters(
         The minimum size for each cluster when performing a merge check. Default is 25.
     minimum_cluster_size : int, optional
         The minimum size a cluster is allowed to be after merging. Default is 150.
+    remove_central_cluster : bool, optional
+        If this flag is set, the cluster that contains the origin will be removed. Default is true.
 
     Returns
     -------
@@ -231,6 +237,15 @@ def generate_clusters(
     # Remove clusters below minimum size
     clusters = list(clusters.values())
     clusters = [cluster for cluster in clusters if cluster.size >= minimum_cluster_size]
+
+    # Remove cluster that contains the centre
+    if remove_central_cluster:
+        log.info("[green]DIAGNOST[/green]: Removing central cluster...")
+        central_row = image.shape[0] // 2
+        central_column = image.shape[1] // 2
+        central_idx = np.ravel_multi_index((central_row, central_column), image.shape)
+        clusters = [cluster for cluster in clusters if central_idx not in cluster]
+
     cluster_arrays = Cluster.list_to_array(image, clusters)
 
     # Show diagnostics of merging step
