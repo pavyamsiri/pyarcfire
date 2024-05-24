@@ -4,7 +4,7 @@ from __future__ import annotations
 
 # Standard libraries
 import logging
-from typing import Sequence
+from typing import Sequence, Union
 
 # External libraries
 import numpy as np
@@ -115,7 +115,7 @@ class Cluster:
 @benchmark
 def generate_clusters(
     image: Array2D,
-    similarity_matrix: sparse.csr_matrix | sparse.csc_matrix,
+    similarity_matrix: Union[sparse.csr_matrix, sparse.csc_matrix],
     stop_threshold: float,
     error_ratio_threshold: float = 2.5,
     merge_check_minimum_cluster_size: int = 25,
@@ -241,7 +241,7 @@ def generate_clusters(
 
 
 def _update_similarity_matrix(
-    similarity_matrix: sparse.csr_matrix | sparse.csc_matrix,
+    similarity_matrix: Union[sparse.csr_matrix, sparse.csc_matrix],
     target_idx: int,
     source_idx: int,
 ) -> sparse.csr_matrix:
@@ -327,7 +327,7 @@ def _update_similarity_matrix(
 
 
 def _clear_similarity_matrix_row_column(
-    similarity_matrix: sparse.csr_matrix | sparse.csc_matrix, clear_idx: int
+    similarity_matrix: Union[sparse.csr_matrix, sparse.csc_matrix], clear_idx: int
 ) -> sparse.csr_matrix:
     """Returns the similarity matrix with the row and column at the given index cleared to zero.
 
