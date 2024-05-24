@@ -1,6 +1,6 @@
 # PyArcFiRe
 
-PyArcFiRe is a python port of SpArcFiRe [https://github.com/waynebhayes/SpArcFiRe] which is written primarily in MatLab.
+PyArcFiRe is a python port of [SpArcFiRe](https://github.com/waynebhayes/SpArcFiRe) which is written primarily in MatLab.
 Like SpArcFiRe it can be used to detect spiral arcs in images, mostly for galaxy images however it perhaps may work in other contexts.
 
 ## Limitations
