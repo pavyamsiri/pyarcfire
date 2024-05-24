@@ -64,13 +64,12 @@ class ClusterSpiralResult:
 
     def dump(self, path: str) -> None:
         extension = os.path.splitext(path)[1].lstrip(".")
-        match extension:
-            case "npy":
-                np.save(path, self._cluster_masks)
-            case "mat":
-                scipy.io.savemat(path, {"image": self._cluster_masks})
-            case _:
-                pass
+        if extension == "npy":
+            np.save(path, self._cluster_masks)
+        elif extension == "mat":
+            scipy.io.savemat(path, {"image": self._cluster_masks})
+        else:
+            log.warning(f"Unknown extension {extension}. Not dumping.")
 
 
 @benchmark
