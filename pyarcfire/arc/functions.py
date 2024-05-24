@@ -1,4 +1,5 @@
 # Standard libraries
+from typing import TypeVar
 
 # External libraries
 import numpy as np
@@ -6,12 +7,13 @@ import numpy as np
 # Internal libraries
 from pyarcfire.definitions import FloatArray1D
 
+T = TypeVar("T", float, FloatArray1D)
 
-def log_spiral[T: (float, FloatArray1D)](
+
+def log_spiral(
     theta: T, offset: float, pitch_angle: float, initial_radius: float, use_modulo: bool
 ) -> T:
     angles = theta - offset
-    # TODO: For single rev, we need to mod but multi rev should not mod
     if use_modulo:
         angles %= 2 * np.pi
     result: T = initial_radius * np.exp(-pitch_angle * angles)  # type:ignore
