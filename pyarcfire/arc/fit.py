@@ -513,7 +513,7 @@ def identify_inner_and_outer_spiral(
 
     assert np.all(
         np.logical_xor(first_region, second_region)
-    ), f"After closeness, XOR = {(~np.logical_xor(first_region, second_region)).nonzero()}"
+    ), "First and second regions are inconsistent!"
 
     # Find innermost region
     first_radii = radii[first_region]

@@ -56,7 +56,9 @@ def process_from_image(args: argparse.Namespace) -> None:
     if args.cluster_path is not None:
         result.dump(args.cluster_path)
 
-    fig = plt.figure()
+    show_flag: bool = args.output_path is None
+
+    fig = plt.figure(figsize=(14, 8))
     original_axis = fig.add_subplot(231)
     original_axis.imshow(image, cmap="gray")
     original_axis.set_title("Original image")
@@ -137,7 +139,13 @@ def process_from_image(args: argparse.Namespace) -> None:
     )
 
     fig.tight_layout()
-    plt.show()
+    if show_flag:
+        plt.show()
+    else:
+        fig.savefig(args.output_path)
+        log.info(
+            f"[yellow]FILESYST[/yellow]: Saved plot to [yellow]{args.output_path}[/yellow]"
+        )
     plt.close()
 
 
@@ -228,6 +236,14 @@ def _parse_args(args: Sequence[str]) -> argparse.Namespace:
 
 def _configure_image_command_parser(parser: argparse.ArgumentParser) -> None:
     __add_input_path_to_parser(parser)
+    parser.add_argument(
+        "-o",
+        "--o",
+        type=str,
+        dest="output_path",
+        help="Path to save plot to. If this argument is not given, the plot will be shown in a GUI instead.",
+        required=False,
+    )
     parser.add_argument(
         "-co",
         "--co",
