@@ -48,8 +48,6 @@ def process_from_image(args: argparse.Namespace) -> None:
     result = detect_spirals_in_image(image)
     unsharp_radius, unsharp_amount = result.get_unsharp_mask_properties()
     cluster_arrays = result.get_cluster_arrays()
-    cluster_sizes = result.get_sizes()
-    cluster_bins = np.logspace(0, np.log10(max(cluster_sizes)), 10)
 
     image = result.get_image()
     contrast_image = result.get_unsharp_image()
