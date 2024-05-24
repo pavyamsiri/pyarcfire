@@ -9,6 +9,7 @@ from __future__ import annotations
 
 # Standard libraries
 from functools import reduce
+import logging
 
 # External libraries
 import numpy as np
@@ -20,6 +21,9 @@ from skimage import transform
 # Internal libraries
 from .debug_utils import benchmark
 from .definitions import Array2D, FloatArray2D, FloatArray3D
+
+
+log: logging.Logger = logging.getLogger(__name__)
 
 
 class OrientationField:
@@ -451,6 +455,12 @@ def generate_orientation_fields(
 
     # Denoise
     denoised_field = merged_field.denoise(neighbour_distance=neighbour_distance)
+    num_nonzero_elements = np.count_nonzero(denoised_field.get_strengths())
+
+    log.info(
+        f"[green]DIAGNOST[/green]: Orientation field has {num_nonzero_elements:,} non-zero elements."
+    )
+
     return denoised_field
 
 

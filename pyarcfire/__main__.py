@@ -28,7 +28,7 @@ def main(raw_args: Sequence[str]) -> None:
     args = _parse_args(raw_args)
 
     if not args.debug_flag:
-        logging.getLogger("pyarcfire").setLevel("CRITICAL")
+        logging.getLogger("pyarcfire").setLevel("INFO")
 
     command: str = args.command
     if command == "image":
@@ -48,8 +48,6 @@ def process_from_image(args: argparse.Namespace) -> None:
     result = detect_spirals_in_image(image)
     unsharp_radius, unsharp_amount = result.get_unsharp_mask_properties()
     cluster_arrays = result.get_cluster_arrays()
-    cluster_sizes = result.get_sizes()
-    cluster_bins = np.logspace(0, np.log10(max(cluster_sizes)), 10)
 
     image = result.get_image()
     contrast_image = result.get_unsharp_image()
@@ -58,7 +56,9 @@ def process_from_image(args: argparse.Namespace) -> None:
     if args.cluster_path is not None:
         result.dump(args.cluster_path)
 
-    fig = plt.figure()
+    show_flag: bool = args.output_path is None
+
+    fig = plt.figure(figsize=(14, 8))
     original_axis = fig.add_subplot(231)
     original_axis.imshow(image, cmap="gray")
     original_axis.set_title("Original image")
@@ -81,13 +81,38 @@ def process_from_image(args: argparse.Namespace) -> None:
 
     cluster_axis = fig.add_subplot(234)
     cluster_axis.set_title("Clusters")
+    cluster_axis.set_xlim(-width, width)
+    cluster_axis.set_ylim(-width, width)
+    cluster_axis.set_axis_off()
+
+    image_overlay_axis = fig.add_subplot(235)
+    image_overlay_axis.imshow(image, extent=(-width, width, -width, width), cmap="gray")
+    image_overlay_axis.set_title("Original image overlaid with spirals")
+    image_overlay_axis.set_xlim(-width, width)
+    image_overlay_axis.set_ylim(-width, width)
+    image_overlay_axis.set_axis_off()
+
+    colored_image_overlay_axis = fig.add_subplot(236)
+    colored_image_overlay_axis.set_title(
+        "Original image colored with masks and overlaid with spirals"
+    )
+    colored_image_overlay_axis.set_xlim(-width, width)
+    colored_image_overlay_axis.set_ylim(-width, width)
+    colored_image_overlay_axis.set_axis_off()
+
     color_map = mpl.colormaps["hsv"]
     num_clusters: int = cluster_arrays.shape[2]
+    colored_image = np.zeros((image.shape[0], image.shape[1], 4))
+    colored_image[:, :, 0] = image / image.max()
+    colored_image[:, :, 1] = image / image.max()
+    colored_image[:, :, 2] = image / image.max()
+    colored_image[:, :, 3] = 1.0
     for cluster_idx in range(num_clusters):
         current_array = cluster_arrays[:, :, cluster_idx]
         mask = current_array > 0
         cluster_mask = np.zeros((current_array.shape[0], current_array.shape[1], 4))
         cluster_mask[mask, :] = color_map((cluster_idx + 0.5) / num_clusters)
+        colored_image[mask, :] *= color_map((cluster_idx + 0.5) / num_clusters)
         cluster_axis.imshow(cluster_mask, extent=(-width, width, -width, width))
         spiral_fit = fit_spiral_to_image(current_array)
         x, y = spiral_fit.calculate_cartesian_coordinates(100)
@@ -97,14 +122,30 @@ def process_from_image(args: argparse.Namespace) -> None:
             color=color_map((num_clusters - cluster_idx + 0.5) / num_clusters),
             label=f"Cluster {cluster_idx}",
         )
-
-    cluster_size_axis = fig.add_subplot(235)
-    cluster_size_axis.set_title("Cluster size")
-    cluster_size_axis.set_yscale("log")
-    cluster_size_axis.hist(cluster_sizes, bins=cluster_bins)
+        image_overlay_axis.plot(
+            x,
+            y,
+            color=color_map((num_clusters - cluster_idx + 0.5) / num_clusters),
+            label=f"Cluster {cluster_idx}",
+        )
+        colored_image_overlay_axis.plot(
+            x,
+            y,
+            color=color_map((num_clusters - cluster_idx + 0.5) / num_clusters),
+            label=f"Cluster {cluster_idx}",
+        )
+    colored_image_overlay_axis.imshow(
+        colored_image, extent=(-width, width, -width, width)
+    )
 
     fig.tight_layout()
-    plt.show()
+    if show_flag:
+        plt.show()
+    else:
+        fig.savefig(args.output_path)
+        log.info(
+            f"[yellow]FILESYST[/yellow]: Saved plot to [yellow]{args.output_path}[/yellow]"
+        )
     plt.close()
 
 
@@ -195,6 +236,14 @@ def _parse_args(args: Sequence[str]) -> argparse.Namespace:
 
 def _configure_image_command_parser(parser: argparse.ArgumentParser) -> None:
     __add_input_path_to_parser(parser)
+    parser.add_argument(
+        "-o",
+        "--o",
+        type=str,
+        dest="output_path",
+        help="Path to save plot to. If this argument is not given, the plot will be shown in a GUI instead.",
+        required=False,
+    )
     parser.add_argument(
         "-co",
         "--co",

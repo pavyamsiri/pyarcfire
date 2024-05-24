@@ -88,7 +88,7 @@ def merge_clusters_by_fit(clusters: Array3D, stop_threshold: float = 2.5) -> Arr
             cluster_distances[left_idx, right_idx] = _calculate_cluster_distance(
                 left_array, right_array, max_pixel_distance
             )
-    log.debug(f"Merged {num_merges} clusters")
+    log.info(f"[green]DIAGNOST[/green]: Merged {num_merges} clusters by fit")
     # Combined clusters into arrays
     merged_clusters = np.dstack(
         [cluster_dict[cluster_idx] for cluster_idx in cluster_dict]

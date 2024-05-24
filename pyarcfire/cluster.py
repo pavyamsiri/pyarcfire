@@ -234,9 +234,11 @@ def generate_clusters(
     cluster_arrays = Cluster.list_to_array(image, clusters)
 
     # Show diagnostics of merging step
-    log.debug(f"Number of clusters = {len(clusters)}")
-    log.debug(f"Checked {check_arc_merge_count} possible cluster merges")
-    log.debug(f"Stopped {merge_stop_count} cluster merges")
+    log.info(f"[green]DIAGNOST[/green]: Number of clusters = {len(clusters)}")
+    log.info(
+        f"[green]DIAGNOST[/green]: Checked {check_arc_merge_count} possible cluster merges"
+    )
+    log.info(f"[green]DIAGNOST[/green]: Stopped {merge_stop_count} cluster merges")
     return cluster_arrays
 
 

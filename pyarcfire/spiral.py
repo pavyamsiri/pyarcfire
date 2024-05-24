@@ -69,7 +69,11 @@ class ClusterSpiralResult:
         elif extension == "mat":
             scipy.io.savemat(path, {"image": self._cluster_masks})
         else:
-            log.warning(f"Unknown extension {extension}. Not dumping.")
+            log.warning(
+                f"[yellow]FILESYST[/yellow]: Can not dump due to unknown extension [yellow]{extension}[/yellow]"
+            )
+            return
+        log.info(f"[yellow]FILESYST[/yellow]: Dumped masks to [yellow]{path}[/yellow]")
 
 
 @benchmark
@@ -82,15 +86,23 @@ def detect_spirals_in_image(
     unsharp_image = filters.unsharp_mask(
         image, radius=unsharp_mask_radius, amount=unsharp_mask_amount
     )
+    log.info("[cyan]PROGRESS[/cyan]: Generating orientation field...")
     field = generate_orientation_fields(unsharp_image)
-    matrix = generate_similarity_matrix(field, stop_threshold)
+    log.info("[cyan]PROGRESS[/cyan]: Done generating orientation field.")
 
-    log.debug(f"Similarity matrix has {matrix.count_nonzero():,} nonzero elements.")  # type:ignore
+    log.info("[cyan]PROGRESS[/cyan]: Generating similarity matrix...")
+    matrix = generate_similarity_matrix(field, stop_threshold)
+    log.info("[cyan]PROGRESS[/cyan]: Done generating similarity matrix.")
 
     # TODO: Delete cluster containing the centre
-    cluster_arrays = generate_clusters(image, matrix.tocsr(), stop_threshold)  # type:ignore
+    log.info("[cyan]PROGRESS[/cyan]: Generating clusters...")
+    cluster_arrays = generate_clusters(image, matrix.tocsr(), stop_threshold)
+    log.info("[cyan]PROGRESS[/cyan]: Done generating clusters.")
 
+    log.info("[cyan]PROGRESS[/cyan]: Merging clusters by fit...")
     merged_clusters = merge_clusters_by_fit(cluster_arrays)
+    log.info("[cyan]PROGRESS[/cyan]: Done merging clusters by fit.")
+
     return ClusterSpiralResult(
         image,
         (unsharp_image, unsharp_mask_radius, unsharp_mask_amount),

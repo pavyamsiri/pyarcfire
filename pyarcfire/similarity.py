@@ -60,6 +60,11 @@ def generate_similarity_matrix(
     )
     assert is_sparse_matrix_hollow(similarity_matrix)
     assert is_sparse_matrix_symmetric(similarity_matrix)
+
+    log.info(
+        f"[green]DIAGNOST[/green]: Similarity matrix has {similarity_matrix.count_nonzero():,} non-zero elements."
+    )
+
     return similarity_matrix
 
 
