@@ -14,9 +14,8 @@ from skimage import transform
 
 
 # Internal libraries
-from .arc import fit_spiral_to_image, identify_inner_and_outer_spiral
+from .arc import fit_spiral_to_image
 from .log_utils import setup_logging
-from .merge_fit import merge_clusters_by_fit
 from .spiral import detect_spirals_in_image
 
 log: logging.Logger = logging.getLogger(__name__)
@@ -31,13 +30,13 @@ def main(raw_args: Sequence[str]) -> None:
     if not args.debug_flag:
         logging.getLogger("pyarcfire").setLevel("CRITICAL")
 
-    match args.command:
-        case "image":
-            process_from_image(args)
-        case "cluster":
-            process_cluster(args)
-        case _ as command:
-            log.critical(f"Command {command} is unrecognised or not yet supported!")
+    command: str = args.command
+    if command == "image":
+        process_from_image(args)
+    elif command == "cluster":
+        process_cluster(args)
+    else:
+        log.critical(f"Command {command} is unrecognised or not yet supported!")
 
 
 def process_from_image(args: argparse.Namespace) -> None:
@@ -111,21 +110,22 @@ def process_from_image(args: argparse.Namespace) -> None:
 
 def process_cluster(args: argparse.Namespace) -> None:
     input_path: str = args.input_path
-    _, ext = os.path.splitext(input_path)
-    match ext.lstrip("."):
-        case "npy":
-            log.info("Loading npy...")
-            arr = np.load(input_path)
-        case "mat":
-            log.info("Loading mat...")
-            data = scipy.io.loadmat(input_path)
-            arr = data["image"]
-            if len(arr.shape) == 2:
-                arr = arr.reshape((arr.shape[0], arr.shape[1], 1))
-            assert len(arr.shape) == 3
-        case _:
-            log.critical(f"The {ext} data format is not valid or is not yet supported!")
-            return
+    extension = os.path.splitext(input_path)[1].lstrip(".")
+    if extension == "npy":
+        log.info("Loading npy...")
+        arr = np.load(input_path)
+    elif extension == "mat":
+        log.info("Loading mat...")
+        data = scipy.io.loadmat(input_path)
+        arr = data["image"]
+        if len(arr.shape) == 2:
+            arr = arr.reshape((arr.shape[0], arr.shape[1], 1))
+        assert len(arr.shape) == 3
+    else:
+        log.critical(
+            f"The {extension} data format is not valid or is not yet supported!"
+        )
+        return
     num_clusters = arr.shape[2]
     log.debug(f"Loaded {num_clusters} clusters")
 

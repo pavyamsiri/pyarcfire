@@ -2,7 +2,7 @@
 from dataclasses import dataclass
 import functools
 import logging
-from typing import Sequence
+from typing import Optional, Sequence
 
 # External libraries
 import numpy as np
@@ -70,7 +70,7 @@ def fit_spiral_to_image(
     # Check if the cluster revolves more than once
     bad_bounds, _, _, _ = _calculate_bounds(theta)
 
-    inner_region: BoolArray1D | None = None
+    inner_region: Optional[BoolArray1D] = None
 
     # Gap in theta is not large enough to not need multiple revolutions
     # and the cluster does not contain the origin or is not closed around centre
@@ -350,7 +350,7 @@ def __cluster_has_no_endpoints_or_contains_origin(
 
 def identify_inner_and_outer_spiral(
     image: FloatArray2D, shrink_amount: int, max_diagonal_distance: float = 1.5
-) -> BoolArray1D | None:
+) -> Optional[BoolArray1D]:
     num_radii = int(np.ceil(max((image.shape[0], image.shape[1])) / 2))
     num_theta: int = 360
 
@@ -630,10 +630,10 @@ def __split_regions(
     end_indices: IntegerArray1D,
     theta: FloatArray1D,
     theta_bin_centres: FloatArray1D,
-    wrap_data: WrapData | None,
+    wrap_data: Optional[WrapData],
 ) -> tuple[BoolArray1D, BoolArray1D, int]:
     region_lengths = end_indices - start_indices + 1
-    max_region_length: int | None = (
+    max_region_length: Optional[int] = (
         region_lengths.max() if len(region_lengths) > 0 else None
     )
     only_wrap_exists: bool = max_region_length is None
@@ -676,10 +676,10 @@ def __calculate_wrap(
     can_be_single_revolution: BoolArray1D,
     start_indices: IntegerArray1D,
     end_indices: IntegerArray1D,
-) -> tuple[IntegerArray1D, IntegerArray1D, WrapData | None]:
+) -> tuple[IntegerArray1D, IntegerArray1D, Optional[WrapData]]:
     has_wrapped: bool = False
-    wrap_start: int | None = None
-    wrap_end: int | None = None
+    wrap_start: Optional[int] = None
+    wrap_end: Optional[int] = None
     # Region ends but either doesn't start or it wraps
     if len(end_indices) > 0 and (
         len(start_indices) == 0 or start_indices[0] > end_indices[0]
@@ -706,7 +706,7 @@ def __calculate_wrap(
         )
     assert len(start_indices) == len(end_indices)
 
-    wrap_data: WrapData | None = None
+    wrap_data: Optional[WrapData] = None
     if has_wrapped:
         # Last continuous single revolution region is at the beginning, but doesn"t
         # actually wrap around
@@ -783,7 +783,7 @@ def _remove_theta_discontinuities(
 
 def _adjust_theta_for_gap(
     theta: FloatArray1D, image: FloatArray2D, region: BoolArray1D
-) -> FloatArray1D | None:
+) -> Optional[FloatArray1D]:
     row_indices, column_indices = image.nonzero()
     assert len(row_indices) == len(column_indices)
     assert len(region) == len(row_indices)

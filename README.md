@@ -13,7 +13,7 @@ This port does not have all of the functionality and features of SpArcFiRe such 
 
 ## Requirements
 
-Currently this requires python 3.12.
+Currently this requires python 3.9 or above.
 The packages used are:
 
 - Pillow
@@ -22,6 +22,8 @@ The packages used are:
 - scipy
 - matplotlib (only if using CLI)
 - rich (only if using CLI)
+- pytest (for testing)
+- hypothesis (for testing)
 
 ## Interface
 

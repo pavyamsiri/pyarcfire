@@ -4,7 +4,7 @@
 from functools import wraps
 import logging
 import time
-from typing import Callable, Sequence
+from typing import Callable, Sequence, Union
 
 # External libraries
 from matplotlib import pyplot as plt
@@ -44,7 +44,7 @@ def benchmark(func: Callable) -> Callable:
     return wrapper
 
 
-def debug_plot_image(image: Array2D | Sequence[Array2D]) -> None:
+def debug_plot_image(image: Union[Array2D, Sequence[Array2D]]) -> None:
     is_sequence = isinstance(image, list) or isinstance(image, tuple)
     fig = plt.figure()
     axis = fig.add_subplot(111)
