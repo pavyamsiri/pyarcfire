@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 # Standard libraries
+from dataclasses import dataclass
 import logging
 
 
@@ -21,6 +22,11 @@ from .matrix_utils import (
 from .orientation import OrientationField
 
 log: logging.Logger = logging.getLogger(__name__)
+
+
+@dataclass
+class GenerateSimilarityMatrixSettings:
+    similarity_cutoff: float = 0.15
 
 
 @benchmark

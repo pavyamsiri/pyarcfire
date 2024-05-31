@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 # Standard libraries
+from dataclasses import dataclass
 import logging
 from typing import Sequence, Union
 
@@ -20,6 +21,15 @@ from .matrix_utils import is_sparse_matrix_symmetric
 from .merge import calculate_arc_merge_error
 
 log: logging.Logger = logging.getLogger(__name__)
+
+
+@dataclass
+class GenerateClustersSettings:
+    stop_threshold: float = 0.15
+    error_ratio_threshold: float = 2.5
+    merge_check_minimum_cluster_size: int = 25
+    minimum_cluster_size: int = 150
+    remove_central_cluster: bool = True
 
 
 class Cluster:
@@ -120,10 +130,10 @@ def generate_clusters(
     image: Array2D,
     similarity_matrix: Union[sparse.csr_matrix, sparse.csc_matrix],
     stop_threshold: float,
-    error_ratio_threshold: float = 2.5,
-    merge_check_minimum_cluster_size: int = 25,
-    minimum_cluster_size: int = 150,
-    remove_central_cluster: bool = True,
+    error_ratio_threshold: float,
+    merge_check_minimum_cluster_size: int,
+    minimum_cluster_size: int,
+    remove_central_cluster: bool,
 ) -> Array3D:
     """Performs single linkage clustering on an image given its corresponding similarity matrix.
     The clusters are merged using single linkage clustering with a single modification. Sufficiently

@@ -17,6 +17,13 @@ from skimage import transform
 from .arc import fit_spiral_to_image
 from .log_utils import setup_logging
 from .spiral import detect_spirals_in_image
+from pyarcfire import (
+    UnsharpMaskSettings,
+    GenerateOrientationFieldSettings,
+    GenerateSimilarityMatrixSettings,
+    GenerateClustersSettings,
+    MergeClustersByFitSettings,
+)
 
 log: logging.Logger = logging.getLogger(__name__)
 
@@ -45,7 +52,14 @@ def process_from_image(args: argparse.Namespace) -> None:
     image = transform.resize(image, (IMAGE_SIZE, IMAGE_SIZE))
     width: float = image.shape[0] / 2 + 0.5
 
-    result = detect_spirals_in_image(image)
+    result = detect_spirals_in_image(
+        image,
+        UnsharpMaskSettings(),
+        GenerateOrientationFieldSettings(),
+        GenerateSimilarityMatrixSettings(),
+        GenerateClustersSettings(),
+        MergeClustersByFitSettings(),
+    )
     unsharp_radius, unsharp_amount = result.get_unsharp_mask_properties()
     cluster_arrays = result.get_cluster_arrays()
 

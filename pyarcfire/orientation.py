@@ -8,6 +8,7 @@ and from the SpArcFiRe code [https://github.com/waynebhayes/SpArcFiRe]
 from __future__ import annotations
 
 # Standard libraries
+from dataclasses import dataclass
 from functools import reduce
 import logging
 
@@ -24,6 +25,13 @@ from .definitions import Array2D, FloatArray2D, FloatArray3D
 
 
 log: logging.Logger = logging.getLogger(__name__)
+
+
+@dataclass
+class GenerateOrientationFieldSettings:
+    neighbour_distance: int = 5
+    kernel_radius: int = 5
+    num_orientation_field_levels: int = 3
 
 
 class OrientationField:
@@ -384,9 +392,9 @@ class OrientationField:
 @benchmark
 def generate_orientation_fields(
     image: Array2D,
-    num_orientation_field_levels: int = 3,
-    neighbour_distance: int = 5,
-    kernel_radius: int = 5,
+    num_orientation_field_levels: int,
+    neighbour_distance: int,
+    kernel_radius: int,
 ) -> OrientationField:
     """Generates an orientation field for the given image.
     This includes a merging step and a denoising step.

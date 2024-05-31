@@ -1,6 +1,7 @@
 """This module contains functions to merge clusters together by considering how spirals will fit them."""
 
 # Standard libraries
+from dataclasses import dataclass
 import logging
 
 # External libraries
@@ -16,8 +17,13 @@ from .merge import calculate_arc_merge_error
 log: logging.Logger = logging.getLogger(__name__)
 
 
+@dataclass
+class MergeClustersByFitSettings:
+    stop_threshold: float = 2.5
+
+
 @benchmark
-def merge_clusters_by_fit(clusters: Array3D, stop_threshold: float = 2.5) -> Array3D:
+def merge_clusters_by_fit(clusters: Array3D, stop_threshold: float) -> Array3D:
     """Merge clusters by if they are fit spirals decently well when combined.
 
     Parameters
