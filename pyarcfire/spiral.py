@@ -94,7 +94,6 @@ def detect_spirals_in_image(
     matrix = generate_similarity_matrix(field, stop_threshold)
     log.info("[cyan]PROGRESS[/cyan]: Done generating similarity matrix.")
 
-    # TODO: Delete cluster containing the centre
     log.info("[cyan]PROGRESS[/cyan]: Generating clusters...")
     cluster_arrays = generate_clusters(image, matrix.tocsr(), stop_threshold)
     log.info("[cyan]PROGRESS[/cyan]: Done generating clusters.")
