@@ -82,7 +82,7 @@ def process_from_image(args: argparse.Namespace) -> None:
     contrast_axis = fig.add_subplot(232)
     contrast_axis.imshow(contrast_image, cmap="gray")
     contrast_axis.set_title(
-        rf"Unsharp image $\text{{Radius}} = {unsharp_settings.radius}, \; \text{{Amount}} = {unsharp_settings.amount}$"
+        rf"Unsharp image $\mathrm{{Radius}} = {unsharp_settings.radius}, \; \mathrm{{Amount}} = {unsharp_settings.amount}$"
     )
     contrast_axis.set_axis_off()
 
