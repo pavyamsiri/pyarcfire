@@ -5,12 +5,13 @@ from __future__ import annotations
 import logging
 from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Union, cast
+from typing import Any, Union, cast
 
 import numpy as np
 from numpy.typing import NDArray
 from scipy import sparse
 
+from .array_utils import get_origin_points_unnested
 from .debug_utils import benchmark
 from .matrix_utils import get_nonzero_values, is_sparse_matrix_symmetric
 from .merge import calculate_arc_merge_error
@@ -52,6 +53,9 @@ class Cluster:
         return str(self)
 
     def __contains__(self, item: object) -> bool:
+        if isinstance(item, Iterable):
+            elements: Iterable[Any] = item
+            return any([elem in self._points for elem in elements])
         return item in self._points
 
     @property
@@ -254,9 +258,8 @@ def generate_clusters(
     # Remove cluster that contains the centre
     if remove_central_cluster:
         log.info("[green]DIAGNOST[/green]: Removing central cluster...")
-        central_row = image.shape[0] // 2
-        central_column = image.shape[1] // 2
-        central_idx = np.ravel_multi_index((central_row, central_column), image.shape)
+        central_points = get_origin_points_unnested(image)
+        central_idx = np.ravel_multi_index(central_points, image.shape)
         clusters_list = [
             cluster for cluster in clusters_list if central_idx not in cluster
         ]
