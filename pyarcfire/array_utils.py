@@ -47,3 +47,12 @@ def get_origin_points(image: NDArray[ScalarType_co]) -> Sequence[tuple[int, int]
         central_indices = ((image.shape[0] // 2, image.shape[1] // 2),)
 
     return central_indices
+
+
+def get_origin_points_unnested(
+    image: NDArray[ScalarType_co],
+) -> tuple[Sequence[int], Sequence[int]]:
+    points = get_origin_points(image)
+    row_indices = [row_idx for row_idx, _ in points]
+    column_indices = [column_idx for _, column_idx in points]
+    return (row_indices, column_indices)
