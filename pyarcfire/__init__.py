@@ -6,6 +6,9 @@ from .similarity import generate_similarity_matrix, GenerateSimilarityMatrixSett
 from .spiral import ClusterSpiralResult, detect_spirals_in_image, UnsharpMaskSettings
 
 
+__version__ = "0.0.0dev1"
+
+
 __all__ = [
     "ClusterSpiralResult",
     "GenerateClustersSettings",
