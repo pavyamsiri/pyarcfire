@@ -326,9 +326,10 @@ def __cluster_has_no_endpoints_or_contains_origin(
     # See if the cluster has actual spiral endpoints by seeing if it is
     # possible to "escape" from the center point to the image boundary,
     # considering non-cluster pixels as empty pixels.
-    central_row: int = image.shape[0] // 2
-    central_column: int = image.shape[1] // 2
-    centre_in_cluster = image[central_row, central_column] != 0
+    centre_indices = __get_origin_indices(image)
+    centre_in_cluster = any(
+        [image[row_idx, column_idx] for row_idx, column_idx in centre_indices]
+    )
     if centre_in_cluster:
         return True
     in_cluster = image > 0
@@ -339,7 +340,33 @@ def __cluster_has_no_endpoints_or_contains_origin(
     )
     assert is_hole_or_cluster is not None
     # NOTE: Check if is_hole_or_cluster is not already a binary array
-    return is_hole_or_cluster[central_row, central_column] > 0
+    no_end_points = any(
+        [
+            is_hole_or_cluster[row_idx, column_idx] > 0
+            for row_idx, column_idx in centre_indices
+        ]
+    )
+    return no_end_points
+
+
+def __get_origin_indices(image: NDArray[FloatType]) -> Sequence[tuple[int, int]]:
+    # Assume that dimensions are even
+    assert image.shape[0] % 2 == 0
+    assert image.shape[1] % 2 == 0
+
+    bottom = image.shape[0] // 2
+    right = image.shape[1] // 2
+    central_indices = (
+        # Top left
+        (bottom - 1, right - 1),
+        # Top right
+        (bottom - 1, right),
+        # Bottom left
+        (bottom, right - 1),
+        # Bottom right
+        (bottom, right),
+    )
+    return central_indices
 
 
 def identify_inner_and_outer_spiral(
