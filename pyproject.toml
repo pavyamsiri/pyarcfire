@@ -1,6 +1,6 @@
 [project]
 name = "pyarcfire"
-version = "0.0.0dev0"
+version = "0.0.0dev1"
 description = "A port of SpArcFiRe, a spiral arc finder"
 authors = [
     { name = "Pavadol Yamsiri" }
@@ -17,17 +17,17 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Astronomy"
 ]
 dependencies = [
-    "Pillow",
-    "numpy",
-    "scikit-image",
-    "scipy",
-    "typing_extensions",
+    "numpy>=1.2`",
+    "scikit-image>=18",
+    "scipy>=1.8",
+    "typing_extensions>=3.10",
 ]
 
 [project.optional-dependencies]
 cli = [
-    "matplotlib",
-    "rich",
+    "matplotlib>=3.5",
+    "Pillow",
+    "rich>=4.2.1",
 ]
 
 [project.urls]
