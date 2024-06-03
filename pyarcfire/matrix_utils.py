@@ -26,12 +26,10 @@ SparseMatrix = TypeVar(
 
 SparseMatrixSupportsIndex = TypeVar(
     "SparseMatrixSupportsIndex",
-    sparse.bsr_array,
     sparse.csc_array,
     sparse.csr_array,
     sparse.dok_array,
     sparse.lil_array,
-    sparse.bsr_matrix,
     sparse.csc_matrix,
     sparse.csr_matrix,
     sparse.dok_matrix,
