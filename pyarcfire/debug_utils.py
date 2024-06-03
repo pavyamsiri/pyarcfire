@@ -1,22 +1,20 @@
 """This module contains useful utilities for debugging or profiling."""
 
-# Internal libraries
-from functools import wraps
 import logging
 import time
-from typing import Callable, Sequence, Union
+from collections.abc import Callable
+from functools import wraps
+from typing import TypeVar
 
-# External libraries
-from matplotlib import pyplot as plt
-
-# Internal libraries
-from .definitions import Array2D
-
+from typing_extensions import ParamSpec
 
 log: logging.Logger = logging.getLogger(__name__)
 
+P = ParamSpec("P")
+R = TypeVar("R")
 
-def benchmark(func: Callable) -> Callable:
+
+def benchmark(func: Callable[P, R]) -> Callable[P, R]:
     """Decorator used to time functions.
 
     Parameters
@@ -31,7 +29,7 @@ def benchmark(func: Callable) -> Callable:
     """
 
     @wraps(func)
-    def wrapper(*args, **kwargs):
+    def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
         time_start = time.perf_counter()
         result = func(*args, **kwargs)
         time_end = time.perf_counter()
@@ -42,17 +40,3 @@ def benchmark(func: Callable) -> Callable:
         return result
 
     return wrapper
-
-
-def debug_plot_image(image: Union[Array2D, Sequence[Array2D]]) -> None:
-    is_sequence = isinstance(image, list) or isinstance(image, tuple)
-    fig = plt.figure()
-    axis = fig.add_subplot(111)
-    if is_sequence:
-        axis.imshow(image[0])
-        for current_image in image[:1]:
-            axis.imshow(current_image, alpha=0.5)
-    else:
-        axis.imshow(image)
-    plt.show()
-    plt.close()

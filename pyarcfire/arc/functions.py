@@ -1,49 +1,52 @@
-# Standard libraries
 from typing import TypeVar
 
-# External libraries
 import numpy as np
+from numpy.typing import NDArray
 
-# Internal libraries
-from pyarcfire.definitions import FloatArray1D
-
-T = TypeVar("T", float, FloatArray1D)
+FloatType = TypeVar("FloatType", np.float32, np.float64)
 
 
 def log_spiral(
-    theta: T, offset: float, pitch_angle: float, initial_radius: float, use_modulo: bool
-) -> T:
-    angles = theta - offset
-    if use_modulo:
-        angles %= 2 * np.pi
-    result: T = initial_radius * np.exp(-pitch_angle * angles)  # type:ignore
-    return result
-
-
-def calculate_log_spiral_residual_vector(
-    radii: FloatArray1D,
-    theta: FloatArray1D,
-    weights: FloatArray1D,
+    theta: NDArray[FloatType],
     offset: float,
     pitch_angle: float,
     initial_radius: float,
     use_modulo: bool,
-) -> FloatArray1D:
-    result = np.sqrt(weights) * (
-        radii - log_spiral(theta, offset, pitch_angle, initial_radius, use_modulo)
+) -> NDArray[FloatType]:
+    angles = theta - offset
+    if use_modulo:
+        angles %= 2 * np.pi
+    result: NDArray[FloatType] = np.multiply(
+        initial_radius, np.exp(np.multiply(-pitch_angle, angles))
+    )
+    return result
+
+
+def calculate_log_spiral_residual_vector(
+    radii: NDArray[FloatType],
+    theta: NDArray[FloatType],
+    weights: NDArray[FloatType],
+    offset: float,
+    pitch_angle: float,
+    initial_radius: float,
+    use_modulo: bool,
+) -> NDArray[FloatType]:
+    result = np.multiply(
+        np.sqrt(weights),
+        (radii - log_spiral(theta, offset, pitch_angle, initial_radius, use_modulo)),
     )
     return result
 
 
 def calculate_log_spiral_error(
-    radii: FloatArray1D,
-    theta: FloatArray1D,
-    weights: FloatArray1D,
+    radii: NDArray[FloatType],
+    theta: NDArray[FloatType],
+    weights: NDArray[FloatType],
     offset: float,
     pitch_angle: float,
     initial_radius: float,
     use_modulo: bool,
-) -> tuple[float, FloatArray1D]:
+) -> tuple[float, NDArray[FloatType]]:
     residuals = calculate_log_spiral_residual_vector(
         radii, theta, weights, offset, pitch_angle, initial_radius, use_modulo
     )
@@ -53,12 +56,12 @@ def calculate_log_spiral_error(
 
 def calculate_log_spiral_error_from_pitch_angle(
     pitch_angle: float,
-    radii: FloatArray1D,
-    theta: FloatArray1D,
-    weights: FloatArray1D,
+    radii: NDArray[FloatType],
+    theta: NDArray[FloatType],
+    weights: NDArray[FloatType],
     offset: float,
     use_modulo: bool,
-) -> FloatArray1D:
+) -> NDArray[FloatType]:
     initial_radius = calculate_best_initial_radius(
         radii, theta, weights, offset, pitch_angle, use_modulo
     )
@@ -69,9 +72,9 @@ def calculate_log_spiral_error_from_pitch_angle(
 
 
 def calculate_best_initial_radius(
-    radii: FloatArray1D,
-    theta: FloatArray1D,
-    weights: FloatArray1D,
+    radii: NDArray[FloatType],
+    theta: NDArray[FloatType],
+    weights: NDArray[FloatType],
     offset: float,
     pitch_angle: float,
     use_modulo: bool,

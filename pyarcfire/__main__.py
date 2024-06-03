@@ -1,29 +1,28 @@
-# Standard libraries
 import argparse
 import logging
 import os
-from typing import Sequence
+from collections.abc import Sequence
+from typing import Any, cast
 
-# External libraries
 import matplotlib as mpl
-from matplotlib import pyplot as plt
 import numpy as np
-from PIL import Image
 import scipy.io
+from matplotlib import pyplot as plt
+from numpy.typing import NDArray
+from PIL import Image
 from skimage import transform
 
+from pyarcfire import (
+    GenerateClustersSettings,
+    GenerateOrientationFieldSettings,
+    GenerateSimilarityMatrixSettings,
+    MergeClustersByFitSettings,
+    UnsharpMaskSettings,
+)
 
-# Internal libraries
 from .arc import fit_spiral_to_image
 from .log_utils import setup_logging
 from .spiral import detect_spirals_in_image
-from pyarcfire import (
-    UnsharpMaskSettings,
-    GenerateOrientationFieldSettings,
-    GenerateSimilarityMatrixSettings,
-    GenerateClustersSettings,
-    MergeClustersByFitSettings,
-)
 
 log: logging.Logger = logging.getLogger(__name__)
 
@@ -48,9 +47,11 @@ def main(raw_args: Sequence[str]) -> None:
 
 def process_from_image(args: argparse.Namespace) -> None:
     # Load image
-    image = np.asarray(Image.open(args.input_path).convert("L"))
-    image = transform.resize(image, (IMAGE_SIZE, IMAGE_SIZE))
-    width: float = image.shape[0] / 2 + 0.5
+    image = (
+        np.asarray(Image.open(args.input_path).convert("L")).astype(np.float32) / 255
+    )
+    image = transform.resize(image, (IMAGE_SIZE, IMAGE_SIZE)).astype(np.float32)
+    width: float = image.shape[0] / 2 - 0.5
 
     result = detect_spirals_in_image(
         image,
@@ -60,7 +61,7 @@ def process_from_image(args: argparse.Namespace) -> None:
         GenerateClustersSettings(),
         MergeClustersByFitSettings(),
     )
-    unsharp_radius, unsharp_amount = result.get_unsharp_mask_properties()
+    unsharp_settings = result.unsharp_mask_settings
     cluster_arrays = result.get_cluster_arrays()
 
     image = result.get_image()
@@ -81,7 +82,7 @@ def process_from_image(args: argparse.Namespace) -> None:
     contrast_axis = fig.add_subplot(232)
     contrast_axis.imshow(contrast_image, cmap="gray")
     contrast_axis.set_title(
-        rf"Unsharp image $\text{{Radius}} = {unsharp_radius}, \; \text{{Amount}} = {unsharp_amount}$"
+        rf"Unsharp image $\text{{Radius}} = {unsharp_settings.radius}, \; \text{{Amount}} = {unsharp_settings.amount}$"
     )
     contrast_axis.set_axis_off()
 
@@ -171,8 +172,8 @@ def process_cluster(args: argparse.Namespace) -> None:
         arr = np.load(input_path)
     elif extension == "mat":
         log.info("Loading mat...")
-        data = scipy.io.loadmat(input_path)
-        arr = data["image"]
+        data: dict[str, Any] = scipy.io.loadmat(input_path)
+        arr = cast(NDArray[np.float32], data["image"])
         if len(arr.shape) == 2:
             arr = arr.reshape((arr.shape[0], arr.shape[1], 1))
         assert len(arr.shape) == 3
@@ -186,7 +187,7 @@ def process_cluster(args: argparse.Namespace) -> None:
 
     fit_spiral_to_image(arr.sum(axis=2))
 
-    width = arr.shape[0] / 2 + 0.5
+    width = arr.shape[0] / 2 - 0.5
 
     for cluster_idx in range(num_clusters):
         log.debug(f"Cluster {cluster_idx} sums to = {arr[:, :, cluster_idx].sum()}")

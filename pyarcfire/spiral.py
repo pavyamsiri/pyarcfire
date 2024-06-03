@@ -1,28 +1,26 @@
-# Standard libraries
-from dataclasses import dataclass
 import logging
 import os
-from typing import Sequence
+from dataclasses import dataclass
 
-# External libraries
 import numpy as np
+from numpy.typing import NDArray
 import scipy.io
 from skimage import filters
 
-# Internal libraries
+from .cluster import GenerateClustersSettings, generate_clusters
 from .debug_utils import benchmark
-from .definitions import Array2D, Array3D
+from .merge_fit import MergeClustersByFitSettings, merge_clusters_by_fit
 from .orientation import (
     GenerateOrientationFieldSettings,
     OrientationField,
     generate_orientation_fields,
 )
 from .similarity import GenerateSimilarityMatrixSettings, generate_similarity_matrix
-from .cluster import GenerateClustersSettings, generate_clusters
-from .merge_fit import MergeClustersByFitSettings, merge_clusters_by_fit
-
 
 log: logging.Logger = logging.getLogger(__name__)
+
+
+FloatType = np.float32
 
 
 @dataclass
@@ -34,33 +32,78 @@ class UnsharpMaskSettings:
 class ClusterSpiralResult:
     def __init__(
         self,
-        image: Array2D,
+        image: NDArray[FloatType],
+        unsharp_image: NDArray[FloatType],
         field: OrientationField,
-        cluster_masks: Array3D,
+        cluster_masks: NDArray[FloatType],
+        unsharp_mask_settings: UnsharpMaskSettings,
+        orientation_field_settings: GenerateOrientationFieldSettings,
+        similarity_matrix_settings: GenerateSimilarityMatrixSettings,
+        generate_cluster_settings: GenerateClustersSettings,
+        merge_clusters_by_fit_settings: MergeClustersByFitSettings,
     ) -> None:
-        self._image: Array2D = image
-        self._cluster_masks: Array3D = cluster_masks
+        self._image: NDArray[FloatType] = image
+        self._unsharp_image: NDArray[FloatType] = unsharp_image
+        self._cluster_masks: NDArray[FloatType] = cluster_masks
         self._field: OrientationField = field
-        self._sizes: Sequence[int] = tuple(
+        self._sizes: tuple[int, ...] = tuple(
             [
                 np.count_nonzero(self._cluster_masks[:, :, idx])
                 for idx in range(self._cluster_masks.shape[2])
             ]
         )
 
-    def get_image(self) -> Array2D:
+        # Settings
+        self._unsharp_mask_settings: UnsharpMaskSettings = unsharp_mask_settings
+        self._orientation_field_settings: GenerateOrientationFieldSettings = (
+            orientation_field_settings
+        )
+        self._similarity_matrix_settings: GenerateSimilarityMatrixSettings = (
+            similarity_matrix_settings
+        )
+        self._generate_cluster_settings: GenerateClustersSettings = (
+            generate_cluster_settings
+        )
+        self._merge_clusters_by_fit_settings: MergeClustersByFitSettings = (
+            merge_clusters_by_fit_settings
+        )
+
+    @property
+    def unsharp_mask_settings(self) -> UnsharpMaskSettings:
+        return self._unsharp_mask_settings
+
+    @property
+    def orientation_field_settings(self) -> GenerateOrientationFieldSettings:
+        return self._orientation_field_settings
+
+    @property
+    def similarity_matrix_settings(self) -> GenerateSimilarityMatrixSettings:
+        return self._similarity_matrix_settings
+
+    @property
+    def generate_cluster_settings(self) -> GenerateClustersSettings:
+        return self._generate_cluster_settings
+
+    @property
+    def merge_clusters_by_fit_settings(self) -> MergeClustersByFitSettings:
+        return self._merge_clusters_by_fit_settings
+
+    def get_image(self) -> NDArray[FloatType]:
         return self._image
+
+    def get_unsharp_image(self) -> NDArray[FloatType]:
+        return self._unsharp_image
 
     def get_field(self) -> OrientationField:
         return self._field
 
-    def get_sizes(self) -> Sequence[int]:
+    def get_sizes(self) -> tuple[int, ...]:
         return self._sizes
 
-    def get_cluster_array(self, cluster_idx: int) -> tuple[Array2D, int]:
+    def get_cluster_array(self, cluster_idx: int) -> tuple[NDArray[FloatType], int]:
         return (self._cluster_masks[:, :, cluster_idx], self._sizes[cluster_idx])
 
-    def get_cluster_arrays(self) -> Array3D:
+    def get_cluster_arrays(self) -> NDArray[FloatType]:
         return self._cluster_masks
 
     def dump(self, path: str) -> None:
@@ -79,7 +122,7 @@ class ClusterSpiralResult:
 
 @benchmark
 def detect_spirals_in_image(
-    image: Array2D,
+    image: NDArray[FloatType],
     unsharp_mask_settings: UnsharpMaskSettings,
     orientation_field_settings: GenerateOrientationFieldSettings,
     similarity_matrix_settings: GenerateSimilarityMatrixSettings,
@@ -129,7 +172,13 @@ def detect_spirals_in_image(
     log.info("[cyan]PROGRESS[/cyan]: Done merging clusters by fit.")
 
     return ClusterSpiralResult(
-        image,
-        field,
-        merged_clusters,
+        image=image,
+        unsharp_image=unsharp_image,
+        field=field,
+        cluster_masks=merged_clusters,
+        unsharp_mask_settings=unsharp_mask_settings,
+        orientation_field_settings=orientation_field_settings,
+        similarity_matrix_settings=similarity_matrix_settings,
+        generate_cluster_settings=generate_clusters_settings,
+        merge_clusters_by_fit_settings=merge_clusters_by_fit_settings,
     )

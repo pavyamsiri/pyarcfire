@@ -1,15 +1,13 @@
 """This module contains functions to help set up logging."""
 
-# Standard libraries
 import logging
-from typing import Sequence
+from collections.abc import Iterable
 
-# External libraries
 from rich.console import Console
 from rich.logging import RichHandler
 
 
-def setup_logging() -> Sequence[logging.Handler]:
+def setup_logging() -> Iterable[logging.Handler]:
     FORMAT = "%(message)s"
     console = Console()
     console_handler = RichHandler(console=console, show_time=False, markup=True)

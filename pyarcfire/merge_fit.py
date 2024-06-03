@@ -1,20 +1,18 @@
 """This module contains functions to merge clusters together by considering how spirals will fit them."""
 
-# Standard libraries
-from dataclasses import dataclass
 import logging
+from dataclasses import dataclass
 
-# External libraries
 import numpy as np
+from numpy.typing import NDArray
 from scipy.ndimage import distance_transform_edt
 
-
-# Internal libraries
 from .debug_utils import benchmark
-from .definitions import Array2D, Array3D
 from .merge import calculate_arc_merge_error
 
 log: logging.Logger = logging.getLogger(__name__)
+
+FloatType = np.float32
 
 
 @dataclass
@@ -23,19 +21,21 @@ class MergeClustersByFitSettings:
 
 
 @benchmark
-def merge_clusters_by_fit(clusters: Array3D, stop_threshold: float) -> Array3D:
+def merge_clusters_by_fit(
+    clusters: NDArray[FloatType], stop_threshold: float
+) -> NDArray[FloatType]:
     """Merge clusters by if they are fit spirals decently well when combined.
 
     Parameters
     ----------
-    clusters : Array3D
+    clusters : NDArray[FloatType]
         The clusters stored as series of masked images.
     stop_threshold : float
         The maximum allowed distance between clusters to be merged.
 
     Returns
     -------
-    merged_clusters : Array3D
+    merged_clusters : NDArray[FloatType]
         The clusters after being merged.
     """
     # Maximum pixel distance
@@ -44,18 +44,18 @@ def merge_clusters_by_fit(clusters: Array3D, stop_threshold: float) -> Array3D:
     )
 
     # Fit spirals to each cluster
-    cluster_dict: dict[int, Array2D] = {}
+    cluster_dict: dict[int, NDArray[FloatType]] = {}
     num_clusters: int = clusters.shape[2]
     for cluster_idx in range(num_clusters):
         cluster_dict[cluster_idx] = clusters[:, :, cluster_idx]
 
     # Compute distances between each cluster
     cluster_distances = np.full((num_clusters, num_clusters), np.inf, dtype=np.float32)
-    for first_idx in range(num_clusters):
-        for second_idx in range(first_idx + 1, num_clusters):
-            left_array = cluster_dict[first_idx][1]
-            right_array = cluster_dict[second_idx][1]
-            cluster_distances[first_idx, second_idx] = _calculate_cluster_distance(
+    for source_idx in range(num_clusters):
+        for target_idx in range(source_idx + 1, num_clusters):
+            left_array = cluster_dict[source_idx][1]
+            right_array = cluster_dict[target_idx][1]
+            cluster_distances[source_idx, target_idx] = _calculate_cluster_distance(
                 left_array, right_array, max_pixel_distance
             )
 
@@ -63,7 +63,9 @@ def merge_clusters_by_fit(clusters: Array3D, stop_threshold: float) -> Array3D:
     while True:
         # Pop the smallest distance
         min_idx = cluster_distances.argmin()
-        first_idx, second_idx = np.unravel_index(min_idx, cluster_distances.shape)
+        unravelled_index = np.unravel_index(min_idx, cluster_distances.shape)
+        first_idx = int(unravelled_index[0])
+        second_idx = int(unravelled_index[1])
         value = cluster_distances[first_idx, second_idx]
 
         # Distance value too large
@@ -99,21 +101,21 @@ def merge_clusters_by_fit(clusters: Array3D, stop_threshold: float) -> Array3D:
     merged_clusters = np.dstack(
         [cluster_dict[cluster_idx] for cluster_idx in cluster_dict]
     )
-    return merged_clusters  # type:ignore
+    return merged_clusters
 
 
 def _calculate_cluster_distance(
-    first_cluster_array: Array2D,
-    second_cluster_array: Array2D,
+    first_cluster_array: NDArray[FloatType],
+    second_cluster_array: NDArray[FloatType],
     max_pixel_distance: float,
 ) -> float:
     """Calculates the "distance" between two clusters.
 
     Parameters
     ----------
-    first_cluster_array : Array2D
+    first_cluster_array : NDArray[FloatType]
         The first cluster in the form of an array.
-    second_cluster_array : Array2D
+    second_cluster_array : NDArray[FloatType]
         The second cluster in the form of an array.
     max_pixel_distance : float
         The maximum allowed distance in pixels between the two clusters for them

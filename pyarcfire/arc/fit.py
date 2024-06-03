@@ -1,25 +1,17 @@
-# Standard libraries
-from dataclasses import dataclass
 import functools
 import logging
-from typing import Optional, Sequence
+from collections.abc import Sequence
+from dataclasses import dataclass
+from typing import Generic, Optional, TypeVar, cast
 
-# External libraries
 import numpy as np
-from scipy import ndimage
-from scipy import optimize
 import skimage
 import skimage.measure
+from numpy.typing import NDArray
+from scipy import ndimage, optimize
 
-# Internal libraries
-from pyarcfire.definitions import (
-    Array2D,
-    BoolArray1D,
-    BoolArray2D,
-    FloatArray1D,
-    FloatArray2D,
-    IntegerArray1D,
-)
+from pyarcfire.array_utils import get_origin_points
+
 from .common import LogSpiralFitResult
 from .functions import (
     calculate_best_initial_radius,
@@ -27,16 +19,21 @@ from .functions import (
     calculate_log_spiral_error_from_pitch_angle,
 )
 from .utils import (
-    _adjust_theta_to_zero,
-    _calculate_bounds,
-    _get_arc_bounds,
-    _get_polar_coordinates,
+    adjust_theta_to_zero,
+    calculate_bounds,
+    get_arc_bounds,
+    get_polar_coordinates,
 )
 
 SINGLE_REVOLUTION_TOLERANCE: float = 1e-8
 MULTIPLE_REVOLUTION_TOLERANCE: float = 1e-12
 
 log: logging.Logger = logging.getLogger(__name__)
+
+
+IndexType = TypeVar("IndexType", np.int32, np.int64)
+FloatType = TypeVar("FloatType", np.float32, np.float64)
+BoolType = np.bool_
 
 
 @dataclass
@@ -49,8 +46,8 @@ class WrapData:
 
 
 @dataclass
-class InternalLogSpiralFitResult:
-    theta: FloatArray1D
+class InternalLogSpiralFitResult(Generic[FloatType]):
+    theta: NDArray[FloatType]
     offset: float
     pitch_angle: float
     arc_bounds: tuple[float, float]
@@ -59,18 +56,17 @@ class InternalLogSpiralFitResult:
 
 
 def fit_spiral_to_image(
-    image: Array2D,
+    image: NDArray[FloatType],
     initial_pitch_angle: float = 0,
     force_single_revolution: bool = False,
-) -> LogSpiralFitResult:
-    image = image.astype(np.float32)
+) -> LogSpiralFitResult[FloatType]:
     # Convert to polar coordinates
-    radii, theta, weights = _get_polar_coordinates(image)
+    radii, theta, weights = get_polar_coordinates(image)
 
     # Check if the cluster revolves more than once
-    bad_bounds, _, _, _ = _calculate_bounds(theta)
+    bad_bounds, _, _, _ = calculate_bounds(theta)
 
-    inner_region: Optional[BoolArray1D] = None
+    inner_region: Optional[NDArray[BoolType]] = None
 
     # Gap in theta is not large enough to not need multiple revolutions
     # and the cluster does not contain the origin or is not closed around centre
@@ -89,7 +85,7 @@ def fit_spiral_to_image(
         else:
             theta = _remove_theta_discontinuities(theta, image, inner_region)
     need_multiple_revolutions: bool = inner_region is not None
-    if need_multiple_revolutions:
+    if inner_region is not None:
         fit_result = _fit_spiral_to_image_multiple_revolution_core(
             radii, theta, weights, initial_pitch_angle, inner_region
         )
@@ -106,7 +102,7 @@ def fit_spiral_to_image(
     bad_bounds = fit_result.bad_bounds
 
     # Adjust so that arc bounds is relative to theta
-    (theta, arc_bounds, offset) = _adjust_theta_to_zero(
+    (theta, arc_bounds, offset) = adjust_theta_to_zero(
         theta, arc_bounds, offset, not need_multiple_revolutions
     )
 
@@ -155,31 +151,31 @@ def fit_spiral_to_image(
 
 
 def _fit_spiral_to_image_single_revolution_core(
-    radii: FloatArray1D,
-    theta: FloatArray1D,
-    weights: FloatArray1D,
+    radii: NDArray[FloatType],
+    theta: NDArray[FloatType],
+    weights: NDArray[FloatType],
     initial_pitch_angle: float,
-) -> InternalLogSpiralFitResult:
+) -> InternalLogSpiralFitResult[FloatType]:
     # Find suitable bounds for the offset parameter
-    bad_bounds, (lower_bound, upper_bound), rotation_amount, _ = _calculate_bounds(
-        theta
-    )
-    rotated_theta = (theta - rotation_amount) % (2 * np.pi)
+    bad_bounds, (lower_bound, upper_bound), rotation_amount, _ = calculate_bounds(theta)
+    rotated_theta = np.mod(theta - rotation_amount, 2 * np.pi)
 
     # Perform a fit to get the pitch angle
+    offset: float
+    pitch_angle: float
     if bad_bounds:
         log.debug("[red]SUBOPTIM[/red]: Single revolution: Bad bounds!")
         offset = 0
         pitch_angle = 0
     else:
         offset = (lower_bound + upper_bound) / 2
-        res = optimize.least_squares(
+        res: optimize.OptimizeResult = optimize.least_squares(
             calculate_log_spiral_error_from_pitch_angle,
             x0=initial_pitch_angle,
             args=(radii, rotated_theta, weights, offset, True),
         )
         assert res.success, "Failed to fit pitch angle"
-        pitch_angle = res.x[0]
+        pitch_angle = cast(float, res.x[0])
 
     # Calculate the error from the fit
     initial_radius = calculate_best_initial_radius(
@@ -198,9 +194,9 @@ def _fit_spiral_to_image_single_revolution_core(
     # Rotate back
     offset += rotation_amount
 
-    theta_adjust = (theta - offset) % (2 * np.pi) + offset
+    theta_adjust = np.add(np.mod(theta - offset, 2 * np.pi), offset)
     # Get arc bounds
-    arc_bounds = _get_arc_bounds(offset, rotation_amount, lower_bound, upper_bound)
+    arc_bounds = get_arc_bounds(offset, rotation_amount, lower_bound, upper_bound)
     fit_result = InternalLogSpiralFitResult(
         theta=theta_adjust,
         offset=offset,
@@ -213,12 +209,12 @@ def _fit_spiral_to_image_single_revolution_core(
 
 
 def _fit_spiral_to_image_multiple_revolution_core(
-    radii: FloatArray1D,
-    theta: FloatArray1D,
-    weights: FloatArray1D,
+    radii: NDArray[FloatType],
+    theta: NDArray[FloatType],
+    weights: NDArray[FloatType],
     initial_pitch_angle: float,
-    inner_region: BoolArray1D,
-) -> InternalLogSpiralFitResult:
+    inner_region: NDArray[BoolType],
+) -> InternalLogSpiralFitResult[FloatType]:
     # fitting depends on the arc bounds, but we don't know what the arc
     # bounds are (i.e., whether to calculate the bounds from the inner or
     # outer points) until we know the chirality.  Since we only know the
@@ -275,18 +271,18 @@ def _fit_spiral_to_image_multiple_revolution_core(
 
 
 def __fit_multiple_revolution_spiral(
-    radii: FloatArray1D,
-    theta: FloatArray1D,
-    weights: FloatArray1D,
-    region: BoolArray1D,
+    radii: NDArray[FloatType],
+    theta: NDArray[FloatType],
+    weights: NDArray[FloatType],
+    region: NDArray[BoolType],
     initial_pitch_angle: float,
     clockwise: bool,
-) -> tuple[FloatArray1D, float, float, float]:
-    bad_bounds, (lower_bound, upper_bound), rotation_amount, _ = _calculate_bounds(
+) -> tuple[NDArray[FloatType], float, float, float]:
+    bad_bounds, (lower_bound, upper_bound), rotation_amount, _ = calculate_bounds(
         theta[region]
     )
     assert not bad_bounds
-    rotated_theta = theta - rotation_amount
+    rotated_theta = np.subtract(theta, rotation_amount)
     offset = (lower_bound + upper_bound) / 2
     pitch_angle_bounds = (0, np.inf) if clockwise else (-np.inf, 0)
     # NOTE: Have to invert the guess if counter clockwise to fit in the bounds
@@ -304,7 +300,7 @@ def __fit_multiple_revolution_spiral(
         xtol=MULTIPLE_REVOLUTION_TOLERANCE,
     )
     assert res.success, "Failed to fit pitch angle"
-    pitch_angle = res.x[0]
+    pitch_angle: float = cast(float, res.x[0])
 
     # Calculate the error from the fit
     initial_radius = calculate_best_initial_radius(
@@ -327,14 +323,15 @@ def __fit_multiple_revolution_spiral(
 
 
 def __cluster_has_no_endpoints_or_contains_origin(
-    image: FloatArray2D, max_half_gap_fill_for_undefined_bounds: int = 3
+    image: NDArray[FloatType], max_half_gap_fill_for_undefined_bounds: int = 3
 ) -> bool:
     # See if the cluster has actual spiral endpoints by seeing if it is
     # possible to "escape" from the center point to the image boundary,
     # considering non-cluster pixels as empty pixels.
-    central_row: int = image.shape[0] // 2
-    central_column: int = image.shape[1] // 2
-    centre_in_cluster = image[central_row, central_column] != 0
+    centre_indices = get_origin_points(image)
+    centre_in_cluster = any(
+        [image[row_idx, column_idx] for row_idx, column_idx in centre_indices]
+    )
     if centre_in_cluster:
         return True
     in_cluster = image > 0
@@ -345,12 +342,18 @@ def __cluster_has_no_endpoints_or_contains_origin(
     )
     assert is_hole_or_cluster is not None
     # NOTE: Check if is_hole_or_cluster is not already a binary array
-    return is_hole_or_cluster[central_row, central_column] > 0
+    no_end_points = any(
+        [
+            is_hole_or_cluster[row_idx, column_idx] > 0
+            for row_idx, column_idx in centre_indices
+        ]
+    )
+    return no_end_points
 
 
 def identify_inner_and_outer_spiral(
-    image: FloatArray2D, shrink_amount: int, max_diagonal_distance: float = 1.5
-) -> Optional[BoolArray1D]:
+    image: NDArray[FloatType], shrink_amount: int, max_diagonal_distance: float = 1.5
+) -> Optional[NDArray[BoolType]]:
     num_radii = int(np.ceil(max((image.shape[0], image.shape[1])) / 2))
     num_theta: int = 360
 
@@ -362,12 +365,11 @@ def identify_inner_and_outer_spiral(
 
     # Find the start and end of each region
     single_revolution_differences = np.diff(can_be_single_revolution.astype(np.float32))
-    start_indices: IntegerArray1D = (single_revolution_differences == 1).nonzero()[
-        0
-    ].astype(np.int32) + 1
-    end_indices: IntegerArray1D = (
-        (single_revolution_differences == -1).nonzero()[0].astype(np.int32)
+    # TODO: Verify this logic
+    start_indices: NDArray[np.int32] = (
+        np.flatnonzero(single_revolution_differences == 1) + 1
     )
+    end_indices: NDArray[np.int32] = np.flatnonzero(single_revolution_differences == -1)
 
     # No start and end
     if len(start_indices) == 0 and len(end_indices) == 0:
@@ -387,7 +389,9 @@ def identify_inner_and_outer_spiral(
     start_indices, end_indices, wrap_data = __calculate_wrap(
         can_be_single_revolution, start_indices, end_indices
     )
-    theta_bin_values = np.arange(1, num_theta) * 2 * np.pi / num_theta
+    theta_bin_values: NDArray[FloatType] = np.divide(
+        np.multiply(np.arange(1, num_theta), 2 * np.pi), num_theta
+    )
     row_indices, column_indices = image.nonzero()
     cluster_mask = np.zeros_like(image, dtype=np.bool_)
     cluster_mask[row_indices, column_indices] = True
@@ -395,7 +399,7 @@ def identify_inner_and_outer_spiral(
         (image.shape[0], image.shape[1]), -1, dtype=np.int32
     )
     image_index_to_point_index[image > 0] = np.arange(len(row_indices))
-    radii, theta, _ = _get_polar_coordinates(image)
+    radii, theta, _ = get_polar_coordinates(image)
 
     first_region, second_region, max_length = __split_regions(
         start_indices, end_indices, theta, theta_bin_values, wrap_data
@@ -426,7 +430,7 @@ def identify_inner_and_outer_spiral(
         ~second_region_mask, return_distances=True
     )
     assert isinstance(second_region_distance, np.ndarray)
-    connected_components, num_components = skimage.measure.label(  # type:ignore
+    connected_components, num_components = skimage.measure.label(
         non_region_mask, return_num=True
     )
     assert isinstance(connected_components, np.ndarray)
@@ -473,7 +477,7 @@ def identify_inner_and_outer_spiral(
         ~second_region_mask, return_distances=True
     )
     assert isinstance(second_region_distance, np.ndarray)
-    connected_components, num_components = skimage.measure.label(  # type:ignore
+    connected_components, num_components = skimage.measure.label(
         non_region_mask, return_num=True
     )
     assert isinstance(connected_components, np.ndarray)
@@ -528,19 +532,19 @@ def identify_inner_and_outer_spiral(
 
 
 def _find_single_revolution_regions(
-    image: FloatArray2D,
+    image: NDArray[FloatType],
     num_radii: int,
     num_theta: int,
     min_acceptable_length: int,
     shrink_amount: int,
-) -> BoolArray1D:
+) -> NDArray[BoolType]:
     assert shrink_amount <= min_acceptable_length
     polar_image = np.flip(
         __image_transform_from_cartesian_to_polar(image, num_radii, num_theta), axis=1
     )
     polar_image = np.nan_to_num(polar_image, nan=0)
 
-    dilated_polar_image: BoolArray2D = ndimage.binary_dilation(  # type:ignore
+    dilated_polar_image: NDArray[BoolType] = ndimage.binary_dilation(
         polar_image, structure=np.ones((3, 3))
     )
 
@@ -548,8 +552,8 @@ def _find_single_revolution_regions(
 
 
 def _find_single_revolution_regions_polar(
-    polar_image: BoolArray2D, shrink_amount: int
-) -> BoolArray1D:
+    polar_image: NDArray[BoolType], shrink_amount: int
+) -> NDArray[BoolType]:
     num_radii: int = polar_image.shape[0]
     num_theta: int = polar_image.shape[1]
     # Pad columns with zeros
@@ -572,7 +576,7 @@ def _find_single_revolution_regions_polar(
     neighbour_max_location_right = np.roll(max_locations, -1)
     neighbour_min_location_left = np.roll(min_locations, 1)
     neighbour_min_location_right = np.roll(min_locations, -1)
-    conditions: Sequence[BoolArray1D] = (
+    conditions: Sequence[NDArray[BoolType]] = (
         can_be_single_revolution,
         np.logical_or(
             min_locations <= neighbour_max_location_left,
@@ -608,15 +612,15 @@ def _find_single_revolution_regions_polar(
 
 
 def __image_transform_from_cartesian_to_polar(
-    image: FloatArray2D, num_radii: int, num_theta: int
-) -> FloatArray2D:
-    centre_x = image.shape[1] / 2 + 0.5
-    centre_y = image.shape[0] / 2 + 0.5 - 1
+    image: NDArray[FloatType], num_radii: int, num_theta: int
+) -> NDArray[FloatType]:
+    centre_x = image.shape[1] / 2 - 0.5
+    centre_y = image.shape[0] / 2 - 0.5
 
     # Calculate maximum radius value
     row_indices, column_indices = image.nonzero()
     dx = max(centre_x, (column_indices - centre_x).max())
-    dy = max(centre_y, (row_indices - centre_y).max())
+    dy = max(centre_y, -(row_indices - centre_y).max())
     max_radius = np.sqrt(dx**2 + dy**2)
 
     return skimage.transform.warp_polar(
@@ -628,12 +632,12 @@ def __image_transform_from_cartesian_to_polar(
 
 
 def __split_regions(
-    start_indices: IntegerArray1D,
-    end_indices: IntegerArray1D,
-    theta: FloatArray1D,
-    theta_bin_centres: FloatArray1D,
+    start_indices: NDArray[IndexType],
+    end_indices: NDArray[IndexType],
+    theta: NDArray[FloatType],
+    theta_bin_centres: NDArray[FloatType],
     wrap_data: Optional[WrapData],
-) -> tuple[BoolArray1D, BoolArray1D, int]:
+) -> tuple[NDArray[BoolType], NDArray[BoolType], int]:
     region_lengths = end_indices - start_indices + 1
     max_region_length: Optional[int] = (
         region_lengths.max() if len(region_lengths) > 0 else None
@@ -675,10 +679,10 @@ def __split_regions(
 
 
 def __calculate_wrap(
-    can_be_single_revolution: BoolArray1D,
-    start_indices: IntegerArray1D,
-    end_indices: IntegerArray1D,
-) -> tuple[IntegerArray1D, IntegerArray1D, Optional[WrapData]]:
+    can_be_single_revolution: NDArray[BoolType],
+    start_indices: NDArray[IndexType],
+    end_indices: NDArray[IndexType],
+) -> tuple[NDArray[IndexType], NDArray[IndexType], Optional[WrapData]]:
     has_wrapped: bool = False
     wrap_start: Optional[int] = None
     wrap_end: Optional[int] = None
@@ -743,8 +747,10 @@ def __calculate_wrap(
 
 
 def _remove_theta_discontinuities(
-    theta: FloatArray1D, image: FloatArray2D, inner_region: BoolArray1D
-) -> FloatArray1D:
+    theta: NDArray[FloatType],
+    image: NDArray[FloatType],
+    inner_region: NDArray[BoolType],
+) -> NDArray[FloatType]:
     assert np.count_nonzero(inner_region) > 0
     adjusted_theta = np.copy(theta)
     inner_adjusted_theta = _adjust_theta_for_gap(theta, image, inner_region)
@@ -784,8 +790,8 @@ def _remove_theta_discontinuities(
 
 
 def _adjust_theta_for_gap(
-    theta: FloatArray1D, image: FloatArray2D, region: BoolArray1D
-) -> Optional[FloatArray1D]:
+    theta: NDArray[FloatType], image: NDArray[FloatType], region: NDArray[BoolType]
+) -> Optional[NDArray[FloatType]]:
     row_indices, column_indices = image.nonzero()
     assert len(row_indices) == len(column_indices)
     assert len(region) == len(row_indices)

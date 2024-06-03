@@ -1,17 +1,14 @@
 """This module contains utilities regarding matrices."""
 
-# Standard libraries
-from typing import Union
+from typing import Union, cast
 
-# External libraries
 import numpy as np
+from numpy.typing import NDArray
 from scipy import sparse
-
-# Internal libraries
 
 
 def is_sparse_matrix_hollow(
-    matrix: Union[sparse.coo_matrix, sparse.csr_matrix, sparse.csc_matrix],
+    matrix: sparse.coo_matrix,
 ) -> bool:
     """Utility used to assert that a sparse matrix is hollow i.e. no non-zero values in diagonal.
 
@@ -44,5 +41,9 @@ def is_sparse_matrix_symmetric(
     is_symmetric : bool
         Returns true if the matrix is symmetric otherwise false.
     """
-    is_symmetric = (matrix - matrix.transpose()).count_nonzero() == 0  # type:ignore
+    is_symmetric = cast(bool, (matrix - matrix.transpose()).count_nonzero() == 0)  # type:ignore
     return is_symmetric
+
+
+def get_nonzero_values(matrix: sparse.csr_matrix) -> NDArray[np.float32]:
+    return np.asarray(matrix[matrix.nonzero()], dtype=np.float32).flatten()  # type:ignore

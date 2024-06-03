@@ -1,31 +1,31 @@
-# Standard libraries
 from dataclasses import dataclass
+from typing import Generic, TypeVar
 
-# External libraries
 import numpy as np
+from numpy.typing import NDArray
 
-# Internal libraries
-from pyarcfire.definitions import FloatArray1D
 from .functions import log_spiral
+
+FloatType = TypeVar("FloatType", np.float32, np.float64)
 
 
 @dataclass
-class LogSpiralFitResult:
+class LogSpiralFitResult(Generic[FloatType]):
     offset: float
     pitch_angle: float
     initial_radius: float
     arc_bounds: tuple[float, float]
     total_error: float
-    errors: FloatArray1D
+    errors: NDArray[FloatType]
     has_multiple_revolutions: bool
 
     def calculate_cartesian_coordinates(
         self, num_points: int
-    ) -> tuple[FloatArray1D, FloatArray1D]:
+    ) -> tuple[NDArray[np.float32], NDArray[np.float32]]:
         start_angle = self.offset
         end_angle = start_angle + self.arc_bounds[1]
 
-        theta = np.linspace(start_angle, end_angle, num_points)
+        theta = np.linspace(start_angle, end_angle, num_points, dtype=np.float32)
         radii = log_spiral(
             theta,
             self.offset,
@@ -33,6 +33,6 @@ class LogSpiralFitResult:
             self.initial_radius,
             use_modulo=not self.has_multiple_revolutions,
         )
-        x = radii * np.cos(theta)
-        y = radii * np.sin(theta)
+        x = np.multiply(radii, np.cos(theta))
+        y = np.multiply(radii, np.sin(theta))
         return (x, y)

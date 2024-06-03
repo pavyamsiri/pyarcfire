@@ -1,39 +1,38 @@
-# External libraries
+from typing import TypeVar
+
 import numpy as np
+from numpy.typing import NDArray
 
-# Internal libraries
-from pyarcfire.definitions import FloatArray1D, FloatArray2D
+FloatType = TypeVar("FloatType", np.float32, np.float64)
 
 
-def _get_polar_coordinates(
-    image: FloatArray2D,
-) -> tuple[FloatArray1D, FloatArray1D, FloatArray1D]:
+def get_polar_coordinates(
+    image: NDArray[FloatType],
+) -> tuple[NDArray[FloatType], NDArray[FloatType], NDArray[FloatType]]:
     row_indices, column_indices = image.nonzero()
-    # NOTE: Have to add 1 to be compliant with MatLab's 1-index arrays
-    # Find centre (subpixel centering)
-    row_offset = image.shape[0] / 2 + 1.5
-    column_offset = image.shape[1] / 2 + 1.5
+    row_offset = image.shape[0] / 2 - 0.5
+    column_offset = image.shape[1] / 2 - 0.5
     x = column_indices - column_offset
     y = -(row_indices - row_offset)
 
     # Compute polar coordinates and get weights
-    radii = np.sqrt(np.square(x) + np.square(y))
-    theta = (np.arctan2(y, x) + 2 * np.pi) % (2 * np.pi)
-    weights = image[row_indices, column_indices]
+    radii: NDArray[FloatType] = np.sqrt(np.square(x) + np.square(y))
+    theta: NDArray[FloatType] = np.mod(np.arctan2(y, x) + 2 * np.pi, 2 * np.pi)
+    weights: NDArray[FloatType] = image[row_indices, column_indices]
     return (radii, theta, weights)
 
 
-def _adjust_theta_to_zero(
-    theta: FloatArray1D,
+def adjust_theta_to_zero(
+    theta: NDArray[FloatType],
     arc_bounds: tuple[float, float],
     offset: float,
     use_modulo: bool,
-) -> tuple[FloatArray1D, tuple[float, float], float]:
+) -> tuple[NDArray[FloatType], tuple[float, float], float]:
     if use_modulo:
-        theta = (theta - offset) % (2 * np.pi) + offset
+        theta = np.add(np.mod(theta - offset, 2 * np.pi), offset)
     arc_start, _ = arc_bounds
     new_offset = float(offset + arc_start)
-    theta += new_offset - np.min(theta)
+    theta += np.subtract(new_offset, np.min(theta))
     arc_bounds = (
         float(arc_bounds[0] - arc_start),
         float(arc_bounds[1] - arc_start),
@@ -41,7 +40,7 @@ def _adjust_theta_to_zero(
     return (theta, arc_bounds, new_offset)
 
 
-def _get_arc_bounds(
+def get_arc_bounds(
     offset: float, rotation_amount: float, lower_bound: float, upper_bound: float
 ) -> tuple[float, float]:
     arc_size = 2 * np.pi - (upper_bound - lower_bound)
@@ -59,16 +58,16 @@ def _get_arc_bounds(
 
 
 def __calculate_angle_distance(
-    from_angle: FloatArray1D, to_angle: FloatArray1D
-) -> FloatArray1D:
+    from_angle: NDArray[FloatType], to_angle: NDArray[FloatType]
+) -> NDArray[FloatType]:
     is_wrapping = from_angle > to_angle
-    distance = to_angle - from_angle
+    distance: NDArray[FloatType] = np.subtract(to_angle, from_angle)
     distance[is_wrapping] += 2 * np.pi
     return distance
 
 
-def _calculate_bounds(
-    theta: FloatArray1D,
+def calculate_bounds(
+    theta: NDArray[FloatType],
 ) -> tuple[bool, tuple[float, float], float, float]:
     """Calculates optimisation bounds for the theta offset.
     If the bounds would cross the polar axis, then the bounds must be
@@ -77,7 +76,7 @@ def _calculate_bounds(
 
     Parameters
     ----------
-    theta : FloatArray1D
+    theta : NDArray[FloatType]
         The theta values of the cluster.
 
     Returns
