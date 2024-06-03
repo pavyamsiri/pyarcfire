@@ -358,9 +358,9 @@ def identify_inner_and_outer_spiral(
     single_revolution_differences = np.diff(can_be_single_revolution.astype(np.float32))
     # TODO: Verify this logic
     start_indices: NDArray[np.int32] = (
-        single_revolution_differences == 1
-    ).flatnonzero() + 1
-    end_indices: NDArray[np.int32] = (single_revolution_differences == -1).flatnonzero()
+        np.flatnonzero(single_revolution_differences == 1) + 1
+    )
+    end_indices: NDArray[np.int32] = np.flatnonzero(single_revolution_differences == -1)
 
     # No start and end
     if len(start_indices) == 0 and len(end_indices) == 0:
