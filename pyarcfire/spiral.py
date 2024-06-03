@@ -3,8 +3,8 @@ import os
 from dataclasses import dataclass
 
 import numpy as np
-from numpy.typing import NDArray
 import scipy.io
+from numpy.typing import NDArray
 from skimage import filters
 
 from .cluster import GenerateClustersSettings, generate_clusters

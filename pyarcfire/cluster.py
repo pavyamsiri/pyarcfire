@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Any, Union, cast
+from typing import Any, TypeVar
 
 import numpy as np
 from numpy.typing import NDArray
@@ -20,6 +20,52 @@ log: logging.Logger = logging.getLogger(__name__)
 
 
 FloatType = np.float32
+
+SparseMatrix = TypeVar(
+    "SparseMatrix",
+    sparse.coo_array,
+    sparse.bsr_array,
+    sparse.csc_array,
+    sparse.csr_array,
+    sparse.dia_array,
+    sparse.dok_array,
+    sparse.lil_array,
+    sparse.coo_matrix,
+    sparse.bsr_matrix,
+    sparse.csc_matrix,
+    sparse.csr_matrix,
+    sparse.dia_matrix,
+    sparse.dok_matrix,
+    sparse.lil_matrix,
+)
+SparseArray = TypeVar(
+    "SparseArray",
+    sparse.coo_array,
+    sparse.bsr_array,
+    sparse.csc_array,
+    sparse.csr_array,
+    sparse.dia_array,
+    sparse.dok_array,
+    sparse.lil_array,
+)
+SparseMatrixSupportsIndex = TypeVar(
+    "SparseMatrixSupportsIndex",
+    sparse.csc_array,
+    sparse.csr_array,
+    sparse.dok_array,
+    sparse.lil_array,
+    sparse.csc_matrix,
+    sparse.csr_matrix,
+    sparse.dok_matrix,
+    sparse.lil_matrix,
+)
+SparseArraySupportsIndex = TypeVar(
+    "SparseArraySupportsIndex",
+    sparse.csc_array,
+    sparse.csr_array,
+    sparse.dok_array,
+    sparse.lil_array,
+)
 
 
 @dataclass
@@ -41,7 +87,7 @@ class Cluster:
 
         Parameters
         ----------
-        points : Sequence[int]
+        points : Iterable[int]
             The points the cluster consists of.
         """
         self._points: list[int] = list(points)
@@ -132,7 +178,7 @@ class Cluster:
 @benchmark
 def generate_clusters(
     image: NDArray[FloatType],
-    similarity_matrix: sparse.csr_matrix,
+    input_similarity_matrix: SparseArray,
     stop_threshold: float,
     error_ratio_threshold: float,
     merge_check_minimum_cluster_size: int,
@@ -149,7 +195,7 @@ def generate_clusters(
     ----------
     image : NDArray[FloatType]
         The image to find clusters in.
-    similarity_matrix : sparse.csr_matrix
+    similarity_matrix : SparseArray
         The similarity matrix representing pixel similarities in the image.
     stop_threshold : float
         The minimum similarity value where cluster merging can happen.
@@ -172,9 +218,11 @@ def generate_clusters(
         raise ValueError("The image must be a 2D array!")
 
     # Verify symmetry and implicitly squareness
-    if not is_sparse_matrix_symmetric(similarity_matrix):
+    if not is_sparse_matrix_symmetric(input_similarity_matrix):
         raise ValueError("Similarity matrix must be symmetric!")
 
+    # Change to an index that supports indexing
+    similarity_matrix: sparse.csr_array = input_similarity_matrix.tocsr()
     num_pixels_from_matrix = similarity_matrix.shape[0]
     num_pixels_from_image = image.shape[0] * image.shape[1]
     if num_pixels_from_image != num_pixels_from_matrix:
@@ -191,8 +239,7 @@ def generate_clusters(
     merge_stop_count: int = 0
 
     # Indices of pixels which have a non-zero similarity with another pixel
-    points = similarity_matrix.sum(axis=0).nonzero()[1]  # type:ignore
-    points = cast(NDArray[np.int64], points)
+    points = np.flatnonzero(similarity_matrix.sum(axis=0))
     # Assign a cluster to each pixel with non-zero similarity to another pixel
     clusters = {idx: Cluster([idx]) for idx in points}
 
@@ -200,12 +247,12 @@ def generate_clusters(
     while True:
         # Pop the pair with the largest similarity
         max_idx = similarity_matrix.argmax()
-        unraveled_idx = np.unravel_index(max_idx, similarity_matrix.get_shape())
+        unraveled_idx = np.unravel_index(max_idx, similarity_matrix.shape)
         first_idx = int(unraveled_idx[0])
         second_idx = int(unraveled_idx[1])
 
         # Leave loop if similarity value is below the stop threshold
-        value = float(similarity_matrix[first_idx, second_idx])  # type:ignore
+        value = similarity_matrix[first_idx, second_idx]
         if value < stop_threshold:
             break
 
@@ -276,17 +323,17 @@ def generate_clusters(
 
 
 def _update_similarity_matrix(
-    similarity_matrix: sparse.csr_matrix,
+    similarity_matrix: sparse.csr_array,
     target_idx: int,
     source_idx: int,
-) -> sparse.csr_matrix:
+) -> sparse.csr_array:
     """Returns the similarity matrix updated to have new similarity values after the merging
     of two clusters. The target cluster's row and column is updated to have the maximum similarity value
     between the two clusters. Note that this function does not remove the other cluster's similarity values.
 
     Parameters
     ----------
-    similarity_matrix : sparse.csr_matrix | sparse.csc_matrix
+    similarity_matrix : sparse.csr_array
         The similarity matrix to update.
     target_idx : int
         The index of the row and column to put the updated similarity values into.
@@ -297,27 +344,22 @@ def _update_similarity_matrix(
 
     Returns
     -------
-    updated_matrix : sparse.csr_matrix
+    updated_matrix : sparse.csr_array
         The matrix with its rows and columns updated with the new similarity values.
     """
     # Merged cluster similarity is the maximum possible similarity from the set of cluster points
-    old_similarity_values: sparse.csr_matrix = cast(
-        sparse.csr_matrix, similarity_matrix[target_idx, :]
-    )
+    old_similarity_values = similarity_matrix[[target_idx], :]
     # The updated values max(Ti, Si)
-    new_similarity_values: sparse.csr_matrix = cast(
-        sparse.csr_matrix,
-        similarity_matrix[target_idx, :].maximum(similarity_matrix[source_idx, :]),
+    new_similarity_values = similarity_matrix[[target_idx], :].maximum(
+        similarity_matrix[[source_idx], :]
     )
     # Remove self-similarity
-    new_similarity_values[0, target_idx] = 0
+    new_similarity_values[0, [target_idx]] = 0
 
     # AIM: Construct matrix such that when added, the target row and column is updated to the desired values
-    add_matrix_values: sparse.csr_matrix = cast(
-        sparse.csr_matrix, new_similarity_values - old_similarity_values
-    )
+    add_matrix_values = new_similarity_values - old_similarity_values
     # The target row/column already has the right similarity values
-    updated_matrix: sparse.csr_matrix
+    updated_matrix: sparse.csr_array
     if add_matrix_values.count_nonzero() == 0:
         updated_matrix = similarity_matrix
     # The target row/column must be updated
@@ -341,33 +383,30 @@ def _update_similarity_matrix(
             shape=similarity_matrix.shape,
         )
         # Add matrix
-        updated_matrix = cast(sparse.csr_matrix, similarity_matrix + add_matrix)
+        updated_matrix = similarity_matrix + add_matrix
     return updated_matrix
 
 
 def _clear_similarity_matrix_row_column(
-    similarity_matrix: Union[sparse.csr_matrix, sparse.csc_matrix], clear_idx: int
-) -> sparse.csr_matrix:
+    similarity_matrix: SparseMatrixSupportsIndex, clear_idx: int
+) -> SparseMatrixSupportsIndex:
     """Returns the similarity matrix with the row and column at the given index cleared to zero.
 
     Parameters
     ----------
-    similarity_matrix : sparse.csr_matrix | sparse.csc_matrix
+    similarity_matrix : SparseMatrixSupportsIndex
         The similarity matrix to update.
     clear_idx: int
         The index of the row and column to clear/zero.
 
     Returns
     -------
-    updated_matrix : sparse.csr_matrix
+    updated_matrix : sparse.csr_array
         The matrix with one of its rows and columns cleared.
     """
     # Construct matrix such that when added the target row and column are cleared
-    values = get_nonzero_values(similarity_matrix.getrow(clear_idx))  # type:ignore
-    indices: NDArray[np.int32] = cast(
-        NDArray[np.int32],
-        similarity_matrix.getrow(clear_idx).nonzero()[1],  # type:ignore
-    )
+    values = get_nonzero_values(similarity_matrix[[clear_idx], :])
+    indices: NDArray[np.int32] = similarity_matrix[[clear_idx], :].nonzero()[1]
     num_nonzero = len(indices)
     clear_matrix_row_indices = np.tile(indices, 2)
     clear_matrix_row_indices[num_nonzero:] = clear_idx
@@ -385,6 +424,6 @@ def _clear_similarity_matrix_row_column(
     )
 
     # Add matrix
-    updated_matrix = cast(sparse.csr_matrix, similarity_matrix - clear_matrix)
+    updated_matrix = similarity_matrix - clear_matrix
 
     return updated_matrix

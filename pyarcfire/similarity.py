@@ -31,7 +31,7 @@ class GenerateSimilarityMatrixSettings:
 @benchmark
 def generate_similarity_matrix(
     orientation: OrientationField, similarity_cutoff: float
-) -> sparse.coo_matrix:
+) -> sparse.coo_array:
     """Generates a sparse pixel-to-pixel similarity matrix from an orientation field.
 
     Parameters
@@ -44,7 +44,7 @@ def generate_similarity_matrix(
 
     Returns
     -------
-    similarity_matrix : sparse.coo_matrix
+    similarity_matrix : sparse.coo_array
         The similarity matrix expressed as a sparse matrix.
 
     Notes
@@ -60,7 +60,7 @@ def generate_similarity_matrix(
         num_vecs,
     ) = _calculate_pixel_similarities(orientation, similarity_cutoff)
 
-    similarity_matrix = sparse.coo_matrix(
+    similarity_matrix = sparse.coo_array(
         (similarity_values, (root_indices, child_indices)), shape=(num_vecs, num_vecs)
     )
     assert is_sparse_matrix_hollow(similarity_matrix)
