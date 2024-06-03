@@ -248,7 +248,7 @@ def generate_clusters(
     # Remove clusters below minimum size
     clusters_list = list(clusters.values())
     clusters_list = [
-        cluster for cluster in clusters if cluster.size >= minimum_cluster_size
+        cluster for cluster in clusters_list if cluster.size >= minimum_cluster_size
     ]
 
     # Remove cluster that contains the centre
@@ -257,7 +257,9 @@ def generate_clusters(
         central_row = image.shape[0] // 2
         central_column = image.shape[1] // 2
         central_idx = np.ravel_multi_index((central_row, central_column), image.shape)
-        clusters_list = [cluster for cluster in clusters if central_idx not in cluster]
+        clusters_list = [
+            cluster for cluster in clusters_list if central_idx not in cluster
+        ]
 
     cluster_arrays = Cluster.list_to_array(image, clusters_list)
 
