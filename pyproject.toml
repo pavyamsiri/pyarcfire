@@ -27,3 +27,4 @@ build-backend = "hatchling.build"
 
 [tool.pyright]
 typeCheckingMode = "standard"
+deprecateTypingAliases = true
