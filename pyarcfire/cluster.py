@@ -221,18 +221,17 @@ def generate_clusters(
     if not is_sparse_matrix_symmetric(input_similarity_matrix):
         raise ValueError("Similarity matrix must be symmetric!")
 
+    # TODO: Should check that the input matrix is not self-similar
+
     # Change to an index that supports indexing
     similarity_matrix: sparse.csr_array = input_similarity_matrix.tocsr()
+    similarity_matrix.eliminate_zeros()
     num_pixels_from_matrix = similarity_matrix.shape[0]
     num_pixels_from_image = image.shape[0] * image.shape[1]
     if num_pixels_from_image != num_pixels_from_matrix:
         raise ValueError(
             "The similarity matrix's size is inconsistent with the image's size."
         )
-
-    # Delete self-similarities
-    similarity_matrix.setdiag(0)
-    similarity_matrix.eliminate_zeros()
 
     # Diagnostics
     check_arc_merge_count: int = 0
