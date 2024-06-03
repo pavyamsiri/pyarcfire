@@ -123,11 +123,11 @@ class ClusterSpiralResult:
 @benchmark
 def detect_spirals_in_image(
     image: NDArray[FloatType],
-    unsharp_mask_settings: UnsharpMaskSettings,
-    orientation_field_settings: GenerateOrientationFieldSettings,
-    similarity_matrix_settings: GenerateSimilarityMatrixSettings,
-    generate_clusters_settings: GenerateClustersSettings,
-    merge_clusters_by_fit_settings: MergeClustersByFitSettings,
+    unsharp_mask_settings: UnsharpMaskSettings = UnsharpMaskSettings(),
+    orientation_field_settings: GenerateOrientationFieldSettings = GenerateOrientationFieldSettings(),
+    similarity_matrix_settings: GenerateSimilarityMatrixSettings = GenerateSimilarityMatrixSettings(),
+    generate_clusters_settings: GenerateClustersSettings = GenerateClustersSettings(),
+    merge_clusters_by_fit_settings: MergeClustersByFitSettings = MergeClustersByFitSettings(),
 ) -> ClusterSpiralResult:
     # Unsharp phase
     unsharp_image = filters.unsharp_mask(
