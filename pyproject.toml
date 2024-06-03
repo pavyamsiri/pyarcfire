@@ -28,3 +28,9 @@ build-backend = "hatchling.build"
 [tool.pyright]
 typeCheckingMode = "standard"
 deprecateTypingAliases = true
+reportDeprecated = true
+reportMissingParameterType = true
+reportMissingTypeArgument = true
+reportUnknownArgumentType = true
+reportUnknownParameterType = true
+reportUnknownVariableType = true
