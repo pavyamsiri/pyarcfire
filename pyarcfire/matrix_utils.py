@@ -8,7 +8,7 @@ from scipy import sparse
 
 
 def is_sparse_matrix_hollow(
-    matrix: sparse.coo_matrix,
+    matrix: sparse.coo_array,
 ) -> bool:
     """Utility used to assert that a sparse matrix is hollow i.e. no non-zero values in diagonal.
 
@@ -27,7 +27,13 @@ def is_sparse_matrix_hollow(
 
 
 def is_sparse_matrix_symmetric(
-    matrix: Union[sparse.coo_matrix, sparse.csr_matrix, sparse.csc_matrix],
+    matrix: Union[
+        sparse.coo_matrix,
+        sparse.csr_matrix,
+        sparse.csc_matrix,
+        sparse.coo_array,
+        sparse.csr_array,
+    ],
 ) -> bool:
     """Utility used to assert that a sparse matrix is symmetric i.e. it is equal to its transpose.
 
@@ -45,5 +51,5 @@ def is_sparse_matrix_symmetric(
     return is_symmetric
 
 
-def get_nonzero_values(matrix: sparse.csr_matrix) -> NDArray[np.float32]:
+def get_nonzero_values(matrix: sparse.csr_array) -> NDArray[np.float32]:
     return np.asarray(matrix[matrix.nonzero()], dtype=np.float32).flatten()  # type:ignore

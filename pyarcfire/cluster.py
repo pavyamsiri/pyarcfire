@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Any, Union, cast
+from typing import Any, cast
 
 import numpy as np
 from numpy.typing import NDArray
@@ -132,7 +132,7 @@ class Cluster:
 @benchmark
 def generate_clusters(
     image: NDArray[FloatType],
-    similarity_matrix: sparse.csr_matrix,
+    similarity_matrix: sparse.csr_array,
     stop_threshold: float,
     error_ratio_threshold: float,
     merge_check_minimum_cluster_size: int,
@@ -149,7 +149,7 @@ def generate_clusters(
     ----------
     image : NDArray[FloatType]
         The image to find clusters in.
-    similarity_matrix : sparse.csr_matrix
+    similarity_matrix : sparse.coo_array
         The similarity matrix representing pixel similarities in the image.
     stop_threshold : float
         The minimum similarity value where cluster merging can happen.
@@ -191,7 +191,7 @@ def generate_clusters(
     merge_stop_count: int = 0
 
     # Indices of pixels which have a non-zero similarity with another pixel
-    points = similarity_matrix.sum(axis=0).nonzero()[1]  # type:ignore
+    points = similarity_matrix.sum(axis=0).nonzero()[0]  # type:ignore
     points = cast(NDArray[np.int64], points)
     # Assign a cluster to each pixel with non-zero similarity to another pixel
     clusters = {idx: Cluster([idx]) for idx in points}
@@ -200,7 +200,7 @@ def generate_clusters(
     while True:
         # Pop the pair with the largest similarity
         max_idx = similarity_matrix.argmax()
-        unraveled_idx = np.unravel_index(max_idx, similarity_matrix.get_shape())
+        unraveled_idx = np.unravel_index(max_idx, similarity_matrix.shape)
         first_idx = int(unraveled_idx[0])
         second_idx = int(unraveled_idx[1])
 
@@ -276,17 +276,17 @@ def generate_clusters(
 
 
 def _update_similarity_matrix(
-    similarity_matrix: sparse.csr_matrix,
+    similarity_matrix: sparse.csr_array,
     target_idx: int,
     source_idx: int,
-) -> sparse.csr_matrix:
+) -> sparse.csr_array:
     """Returns the similarity matrix updated to have new similarity values after the merging
     of two clusters. The target cluster's row and column is updated to have the maximum similarity value
     between the two clusters. Note that this function does not remove the other cluster's similarity values.
 
     Parameters
     ----------
-    similarity_matrix : sparse.csr_matrix | sparse.csc_matrix
+    similarity_matrix : sparse.csr_array
         The similarity matrix to update.
     target_idx : int
         The index of the row and column to put the updated similarity values into.
@@ -297,27 +297,27 @@ def _update_similarity_matrix(
 
     Returns
     -------
-    updated_matrix : sparse.csr_matrix
+    updated_matrix : sparse.csr_array
         The matrix with its rows and columns updated with the new similarity values.
     """
     # Merged cluster similarity is the maximum possible similarity from the set of cluster points
-    old_similarity_values: sparse.csr_matrix = cast(
-        sparse.csr_matrix, similarity_matrix[target_idx, :]
+    old_similarity_values: sparse.csr_array = cast(
+        sparse.csr_array, similarity_matrix[[target_idx], :]
     )
     # The updated values max(Ti, Si)
-    new_similarity_values: sparse.csr_matrix = cast(
-        sparse.csr_matrix,
-        similarity_matrix[target_idx, :].maximum(similarity_matrix[source_idx, :]),
+    new_similarity_values: sparse.csr_array = cast(
+        sparse.csr_array,
+        similarity_matrix[[target_idx], :].maximum(similarity_matrix[[source_idx], :]),
     )
     # Remove self-similarity
-    new_similarity_values[0, target_idx] = 0
+    new_similarity_values[0, [target_idx]] = 0
 
     # AIM: Construct matrix such that when added, the target row and column is updated to the desired values
-    add_matrix_values: sparse.csr_matrix = cast(
-        sparse.csr_matrix, new_similarity_values - old_similarity_values
+    add_matrix_values: sparse.csr_array = cast(
+        sparse.csr_array, new_similarity_values - old_similarity_values
     )
     # The target row/column already has the right similarity values
-    updated_matrix: sparse.csr_matrix
+    updated_matrix: sparse.csr_array
     if add_matrix_values.count_nonzero() == 0:
         updated_matrix = similarity_matrix
     # The target row/column must be updated
@@ -341,25 +341,25 @@ def _update_similarity_matrix(
             shape=similarity_matrix.shape,
         )
         # Add matrix
-        updated_matrix = cast(sparse.csr_matrix, similarity_matrix + add_matrix)
+        updated_matrix = cast(sparse.csr_array, similarity_matrix + add_matrix)
     return updated_matrix
 
 
 def _clear_similarity_matrix_row_column(
-    similarity_matrix: Union[sparse.csr_matrix, sparse.csc_matrix], clear_idx: int
-) -> sparse.csr_matrix:
+    similarity_matrix: sparse.csr_array, clear_idx: int
+) -> sparse.csr_array:
     """Returns the similarity matrix with the row and column at the given index cleared to zero.
 
     Parameters
     ----------
-    similarity_matrix : sparse.csr_matrix | sparse.csc_matrix
+    similarity_matrix : sparse.csr_array
         The similarity matrix to update.
     clear_idx: int
         The index of the row and column to clear/zero.
 
     Returns
     -------
-    updated_matrix : sparse.csr_matrix
+    updated_matrix : sparse.csr_array
         The matrix with one of its rows and columns cleared.
     """
     # Construct matrix such that when added the target row and column are cleared
@@ -385,6 +385,6 @@ def _clear_similarity_matrix_row_column(
     )
 
     # Add matrix
-    updated_matrix = cast(sparse.csr_matrix, similarity_matrix - clear_matrix)
+    updated_matrix = cast(sparse.csr_array, similarity_matrix - clear_matrix)
 
     return updated_matrix
