@@ -1,12 +1,10 @@
 import logging
 import os
 from dataclasses import dataclass
-from typing import cast
 
 import numpy as np
 import scipy.io
 from numpy.typing import NDArray
-from scipy import sparse
 from skimage import filters
 
 from .cluster import GenerateClustersSettings, generate_clusters
@@ -157,7 +155,7 @@ def detect_spirals_in_image(
     log.info("[cyan]PROGRESS[/cyan]: Generating clusters...")
     cluster_arrays = generate_clusters(
         image,
-        cast(sparse.csr_array, matrix.tocsr()),
+        matrix.tocsr(),
         stop_threshold=generate_clusters_settings.stop_threshold,
         error_ratio_threshold=generate_clusters_settings.error_ratio_threshold,
         merge_check_minimum_cluster_size=generate_clusters_settings.merge_check_minimum_cluster_size,
