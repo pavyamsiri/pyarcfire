@@ -17,7 +17,7 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Astronomy"
 ]
 dependencies = [
-    "numpy>=1.2`",
+    "numpy>=1.2",
     "scikit-image>=18",
     "scipy>=1.8",
     "typing_extensions>=3.10",
