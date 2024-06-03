@@ -11,19 +11,13 @@ Note that this is currently a work in progress and the project may change greatl
 
 This port does not have all of the functionality and features of SpArcFiRe such as bar finding and fitting, automatic centering and deprojection, etc.
 
-## Requirements
+## Installation
 
-Currently this requires python 3.9 or above.
-The packages used are:
+You can install this package by simply using the command
 
-- Pillow
-- numpy
-- scikit-image
-- scipy
-- matplotlib (only if using CLI)
-- rich (only if using CLI)
-- pytest (for testing)
-- hypothesis (for testing)
+```
+$ pip install pyarcfire
+```
 
 ## Interface
 
