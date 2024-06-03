@@ -54,17 +54,39 @@ class ClusterSpiralResult:
         )
 
         # Settings
-        self._unsharp_settings: UnsharpMaskSettings = unsharp_mask_settings
-        self._orientation_settings: GenerateOrientationFieldSettings = (
+        self._unsharp_mask_settings: UnsharpMaskSettings = unsharp_mask_settings
+        self._orientation_field_settings: GenerateOrientationFieldSettings = (
             orientation_field_settings
         )
-        self._similarity_settings: GenerateSimilarityMatrixSettings = (
+        self._similarity_matrix_settings: GenerateSimilarityMatrixSettings = (
             similarity_matrix_settings
         )
-        self._cluster_settings: GenerateClustersSettings = generate_cluster_settings
-        self._merge_fit_settings: MergeClustersByFitSettings = (
+        self._generate_cluster_settings: GenerateClustersSettings = (
+            generate_cluster_settings
+        )
+        self._merge_clusters_by_fit_settings: MergeClustersByFitSettings = (
             merge_clusters_by_fit_settings
         )
+
+    @property
+    def unsharp_mask_settings(self) -> UnsharpMaskSettings:
+        return self._unsharp_mask_settings
+
+    @property
+    def orientation_field_settings(self) -> GenerateOrientationFieldSettings:
+        return self._orientation_field_settings
+
+    @property
+    def similarity_matrix_settings(self) -> GenerateSimilarityMatrixSettings:
+        return self._similarity_matrix_settings
+
+    @property
+    def generate_cluster_settings(self) -> GenerateClustersSettings:
+        return self._generate_cluster_settings
+
+    @property
+    def merge_clusters_by_fit_settings(self) -> MergeClustersByFitSettings:
+        return self._merge_clusters_by_fit_settings
 
     def get_image(self) -> NDArray[FloatType]:
         return self._image
