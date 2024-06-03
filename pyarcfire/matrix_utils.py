@@ -1,6 +1,6 @@
 """This module contains utilities regarding matrices."""
 
-from typing import cast, TypeVar
+from typing import TypeVar
 
 import numpy as np
 from numpy.typing import NDArray
@@ -67,7 +67,7 @@ def is_sparse_matrix_symmetric(matrix: SparseMatrix) -> bool:
     is_symmetric : bool
         Returns true if the matrix is symmetric otherwise false.
     """
-    is_symmetric = cast(bool, (matrix - matrix.transpose()).count_nonzero() == 0)
+    is_symmetric = (matrix - matrix.transpose()).count_nonzero() == 0
     return is_symmetric
 
 
