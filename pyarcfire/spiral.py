@@ -91,6 +91,9 @@ class ClusterSpiralResult:
     def get_image(self) -> NDArray[FloatType]:
         return self._image
 
+    def get_unsharp_image(self) -> NDArray[FloatType]:
+        return self._unsharp_image
+
     def get_field(self) -> OrientationField:
         return self._field
 
