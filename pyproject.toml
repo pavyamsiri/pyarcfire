@@ -34,3 +34,4 @@ reportMissingTypeArgument = true
 reportUnknownArgumentType = true
 reportUnknownParameterType = true
 reportUnknownVariableType = true
+stubPath = "stubs"
