@@ -10,6 +10,8 @@ import skimage.measure
 from numpy.typing import NDArray
 from scipy import ndimage, optimize
 
+from pyarcfire.array_utils import get_origin_points
+
 from .common import LogSpiralFitResult
 from .functions import (
     calculate_best_initial_radius,
@@ -326,7 +328,7 @@ def __cluster_has_no_endpoints_or_contains_origin(
     # See if the cluster has actual spiral endpoints by seeing if it is
     # possible to "escape" from the center point to the image boundary,
     # considering non-cluster pixels as empty pixels.
-    centre_indices = __get_origin_indices(image)
+    centre_indices = get_origin_points(image)
     centre_in_cluster = any(
         [image[row_idx, column_idx] for row_idx, column_idx in centre_indices]
     )
@@ -347,26 +349,6 @@ def __cluster_has_no_endpoints_or_contains_origin(
         ]
     )
     return no_end_points
-
-
-def __get_origin_indices(image: NDArray[FloatType]) -> Sequence[tuple[int, int]]:
-    # Assume that dimensions are even
-    assert image.shape[0] % 2 == 0
-    assert image.shape[1] % 2 == 0
-
-    bottom = image.shape[0] // 2
-    right = image.shape[1] // 2
-    central_indices = (
-        # Top left
-        (bottom - 1, right - 1),
-        # Top right
-        (bottom - 1, right),
-        # Bottom left
-        (bottom, right - 1),
-        # Bottom right
-        (bottom, right),
-    )
-    return central_indices
 
 
 def identify_inner_and_outer_spiral(
