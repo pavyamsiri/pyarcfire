@@ -51,7 +51,7 @@ def process_from_image(args: argparse.Namespace) -> None:
         np.asarray(Image.open(args.input_path).convert("L")).astype(np.float32) / 255
     )
     image = transform.resize(image, (IMAGE_SIZE, IMAGE_SIZE)).astype(np.float32)
-    width: float = image.shape[0] / 2 + 0.5
+    width: float = image.shape[0] / 2 - 0.5
 
     result = detect_spirals_in_image(
         image,

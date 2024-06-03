@@ -605,13 +605,13 @@ def _find_single_revolution_regions_polar(
 def __image_transform_from_cartesian_to_polar(
     image: NDArray[FloatType], num_radii: int, num_theta: int
 ) -> NDArray[FloatType]:
-    centre_x = image.shape[1] / 2 + 0.5
-    centre_y = image.shape[0] / 2 + 0.5 - 1
+    centre_x = image.shape[1] / 2 - 0.5
+    centre_y = image.shape[0] / 2 - 0.5
 
     # Calculate maximum radius value
     row_indices, column_indices = image.nonzero()
     dx = max(centre_x, (column_indices - centre_x).max())
-    dy = max(centre_y, (row_indices - centre_y).max())
+    dy = max(centre_y, -(row_indices - centre_y).max())
     max_radius = np.sqrt(dx**2 + dy**2)
 
     return skimage.transform.warp_polar(
