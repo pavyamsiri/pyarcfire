@@ -33,10 +33,17 @@ class ClusterSpiralResult:
     def __init__(
         self,
         image: NDArray[FloatType],
+        unsharp_image: NDArray[FloatType],
         field: OrientationField,
         cluster_masks: NDArray[FloatType],
+        unsharp_mask_settings: UnsharpMaskSettings,
+        orientation_field_settings: GenerateOrientationFieldSettings,
+        similarity_matrix_settings: GenerateSimilarityMatrixSettings,
+        generate_cluster_settings: GenerateClustersSettings,
+        merge_clusters_by_fit_settings: MergeClustersByFitSettings,
     ) -> None:
         self._image: NDArray[FloatType] = image
+        self._unsharp_image: NDArray[FloatType] = unsharp_image
         self._cluster_masks: NDArray[FloatType] = cluster_masks
         self._field: OrientationField = field
         self._sizes: tuple[int, ...] = tuple(
@@ -44,6 +51,19 @@ class ClusterSpiralResult:
                 np.count_nonzero(self._cluster_masks[:, :, idx])
                 for idx in range(self._cluster_masks.shape[2])
             ]
+        )
+
+        # Settings
+        self._unsharp_settings: UnsharpMaskSettings = unsharp_mask_settings
+        self._orientation_settings: GenerateOrientationFieldSettings = (
+            orientation_field_settings
+        )
+        self._similarity_settings: GenerateSimilarityMatrixSettings = (
+            similarity_matrix_settings
+        )
+        self._cluster_settings: GenerateClustersSettings = generate_cluster_settings
+        self._merge_fit_settings: MergeClustersByFitSettings = (
+            merge_clusters_by_fit_settings
         )
 
     def get_image(self) -> NDArray[FloatType]:
@@ -127,7 +147,13 @@ def detect_spirals_in_image(
     log.info("[cyan]PROGRESS[/cyan]: Done merging clusters by fit.")
 
     return ClusterSpiralResult(
-        image,
-        field,
-        merged_clusters,
+        image=image,
+        unsharp_image=unsharp_image,
+        field=field,
+        cluster_masks=merged_clusters,
+        unsharp_mask_settings=unsharp_mask_settings,
+        orientation_field_settings=orientation_field_settings,
+        similarity_matrix_settings=similarity_matrix_settings,
+        generate_cluster_settings=generate_clusters_settings,
+        merge_clusters_by_fit_settings=merge_clusters_by_fit_settings,
     )
