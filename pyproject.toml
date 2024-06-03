@@ -18,7 +18,7 @@ classifiers = [
 ]
 dependencies = [
     "numpy>=1.2",
-    "scikit-image>=18",
+    "scikit-image>=0.18",
     "scipy>=1.8",
     "typing_extensions>=3.10",
 ]
