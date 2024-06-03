@@ -1,16 +1,20 @@
 """This module contains useful utilities for debugging or profiling."""
 
-# Internal libraries
-from functools import wraps
 import logging
 import time
-from typing import Callable
+from collections.abc import Callable
+from functools import wraps
+from typing import TypeVar
 
+from typing_extensions import ParamSpec
 
 log: logging.Logger = logging.getLogger(__name__)
 
+P = ParamSpec("P")
+R = TypeVar("R")
 
-def benchmark(func: Callable) -> Callable:
+
+def benchmark(func: Callable[P, R]) -> Callable[P, R]:
     """Decorator used to time functions.
 
     Parameters
@@ -25,7 +29,7 @@ def benchmark(func: Callable) -> Callable:
     """
 
     @wraps(func)
-    def wrapper(*args, **kwargs):
+    def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
         time_start = time.perf_counter()
         result = func(*args, **kwargs)
         time_end = time.perf_counter()
