@@ -1,20 +1,18 @@
 """This module contains functions relating to calculating merging errors."""
 
-# Standard libraries
 import logging
+import numpy as np
+from numpy.typing import NDArray
 
-# External libraries
-
-# Internal libraries
 from .arc import fit_spiral_to_image
-from .definitions import Array2D
-
 
 log: logging.Logger = logging.getLogger(__name__)
 
+FloatType = np.float32
+
 
 def calculate_arc_merge_error(
-    first_cluster_array: Array2D, second_cluster_array: Array2D
+    first_cluster_array: NDArray[FloatType], second_cluster_array: NDArray[FloatType]
 ) -> float:
     """Calculates the arc merge error ratio for two clusters. This is a measure of how
     well the merged cluster of the two clusters given fit to a log spiral compared to
