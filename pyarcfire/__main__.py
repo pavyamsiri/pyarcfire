@@ -46,10 +46,14 @@ def main(raw_args: Sequence[str]) -> None:
 
 
 def process_from_image(args: argparse.Namespace) -> None:
-    # Load image
-    image = (
-        np.asarray(Image.open(args.input_path).convert("L")).astype(np.float32) / 255
-    )
+    input_path: str = args.input_path
+    ext = os.path.splitext(input_path)[1].lstrip(".")
+    image: NDArray[np.float32]
+    if ext == "npy":
+        image = np.load(input_path, allow_pickle=True).astype(np.float32)
+    else:
+        # Load image
+        image = np.asarray(Image.open(input_path).convert("L")).astype(np.float32) / 255
     image = transform.resize(image, (IMAGE_SIZE, IMAGE_SIZE)).astype(np.float32)
     width: float = image.shape[0] / 2 - 0.5
 
