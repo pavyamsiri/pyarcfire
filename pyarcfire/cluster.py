@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Any, TypeVar
+from typing import Any, TypeVar, Optional
 
 import numpy as np
 from numpy.typing import NDArray
@@ -135,7 +135,7 @@ class Cluster:
     @staticmethod
     def list_to_array(
         image: NDArray[FloatType], clusters: Iterable[Cluster]
-    ) -> NDArray[FloatType]:
+    ) -> Optional[NDArray[FloatType]]:
         """Converts a list of clusters and an image into an array of the same image
         masked by each different cluster.
 
@@ -149,10 +149,13 @@ class Cluster:
 
         Returns
         -------
-        NDArray[FloatType]
-            The image masked by the different clusters.
+        Optional[NDArray[FloatType]]
+            The image masked by the different clusters. This returns None if there
+            are no clusters given.
         """
         array_list = [cluster.get_masked_image(image) for cluster in clusters]
+        if len(array_list) == 0:
+            return None
         return np.dstack(array_list)
 
     @staticmethod
@@ -184,7 +187,7 @@ def generate_clusters(
     merge_check_minimum_cluster_size: int,
     minimum_cluster_size: int,
     remove_central_cluster: bool,
-) -> NDArray[FloatType]:
+) -> Optional[NDArray[FloatType]]:
     """Performs single linkage clustering on an image given its corresponding similarity matrix.
     The clusters are merged using single linkage clustering with a single modification. Sufficiently
     large cluster pairs will first be checked if their resulting merged cluster will fit a spiral
@@ -210,8 +213,9 @@ def generate_clusters(
 
     Returns
     -------
-    cluster_arrays : NDArray[FloatType]
-        The image masked by each cluster.
+    cluster_arrays : Optional[NDArray[FloatType]]
+        The image masked by each cluster. This function may not find any suitable clusters in which case
+        it will return None.
     """
     # The image must be 2D
     if len(image.shape) != 2:

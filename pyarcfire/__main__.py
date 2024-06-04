@@ -65,6 +65,11 @@ def process_from_image(args: argparse.Namespace) -> None:
         GenerateClustersSettings(),
         MergeClustersByFitSettings(),
     )
+
+    if result is None:
+        log.critical("Could not find any suitable clusters!")
+        return
+
     unsharp_settings = result.unsharp_mask_settings
     cluster_arrays = result.get_cluster_arrays()
 

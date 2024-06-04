@@ -1,6 +1,7 @@
 import logging
 import os
 from dataclasses import dataclass
+from typing import Optional
 
 import numpy as np
 import scipy.io
@@ -128,7 +129,7 @@ def detect_spirals_in_image(
     similarity_matrix_settings: GenerateSimilarityMatrixSettings = GenerateSimilarityMatrixSettings(),
     generate_clusters_settings: GenerateClustersSettings = GenerateClustersSettings(),
     merge_clusters_by_fit_settings: MergeClustersByFitSettings = MergeClustersByFitSettings(),
-) -> ClusterSpiralResult:
+) -> Optional[ClusterSpiralResult]:
     # Unsharp phase
     unsharp_image = filters.unsharp_mask(
         image, radius=unsharp_mask_settings.radius, amount=unsharp_mask_settings.amount
@@ -153,7 +154,7 @@ def detect_spirals_in_image(
 
     # Merge clusters via HAC
     log.info("[cyan]PROGRESS[/cyan]: Generating clusters...")
-    cluster_arrays = generate_clusters(
+    cluster_arrays: Optional[NDArray[FloatType]] = generate_clusters(
         image,
         matrix.tocsr(),
         stop_threshold=generate_clusters_settings.stop_threshold,
@@ -163,6 +164,8 @@ def detect_spirals_in_image(
         remove_central_cluster=generate_clusters_settings.remove_central_cluster,
     )
     log.info("[cyan]PROGRESS[/cyan]: Done generating clusters.")
+    if cluster_arrays is None:
+        return None
 
     # Do some final merges based on fit
     log.info("[cyan]PROGRESS[/cyan]: Merging clusters by fit...")
