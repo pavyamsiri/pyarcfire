@@ -1,6 +1,6 @@
 [project]
 name = "pyarcfire"
-version = "0.0.0dev1"
+version = "0.0.0.dev2a"
 description = "A port of SpArcFiRe, a spiral arc finder"
 authors = [
     { name = "Pavadol Yamsiri" }
