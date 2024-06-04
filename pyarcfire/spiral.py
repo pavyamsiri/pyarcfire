@@ -1,5 +1,6 @@
 import logging
 import os
+from collections.abc import Callable, Generator
 from dataclasses import dataclass
 from typing import Optional
 
@@ -8,6 +9,9 @@ import scipy.io
 from numpy.typing import NDArray
 from skimage import filters
 
+from pyarcfire.arc.utils import get_polar_coordinates
+
+from .arc import LogSpiralFitResult, fit_spiral_to_image
 from .cluster import GenerateClustersSettings, generate_clusters
 from .debug_utils import benchmark
 from .merge_fit import MergeClustersByFitSettings, merge_clusters_by_fit
@@ -69,6 +73,9 @@ class ClusterSpiralResult:
             merge_clusters_by_fit_settings
         )
 
+        # Cache
+        self._spiral_cache: dict[int, LogSpiralFitResult[FloatType]] = {}
+
     @property
     def unsharp_mask_settings(self) -> UnsharpMaskSettings:
         return self._unsharp_mask_settings
@@ -88,6 +95,9 @@ class ClusterSpiralResult:
     @property
     def merge_clusters_by_fit_settings(self) -> MergeClustersByFitSettings:
         return self._merge_clusters_by_fit_settings
+
+    def get_num_clusters(self) -> int:
+        return self._cluster_masks.shape[2]
 
     def get_image(self) -> NDArray[FloatType]:
         return self._image
@@ -119,6 +129,53 @@ class ClusterSpiralResult:
             )
             return
         log.info(f"[yellow]FILESYST[/yellow]: Dumped masks to [yellow]{path}[/yellow]")
+
+    def get_spiral_of(
+        self, cluster_idx: int, num_points: int = 100
+    ) -> tuple[NDArray[FloatType], NDArray[FloatType]]:
+        if cluster_idx not in range(self.get_num_clusters()):
+            raise ValueError("Expected a valid cluster index!")
+
+        if cluster_idx not in self._spiral_cache:
+            current_array, _ = self.get_cluster_array(cluster_idx)
+            self._spiral_cache[cluster_idx] = fit_spiral_to_image(current_array)
+        spiral_fit = self._spiral_cache[cluster_idx]
+        x, y = spiral_fit.calculate_cartesian_coordinates(num_points)
+        return x, y
+
+    def _get_fit(self, cluster_idx: int) -> LogSpiralFitResult[FloatType]:
+        if cluster_idx not in self._spiral_cache:
+            current_array, _ = self.get_cluster_array(cluster_idx)
+            self._spiral_cache[cluster_idx] = fit_spiral_to_image(current_array)
+        return self._spiral_cache[cluster_idx]
+
+    def get_spirals(
+        self, num_points: int
+    ) -> Generator[tuple[NDArray[FloatType], NDArray[FloatType]], None, None]:
+        num_clusters: int = self.get_num_clusters()
+        for cluster_idx in range(num_clusters):
+            spiral_fit = self._get_fit(cluster_idx)
+            x, y = spiral_fit.calculate_cartesian_coordinates(num_points)
+            yield x, y
+
+    def get_arc_bounds(self, cluster_idx: int) -> tuple[float, float]:
+        current_fit = self._get_fit(cluster_idx)
+        start_angle = current_fit.offset
+        end_angle = start_angle + current_fit.arc_bounds[1]
+        return (start_angle, end_angle)
+
+    def calculate_fit_error_to_cluster(
+        self,
+        calculate_radii: Callable[[NDArray[FloatType]], NDArray[FloatType]],
+        cluster_idx: int,
+    ) -> NDArray[FloatType]:
+        current_array, _ = self.get_cluster_array(cluster_idx)
+        radii, theta, weights = get_polar_coordinates(current_array)
+        result = np.multiply(
+            np.sqrt(weights),
+            (radii - calculate_radii(theta)),
+        )
+        return result
 
 
 @benchmark
