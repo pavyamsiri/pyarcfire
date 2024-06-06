@@ -76,6 +76,9 @@ class ClusterSpiralResult:
         # Cache
         self._spiral_cache: dict[int, LogSpiralFitResult[FloatType]] = {}
 
+    def __str__(self) -> str:
+        return f"ClusterSpiralResult(num_clusters={self.get_num_clusters()})"
+
     @property
     def unsharp_mask_settings(self) -> UnsharpMaskSettings:
         return self._unsharp_mask_settings
