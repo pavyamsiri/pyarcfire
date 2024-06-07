@@ -623,12 +623,16 @@ def __image_transform_from_cartesian_to_polar(
     dy = max(centre_y, -(row_indices - centre_y).max())
     max_radius = np.sqrt(dx**2 + dy**2)
 
-    return skimage.transform.warp_polar(
-        image,
-        center=(centre_x, centre_y),
-        radius=max_radius,
-        output_shape=(num_theta, num_radii),
-    ).T
+    return (
+        skimage.transform.warp_polar(
+            image,
+            center=(centre_x, centre_y),
+            radius=max_radius,
+            output_shape=(num_theta, num_radii),
+        )
+        .astype(image.dtype)
+        .T
+    )
 
 
 def __split_regions(
