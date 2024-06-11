@@ -365,7 +365,6 @@ def identify_inner_and_outer_spiral(
 
     # Find the start and end of each region
     single_revolution_differences = np.diff(can_be_single_revolution.astype(np.float32))
-    # TODO: Verify this logic
     start_indices: NDArray[np.int32] = (
         np.flatnonzero(single_revolution_differences == 1) + 1
     )
@@ -663,6 +662,8 @@ def __split_regions(
             split_theta_idx = int(wrap_data.start + wrap_mid_length - 1)
         else:
             split_theta_idx = int(wrap_mid_length - wrap_data.start_length - 1)
+        # NOTE: Sometimes we need to wrap the angles
+        split_theta_idx %= len(theta_bin_centres)
         split_theta = theta_bin_centres[split_theta_idx]
         first_region = np.logical_and(
             inner_region, np.logical_and(theta >= split_theta, theta < theta_end)
@@ -695,7 +696,7 @@ def __calculate_wrap(
         len(start_indices) == 0 or start_indices[0] > end_indices[0]
     ):
         has_wrapped = True
-        wrap_end = end_indices[0]
+        wrap_end = end_indices[0] + 1
         end_indices = end_indices[1:]
         assert (
             len(start_indices) == 0
