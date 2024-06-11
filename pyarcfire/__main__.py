@@ -7,6 +7,7 @@ from typing import Any, cast
 import matplotlib as mpl
 import numpy as np
 import scipy.io
+from matplotlib import colors as mplcolors
 from matplotlib import pyplot as plt
 from numpy.typing import NDArray
 from PIL import Image
@@ -51,9 +52,19 @@ def process_from_image(args: argparse.Namespace) -> None:
     image: NDArray[np.float32]
     if ext == "npy":
         image = np.load(input_path, allow_pickle=True).astype(np.float32)
+        image[np.isclose(image, 0)] = 0
+        min_value = image.min()
+        max_value = image.max()
+        not_normed = min_value < 0 or max_value > 1
+        if not_normed:
+            log.info("Normalize using LogNorm")
+            image = mplcolors.LogNorm(clip=True)(image)
     else:
         # Load image
         image = np.asarray(Image.open(input_path).convert("L")).astype(np.float32) / 255
+    if np.count_nonzero(image < 0) > 0:
+        log.critical("Image has negative values!")
+        return
     image = transform.resize(image, (IMAGE_SIZE, IMAGE_SIZE)).astype(np.float32)
     width: float = image.shape[0] / 2 - 0.5
 
