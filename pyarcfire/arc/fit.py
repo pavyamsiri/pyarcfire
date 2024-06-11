@@ -169,13 +169,13 @@ def _fit_spiral_to_image_single_revolution_core(
         pitch_angle = 0
     else:
         offset = (lower_bound + upper_bound) / 2
-        res: optimize.OptimizeResult = optimize.least_squares(
+        res = optimize.least_squares(
             calculate_log_spiral_error_from_pitch_angle,
             x0=initial_pitch_angle,
             args=(radii, rotated_theta, weights, offset, True),
         )
         assert res.success, "Failed to fit pitch angle"
-        pitch_angle = cast(float, res.x[0])
+        pitch_angle = res.x[0]
 
     # Calculate the error from the fit
     initial_radius = calculate_best_initial_radius(
