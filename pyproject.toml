@@ -50,4 +50,4 @@ reportUnknownVariableType = true
 
 [tool.ruff.lint]
 select = ["ALL"]
-ignore = []
+ignore = ["D203", "D213"]
