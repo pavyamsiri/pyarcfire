@@ -48,6 +48,9 @@ reportUnknownArgumentType = true
 reportUnknownParameterType = true
 reportUnknownVariableType = true
 
+[tool.ruff]
+line-length = 130
+
 [tool.ruff.lint]
 select = ["ALL"]
 ignore = ["D203", "D213"]
