@@ -1,4 +1,4 @@
-"""This module contains functions to help set up logging."""
+"""Functions to help set up logging."""
 
 import logging
 from collections.abc import Iterable
@@ -6,9 +6,18 @@ from collections.abc import Iterable
 from rich.console import Console
 from rich.logging import RichHandler
 
+FORMAT: str = "%(message)s"
+
 
 def setup_logging() -> Iterable[logging.Handler]:
-    FORMAT = "%(message)s"
+    """Set up logging.
+
+    Returns
+    -------
+    handlers : Iterable[logging.Handler]
+        The logging handlers.
+
+    """
     console = Console()
     console_handler = RichHandler(console=console, show_time=False, markup=True)
     handlers: list[logging.Handler] = [console_handler]
