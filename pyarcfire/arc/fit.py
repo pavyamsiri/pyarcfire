@@ -388,9 +388,6 @@ def identify_inner_and_outer_spiral(
     start_indices, end_indices, wrap_data = __calculate_wrap(
         can_be_single_revolution, start_indices, end_indices
     )
-    theta_bin_values: NDArray[FloatType] = np.divide(
-        np.multiply(np.arange(0, num_theta), 2 * np.pi), num_theta
-    )
     theta_bin_values: NDArray[FloatType] = np.linspace(
         2 * np.pi, 0, num_theta, endpoint=False
     ).astype(image.dtype)[::-1]
