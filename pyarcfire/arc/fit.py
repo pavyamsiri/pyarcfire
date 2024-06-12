@@ -169,13 +169,13 @@ def _fit_spiral_to_image_single_revolution_core(
         pitch_angle = 0
     else:
         offset = (lower_bound + upper_bound) / 2
-        res: optimize.OptimizeResult = optimize.least_squares(
+        res = optimize.least_squares(
             calculate_log_spiral_error_from_pitch_angle,
             x0=initial_pitch_angle,
             args=(radii, rotated_theta, weights, offset, True),
         )
         assert res.success, "Failed to fit pitch angle"
-        pitch_angle = cast(float, res.x[0])
+        pitch_angle = res.x[0]
 
     # Calculate the error from the fit
     initial_radius = calculate_best_initial_radius(
@@ -365,7 +365,6 @@ def identify_inner_and_outer_spiral(
 
     # Find the start and end of each region
     single_revolution_differences = np.diff(can_be_single_revolution.astype(np.float32))
-    # TODO: Verify this logic
     start_indices: NDArray[np.int32] = (
         np.flatnonzero(single_revolution_differences == 1) + 1
     )
@@ -389,9 +388,9 @@ def identify_inner_and_outer_spiral(
     start_indices, end_indices, wrap_data = __calculate_wrap(
         can_be_single_revolution, start_indices, end_indices
     )
-    theta_bin_values: NDArray[FloatType] = np.divide(
-        np.multiply(np.arange(1, num_theta), 2 * np.pi), num_theta
-    )
+    theta_bin_values: NDArray[FloatType] = np.linspace(
+        2 * np.pi, 0, num_theta, endpoint=False
+    ).astype(image.dtype)[::-1]
     row_indices, column_indices = image.nonzero()
     cluster_mask = np.zeros_like(image, dtype=np.bool_)
     cluster_mask[row_indices, column_indices] = True
@@ -623,12 +622,16 @@ def __image_transform_from_cartesian_to_polar(
     dy = max(centre_y, -(row_indices - centre_y).max())
     max_radius = np.sqrt(dx**2 + dy**2)
 
-    return skimage.transform.warp_polar(
-        image,
-        center=(centre_x, centre_y),
-        radius=max_radius,
-        output_shape=(num_theta, num_radii),
-    ).T
+    return (
+        skimage.transform.warp_polar(
+            image,
+            center=(centre_x, centre_y),
+            radius=max_radius,
+            output_shape=(num_theta, num_radii),
+        )
+        .astype(image.dtype)
+        .T
+    )
 
 
 def __split_regions(
@@ -659,6 +662,8 @@ def __split_regions(
             split_theta_idx = int(wrap_data.start + wrap_mid_length - 1)
         else:
             split_theta_idx = int(wrap_mid_length - wrap_data.start_length - 1)
+        # NOTE: Sometimes we need to wrap the angles
+        split_theta_idx %= len(theta_bin_centres)
         split_theta = theta_bin_centres[split_theta_idx]
         first_region = np.logical_and(
             inner_region, np.logical_and(theta >= split_theta, theta < theta_end)
@@ -691,7 +696,7 @@ def __calculate_wrap(
         len(start_indices) == 0 or start_indices[0] > end_indices[0]
     ):
         has_wrapped = True
-        wrap_end = end_indices[0]
+        wrap_end = end_indices[0] + 1
         end_indices = end_indices[1:]
         assert (
             len(start_indices) == 0

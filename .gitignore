@@ -7,3 +7,6 @@ __pycache__/
 .hypothesis/
 stubs/
 dist/
+
+# Local configs
+pyrightconfig.json
