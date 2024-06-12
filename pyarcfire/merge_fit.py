@@ -1,10 +1,12 @@
-"""This module contains functions to merge clusters together by considering how spirals will fit them."""
+"""Functions to merge clusters together by considering how spirals will fit them."""
+
+from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
+from typing import TYPE_CHECKING, TypeVar
 
 import numpy as np
-from numpy.typing import NDArray
 from scipy.ndimage import distance_transform_edt
 
 from .debug_utils import benchmark
@@ -12,18 +14,28 @@ from .merge import calculate_arc_merge_error
 
 log: logging.Logger = logging.getLogger(__name__)
 
-FloatType = np.float32
+if TYPE_CHECKING:
+    from numpy.typing import NDArray
+
+    FloatType = TypeVar("FloatType", np.float32, np.float64)
 
 
 @dataclass
 class MergeClustersByFitSettings:
+    """Settings to configure merge_clusters_by_fit.
+
+    Attributes
+    ----------
+    stop_threshold : float
+        The maximum merge error ratio before stopping merges.
+
+    """
+
     stop_threshold: float = 2.5
 
 
 @benchmark
-def merge_clusters_by_fit(
-    clusters: NDArray[FloatType], stop_threshold: float
-) -> NDArray[FloatType]:
+def merge_clusters_by_fit(clusters: NDArray[FloatType], stop_threshold: float) -> NDArray[FloatType]:
     """Merge clusters by if they are fit spirals decently well when combined.
 
     Parameters
@@ -37,11 +49,10 @@ def merge_clusters_by_fit(
     -------
     merged_clusters : NDArray[FloatType]
         The clusters after being merged.
+
     """
     # Maximum pixel distance
-    max_pixel_distance = (
-        np.mean([clusters.shape[0], clusters.shape[1]]).astype(float) / 20
-    )
+    max_pixel_distance = np.mean([clusters.shape[0], clusters.shape[1]]).astype(float) / 20
 
     # Fit spirals to each cluster
     cluster_dict: dict[int, NDArray[FloatType]] = {}
@@ -55,9 +66,7 @@ def merge_clusters_by_fit(
         for target_idx in range(source_idx + 1, num_clusters):
             left_array = cluster_dict[source_idx][1]
             right_array = cluster_dict[target_idx][1]
-            cluster_distances[source_idx, target_idx] = _calculate_cluster_distance(
-                left_array, right_array, max_pixel_distance
-            )
+            cluster_distances[source_idx, target_idx] = _calculate_cluster_distance(left_array, right_array, max_pixel_distance)
 
     num_merges: int = 0
     while True:
@@ -93,15 +102,10 @@ def merge_clusters_by_fit(
             right_idx = max(first_idx, other_idx)
             left_array = cluster_dict[int(left_idx)][1]
             right_array = cluster_dict[int(right_idx)][1]
-            cluster_distances[left_idx, right_idx] = _calculate_cluster_distance(
-                left_array, right_array, max_pixel_distance
-            )
-    log.info(f"[green]DIAGNOST[/green]: Merged {num_merges} clusters by fit")
+            cluster_distances[left_idx, right_idx] = _calculate_cluster_distance(left_array, right_array, max_pixel_distance)
+    log.info("[green]DIAGNOST[/green]: Merged %d clusters by fit", num_merges)
     # Combined clusters into arrays
-    merged_clusters = np.dstack(
-        [cluster_dict[cluster_idx] for cluster_idx in cluster_dict]
-    )
-    return merged_clusters
+    return np.dstack([cluster_dict[cluster_idx] for cluster_idx in cluster_dict])
 
 
 def _calculate_cluster_distance(
@@ -109,7 +113,7 @@ def _calculate_cluster_distance(
     second_cluster_array: NDArray[FloatType],
     max_pixel_distance: float,
 ) -> float:
-    """Calculates the "distance" between two clusters.
+    """Calculate the "distance" between two clusters.
 
     Parameters
     ----------
@@ -130,17 +134,14 @@ def _calculate_cluster_distance(
     -----
     The distance here is the merge error ratio of the two clusters. This is a measure of how
     well a merged cluster fits a spiral compared to the two clusters fitted separately.
+
     """
     # Compute pixel distances to first cluster
     distances = distance_transform_edt(first_cluster_array == 0, return_distances=True)
-    assert isinstance(distances, np.ndarray)
     # Mask the distance matrix using the second cluster as a mask
     distances = distances[second_cluster_array > 0]
 
     # Only compute if the second cluster is close enough to the first cluster
     if len(distances) > 0 and distances.min() <= max_pixel_distance:
-        merge_error = calculate_arc_merge_error(
-            first_cluster_array, second_cluster_array
-        )
-        return merge_error
+        return calculate_arc_merge_error(first_cluster_array, second_cluster_array)
     return np.inf
