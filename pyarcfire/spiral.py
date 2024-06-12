@@ -153,13 +153,19 @@ class ClusterSpiralResult:
         return self._spiral_cache[cluster_idx]
 
     def get_spirals(
-        self, num_points: int, pixel_to_distance: float
+        self,
+        num_points: int,
+        pixel_to_distance: float,
+        *,
+        flip_y: bool = False,
     ) -> Generator[tuple[NDArray[FloatType], NDArray[FloatType]], None, None]:
         num_clusters: int = self.get_num_clusters()
         for cluster_idx in range(num_clusters):
             spiral_fit = self._get_fit(cluster_idx)
             x, y = spiral_fit.calculate_cartesian_coordinates(
-                num_points, pixel_to_distance
+                num_points,
+                pixel_to_distance,
+                flip_y=flip_y,
             )
             yield x, y
 
