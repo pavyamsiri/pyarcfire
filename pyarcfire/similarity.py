@@ -41,6 +41,9 @@ class GenerateSimilarityMatrixSettings:
     similarity_cutoff: float = 0.15
 
 
+DEFAULT_SIMILARITY_MATRIX_SETTINGS: GenerateSimilarityMatrixSettings = GenerateSimilarityMatrixSettings()
+
+
 @benchmark
 def generate_similarity_matrix(orientation: OrientationField, similarity_cutoff: float) -> sparse.coo_array:
     """Generate a sparse pixel-to-pixel similarity matrix from an orientation field.

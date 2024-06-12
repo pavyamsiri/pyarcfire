@@ -34,6 +34,9 @@ class MergeClustersByFitSettings:
     stop_threshold: float = 2.5
 
 
+DEFAULT_MERGE_CLUSTER_BY_FIT_SETTINGS: MergeClustersByFitSettings = MergeClustersByFitSettings()
+
+
 @benchmark
 def merge_clusters_by_fit(clusters: NDArray[FloatType], stop_threshold: float) -> NDArray[FloatType]:
     """Merge clusters by if they are fit spirals decently well when combined.

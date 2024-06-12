@@ -77,6 +77,9 @@ class GenerateClustersSettings:
     remove_central_cluster: bool = True
 
 
+DEFAULT_CLUSTER_SETTINGS: GenerateClustersSettings = GenerateClustersSettings()
+
+
 class Cluster:
     """This class represents a cluster of pixels grouped by their similarity and spatial distance.
     A cluster should represent a spiral arm segment and be fit well by a log spiral.
@@ -123,9 +126,7 @@ class Cluster:
             The masked image.
         """
         num_rows, num_columns = image.shape
-        row_indices, column_indices = np.unravel_index(
-            self._points, (num_rows, num_columns)
-        )
+        row_indices, column_indices = np.unravel_index(self._points, (num_rows, num_columns))
         mask = np.ones_like(image, dtype=np.bool_)
         mask[row_indices, column_indices] = False
         masked_image = image.copy()
@@ -133,9 +134,7 @@ class Cluster:
         return masked_image
 
     @staticmethod
-    def list_to_array(
-        image: NDArray[FloatType], clusters: Iterable[Cluster]
-    ) -> Optional[NDArray[FloatType]]:
+    def list_to_array(image: NDArray[FloatType], clusters: Iterable[Cluster]) -> Optional[NDArray[FloatType]]:
         """Converts a list of clusters and an image into an array of the same image
         masked by each different cluster.
 
@@ -233,9 +232,7 @@ def generate_clusters(
     num_pixels_from_matrix = similarity_matrix.shape[0]
     num_pixels_from_image = image.shape[0] * image.shape[1]
     if num_pixels_from_image != num_pixels_from_matrix:
-        raise ValueError(
-            "The similarity matrix's size is inconsistent with the image's size."
-        )
+        raise ValueError("The similarity matrix's size is inconsistent with the image's size.")
 
     # Diagnostics
     check_arc_merge_count: int = 0
@@ -263,18 +260,13 @@ def generate_clusters(
         first_cluster = clusters[first_idx]
         second_cluster = clusters[second_idx]
         # Perform a merge check on sufficiently large cluster pairs
-        if (
-            min(first_cluster.size, second_cluster.size)
-            > merge_check_minimum_cluster_size
-        ):
+        if min(first_cluster.size, second_cluster.size) > merge_check_minimum_cluster_size:
             check_arc_merge_count += 1
             first_cluster_array = first_cluster.get_masked_image(image)
             second_cluster_array = second_cluster.get_masked_image(image)
             # Check if merging will result in a sufficently worse spiral fit than
             # if the clusters were separate.
-            merge_error = calculate_arc_merge_error(
-                first_cluster_array, second_cluster_array
-            )
+            merge_error = calculate_arc_merge_error(first_cluster_array, second_cluster_array)
             # Error after merging is sufficiently bad to halt merging
             if merge_error > error_ratio_threshold:
                 merge_stop_count += 1
@@ -291,36 +283,26 @@ def generate_clusters(
         del clusters[second_idx]
 
         # Update the similarity matrix with the inclusion of the merged cluster
-        similarity_matrix = _update_similarity_matrix(
-            similarity_matrix, first_idx, second_idx
-        )
+        similarity_matrix = _update_similarity_matrix(similarity_matrix, first_idx, second_idx)
         # Remove the links associated with the deleted cluster
-        similarity_matrix = _clear_similarity_matrix_row_column(
-            similarity_matrix, second_idx
-        )
+        similarity_matrix = _clear_similarity_matrix_row_column(similarity_matrix, second_idx)
 
     # Remove clusters below minimum size
     clusters_list = list(clusters.values())
-    clusters_list = [
-        cluster for cluster in clusters_list if cluster.size >= minimum_cluster_size
-    ]
+    clusters_list = [cluster for cluster in clusters_list if cluster.size >= minimum_cluster_size]
 
     # Remove cluster that contains the centre
     if remove_central_cluster:
         log.info("[green]DIAGNOST[/green]: Removing central cluster...")
         central_points = get_origin_points_unnested(image)
         central_idx = np.ravel_multi_index(central_points, image.shape)
-        clusters_list = [
-            cluster for cluster in clusters_list if central_idx not in cluster
-        ]
+        clusters_list = [cluster for cluster in clusters_list if central_idx not in cluster]
 
     cluster_arrays = Cluster.list_to_array(image, clusters_list)
 
     # Show diagnostics of merging step
     log.info(f"[green]DIAGNOST[/green]: Number of clusters = {len(clusters)}")
-    log.info(
-        f"[green]DIAGNOST[/green]: Checked {check_arc_merge_count} possible cluster merges"
-    )
+    log.info(f"[green]DIAGNOST[/green]: Checked {check_arc_merge_count} possible cluster merges")
     log.info(f"[green]DIAGNOST[/green]: Stopped {merge_stop_count} cluster merges")
     return cluster_arrays
 
@@ -353,9 +335,7 @@ def _update_similarity_matrix(
     # Merged cluster similarity is the maximum possible similarity from the set of cluster points
     old_similarity_values = similarity_matrix[[target_idx], :]
     # The updated values max(Ti, Si)
-    new_similarity_values = similarity_matrix[[target_idx], :].maximum(
-        similarity_matrix[[source_idx], :]
-    )
+    new_similarity_values = similarity_matrix[[target_idx], :].maximum(similarity_matrix[[source_idx], :])
     # Remove self-similarity
     new_similarity_values[0, [target_idx]] = 0
 

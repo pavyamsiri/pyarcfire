@@ -48,6 +48,9 @@ class GenerateOrientationFieldSettings:
     num_orientation_field_levels: int = 3
 
 
+DEFAULT_ORIENTATION_FIELD_SETTINGS: GenerateOrientationFieldSettings = GenerateOrientationFieldSettings()
+
+
 class OrientationField:
     """The orientation field of an image.
 

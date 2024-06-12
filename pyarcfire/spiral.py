@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 import numpy as np
 import scipy.io
@@ -14,15 +14,16 @@ from skimage import filters
 from pyarcfire.arc.utils import get_polar_coordinates
 
 from .arc import LogSpiralFitResult, fit_spiral_to_image
-from .cluster import GenerateClustersSettings, generate_clusters
+from .cluster import DEFAULT_CLUSTER_SETTINGS, GenerateClustersSettings, generate_clusters
 from .debug_utils import benchmark
-from .merge_fit import MergeClustersByFitSettings, merge_clusters_by_fit
+from .merge_fit import DEFAULT_MERGE_CLUSTER_BY_FIT_SETTINGS, MergeClustersByFitSettings, merge_clusters_by_fit
 from .orientation import (
+    DEFAULT_ORIENTATION_FIELD_SETTINGS,
     GenerateOrientationFieldSettings,
     OrientationField,
     generate_orientation_fields,
 )
-from .similarity import GenerateSimilarityMatrixSettings, generate_similarity_matrix
+from .similarity import DEFAULT_SIMILARITY_MATRIX_SETTINGS, GenerateSimilarityMatrixSettings, generate_similarity_matrix
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Generator
@@ -50,6 +51,9 @@ class UnsharpMaskSettings:
 
     radius: float = 25
     amount: float = 6
+
+
+DEFAULT_UNSHARP_MASK: UnsharpMaskSettings = UnsharpMaskSettings()
 
 
 class ClusterSpiralResult:
@@ -376,11 +380,11 @@ class ClusterSpiralResult:
 @benchmark
 def detect_spirals_in_image(
     image: NDArray[FloatType],
-    unsharp_mask_settings: UnsharpMaskSettings = UnsharpMaskSettings(),
-    orientation_field_settings: GenerateOrientationFieldSettings = GenerateOrientationFieldSettings(),
-    similarity_matrix_settings: GenerateSimilarityMatrixSettings = GenerateSimilarityMatrixSettings(),
-    generate_clusters_settings: GenerateClustersSettings = GenerateClustersSettings(),
-    merge_clusters_by_fit_settings: MergeClustersByFitSettings = MergeClustersByFitSettings(),
+    unsharp_mask_settings: UnsharpMaskSettings = DEFAULT_UNSHARP_MASK,
+    orientation_field_settings: GenerateOrientationFieldSettings = DEFAULT_ORIENTATION_FIELD_SETTINGS,
+    similarity_matrix_settings: GenerateSimilarityMatrixSettings = DEFAULT_SIMILARITY_MATRIX_SETTINGS,
+    generate_clusters_settings: GenerateClustersSettings = DEFAULT_CLUSTER_SETTINGS,
+    merge_clusters_by_fit_settings: MergeClustersByFitSettings = DEFAULT_MERGE_CLUSTER_BY_FIT_SETTINGS,
 ) -> ClusterSpiralResult | None:
     """Run the spiral arc finder algorithm on the given image.
 
@@ -390,19 +394,14 @@ def detect_spirals_in_image(
     ----------
     image : NDArray[FloatType]
         The input image as a NumPy array.
-
     unsharp_mask_settings : UnsharpMaskSettings, optional
         Settings for the unsharp mask, by default UnsharpMaskSettings().
-
     orientation_field_settings : GenerateOrientationFieldSettings, optional
         Settings for generating the orientation field, by default GenerateOrientationFieldSettings().
-
     similarity_matrix_settings : GenerateSimilarityMatrixSettings, optional
         Settings for generating the similarity matrix, by default GenerateSimilarityMatrixSettings().
-
     generate_clusters_settings : GenerateClustersSettings, optional
         Settings for generating clusters, by default GenerateClustersSettings().
-
     merge_clusters_by_fit_settings : MergeClustersByFitSettings, optional
         Settings for merging clusters based on fit criteria, by default MergeClustersByFitSettings().
 
@@ -432,7 +431,7 @@ def detect_spirals_in_image(
 
     # Merge clusters via HAC
     log.info("[cyan]PROGRESS[/cyan]: Generating clusters...")
-    cluster_arrays: Optional[NDArray[FloatType]] = generate_clusters(
+    cluster_arrays: NDArray[FloatType] | None = generate_clusters(
         image,
         matrix.tocsr(),
         stop_threshold=generate_clusters_settings.stop_threshold,
