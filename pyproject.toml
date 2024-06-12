@@ -47,3 +47,7 @@ reportMissingTypeArgument = true
 reportUnknownArgumentType = true
 reportUnknownParameterType = true
 reportUnknownVariableType = true
+
+[tool.ruff.lint]
+select = ["ALL"]
+ignore = []
