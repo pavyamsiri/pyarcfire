@@ -20,13 +20,13 @@ class LogSpiralFitResult(Generic[FloatType]):
     has_multiple_revolutions: bool
 
     def calculate_cartesian_coordinates(
-        self, num_points: int
+        self, num_points: int, pixel_to_distance: float
     ) -> tuple[NDArray[np.float32], NDArray[np.float32]]:
         start_angle = self.offset
         end_angle = start_angle + self.arc_bounds[1]
 
         theta = np.linspace(start_angle, end_angle, num_points, dtype=np.float32)
-        radii = log_spiral(
+        radii = pixel_to_distance * log_spiral(
             theta,
             self.offset,
             self.pitch_angle,
