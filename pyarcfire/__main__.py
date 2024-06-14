@@ -75,8 +75,13 @@ def process_from_image(args: argparse.Namespace) -> None:
         max_value = image.max()
         not_normed = min_value < 0 or max_value > 1
         if not_normed:
-            log.info("Normalize using LogNorm")
-            image = mplcolors.LogNorm(clip=True)(image)
+            can_use_log = min_value > 0 and max_value > 0
+            if can_use_log:
+                # TODO: Maybe detect if there is a sufficient difference in powers?
+                image = mplcolors.LogNorm(clip=True)(image)
+            else:
+                log.info("Normalize using Normalize")
+                image = mplcolors.Normalize(clip=True)(image)
     else:
         # Load image
         image = np.asarray(Image.open(input_path).convert("L")).astype(np.float32) / 255
@@ -146,7 +151,9 @@ def process_from_image(args: argparse.Namespace) -> None:
     image_overlay_axis.set_axis_off()
 
     colored_image_overlay_axis = fig.add_subplot(236)
-    colored_image_overlay_axis.set_title("Original image colored with masks and overlaid with spirals")
+    colored_image_overlay_axis.set_title(
+        "Original image colored with masks and overlaid with spirals"
+    )
     colored_image_overlay_axis.set_xlim(-width, width)
     colored_image_overlay_axis.set_ylim(-width, width)
     colored_image_overlay_axis.set_axis_off()
@@ -185,14 +192,19 @@ def process_from_image(args: argparse.Namespace) -> None:
             color=color_map((num_clusters - cluster_idx + 0.5) / num_clusters),
             label=f"Cluster {cluster_idx}",
         )
-    colored_image_overlay_axis.imshow(colored_image, extent=(-width, width, -width, width))
+    colored_image_overlay_axis.imshow(
+        colored_image, extent=(-width, width, -width, width)
+    )
 
     fig.tight_layout()
     if show_flag:
         plt.show()
     else:
         fig.savefig(args.output_path)
-        log.info("[yellow]FILESYST[/yellow]: Saved plot to [yellow]%s[/yellow]", args.output_path)
+        log.info(
+            "[yellow]FILESYST[/yellow]: Saved plot to [yellow]%s[/yellow]",
+            args.output_path,
+        )
     plt.close()
 
 
@@ -218,7 +230,9 @@ def process_cluster(args: argparse.Namespace) -> None:
             arr = arr.reshape((arr.shape[0], arr.shape[1], 1))
         assert len(arr.shape) == 3
     else:
-        log.critical("The %s data format is not valid or is not yet supported!", extension)
+        log.critical(
+            "The %s data format is not valid or is not yet supported!", extension
+        )
         return
     num_clusters = arr.shape[2]
     log.debug("Loaded %d clusters", num_clusters)
@@ -274,7 +288,9 @@ def _parse_args(args: Sequence[str]) -> argparse.Namespace:
     )
 
     subparsers = parser.add_subparsers(dest="command")
-    from_image_parser = subparsers.add_parser("image", help="Process an image.", parents=(base_subparser,))
+    from_image_parser = subparsers.add_parser(
+        "image", help="Process an image.", parents=(base_subparser,)
+    )
     _configure_image_command_parser(from_image_parser)
     from_cluster_parser = subparsers.add_parser(
         "cluster",
