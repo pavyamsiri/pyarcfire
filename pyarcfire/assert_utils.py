@@ -13,6 +13,14 @@ if TYPE_CHECKING:
 
 
 def verify_data_is_normalized(data: NDArray[Any]) -> None:
+    """Verify that the given data is normalized to the range [0, 1].
+
+    Parameters
+    ----------
+    data : NDArray[Any]
+        The data to verify.
+
+    """
     not_normalized = np.min(data) < 0 or np.max(data) > 1
     if not_normalized:
         msg = "The data is not normalized to the range [0, 1]! Please normalize your data before using this function."
