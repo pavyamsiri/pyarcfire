@@ -29,6 +29,10 @@ cli = [
     "Pillow",
     "rich>=4.2.1",
 ]
+test = [
+    "pytest",
+    "hypothesis",
+]
 
 [project.urls]
 Source = "https://github.com/pavyamsiri/pyarcfire.git"
