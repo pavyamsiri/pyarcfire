@@ -34,6 +34,7 @@ from .orientation import (
     OrientationField,
     generate_orientation_fields,
 )
+from .preprocess import preprocess_image
 from .similarity import (
     DEFAULT_SIMILARITY_MATRIX_SETTINGS,
     GenerateSimilarityMatrixSettings,
@@ -410,6 +411,8 @@ def detect_spirals_in_image(
     similarity_matrix_settings: GenerateSimilarityMatrixSettings = DEFAULT_SIMILARITY_MATRIX_SETTINGS,
     generate_clusters_settings: GenerateClustersSettings = DEFAULT_CLUSTER_SETTINGS,
     merge_clusters_by_fit_settings: MergeClustersByFitSettings = DEFAULT_MERGE_CLUSTER_BY_FIT_SETTINGS,
+    *,
+    preprocess: bool = False,
 ) -> ClusterSpiralResult | None:
     """Run the spiral arc finder algorithm on the given image.
 
@@ -429,6 +432,8 @@ def detect_spirals_in_image(
         Settings for generating clusters, by default GenerateClustersSettings().
     merge_clusters_by_fit_settings : MergeClustersByFitSettings, optional
         Settings for merging clusters based on fit criteria, by default MergeClustersByFitSettings().
+    preprocess : bool
+        Set this flag to preprocess the image to ensure it is compatible.
 
     Returns
     -------
@@ -441,6 +446,9 @@ def detect_spirals_in_image(
     have dimensions divisible by 2^n where n is the number of orientation field levels (this is a setting you can adjust).
 
     """
+    if preprocess:
+        image = preprocess_image(image, num_orientation_field_levels=orientation_field_settings.num_orientation_field_levels)
+
     # Checks
     verify_data_is_normalized(image)
     verify_data_is_2d(image)

@@ -22,6 +22,7 @@ from pyarcfire import (
     MergeClustersByFitSettings,
     UnsharpMaskSettings,
 )
+from pyarcfire.preprocess import preprocess_image
 
 from .arc import fit_spiral_to_image
 from .log_utils import setup_logging
@@ -70,25 +71,9 @@ def process_from_image(args: argparse.Namespace) -> None:
     extension = Path(input_path).suffix.lstrip(".")
     if extension == "npy":
         image = np.load(input_path, allow_pickle=True).astype(np.float32)
-        image[np.isclose(image, 0)] = 0
-        min_value = image.min()
-        max_value = image.max()
-        not_normed = min_value < 0 or max_value > 1
-        if not_normed:
-            can_use_log = min_value > 0 and max_value > 0
-            if can_use_log:
-                # TODO(pavyamsiri): Maybe detect if there is a sufficient difference in powers?
-                image = mplcolors.LogNorm(clip=True)(image)
-            else:
-                log.info("Normalize using Normalize")
-                image = mplcolors.Normalize(clip=True)(image)
     else:
         # Load image
         image = np.asarray(Image.open(input_path).convert("L")).astype(np.float32) / 255
-    if np.count_nonzero(image < 0) > 0:
-        log.critical("Image has negative values!")
-        return
-    image = transform.resize(image, (IMAGE_SIZE, IMAGE_SIZE)).astype(np.float32)
     width: float = image.shape[0] / 2 - 0.5
 
     result = detect_spirals_in_image(
@@ -98,6 +83,7 @@ def process_from_image(args: argparse.Namespace) -> None:
         GenerateSimilarityMatrixSettings(),
         GenerateClustersSettings(),
         MergeClustersByFitSettings(),
+        preprocess=True,
     )
 
     if result is None:
