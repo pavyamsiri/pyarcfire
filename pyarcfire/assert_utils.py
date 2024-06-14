@@ -43,7 +43,9 @@ def verify_data_is_2d(data: NDArray[Any]) -> None:
 
 
 def verify_data_can_be_shrunk_orientation(
-    data: NDArray[Any], *, num_orientation_field_levels: int,
+    data: NDArray[Any],
+    *,
+    num_orientation_field_levels: int,
 ) -> None:
     """Verify that the given data is 2D.
 
@@ -57,10 +59,7 @@ def verify_data_can_be_shrunk_orientation(
     """
     # The dimensions of the image must be divisible by the largest shrink factor
     maximum_shrink_factor: int = 2**num_orientation_field_levels
-    if (
-        data.shape[0] % maximum_shrink_factor != 0
-        or data.shape[1] % maximum_shrink_factor != 0
-    ):
+    if data.shape[0] % maximum_shrink_factor != 0 or data.shape[1] % maximum_shrink_factor != 0:
         msg = f"""Image dimensions must be divisible by 2^{num_orientation_field_levels} = {maximum_shrink_factor}.
     Either resize or adjust the number of orientation field levels.
         """
