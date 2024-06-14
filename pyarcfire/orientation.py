@@ -480,7 +480,7 @@ def generate_orientation_fields(
         image.shape[0] % maximum_shrink_factor != 0
         or image.shape[1] % maximum_shrink_factor != 0
     ):
-        msg = "Image dimensions must be divisible by 2^{num_orientation_field_levels} = {maximum_shrink_factor}"
+        msg = f"Image dimensions must be divisible by 2^{num_orientation_field_levels} = {maximum_shrink_factor}"
         raise ValueError(msg)
 
     if num_orientation_field_levels < 1:
