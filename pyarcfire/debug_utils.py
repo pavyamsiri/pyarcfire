@@ -1,4 +1,4 @@
-"""This module contains useful utilities for debugging or profiling."""
+"""Useful utilities for debugging or profiling."""
 
 import logging
 import time
@@ -15,7 +15,7 @@ R = TypeVar("R")
 
 
 def benchmark(func: Callable[P, R]) -> Callable[P, R]:
-    """Decorator used to time functions.
+    """Time functions.
 
     Parameters
     ----------
@@ -26,6 +26,7 @@ def benchmark(func: Callable[P, R]) -> Callable[P, R]:
     -------
     Callable
         The wrapped function.
+
     """
 
     @wraps(func)
@@ -35,7 +36,9 @@ def benchmark(func: Callable[P, R]) -> Callable[P, R]:
         time_end = time.perf_counter()
         time_duration = time_end - time_start
         log.info(
-            f"[magenta]PROFILER[/magenta]: [blue underline]{func.__qualname__}[/blue underline] took {time_duration:.3f} seconds"
+            "[magenta]PROFILER[/magenta]: [blue underline]%s[/blue underline] took %.3f seconds",
+            func.__qualname__,
+            time_duration,
         )
         return result
 

@@ -1,14 +1,13 @@
-"""This module contains routines to generate clusters representing spiral arm segments from a similarity matrix."""
+"""Routines to generate clusters representing spiral arm segments from a similarity matrix."""
 
 from __future__ import annotations
 
 import logging
 from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Any, TypeVar, Optional
+from typing import TYPE_CHECKING, Any, TypeVar
 
 import numpy as np
-from numpy.typing import NDArray
 from scipy import sparse
 
 from .array_utils import get_origin_points_unnested
@@ -16,60 +15,84 @@ from .debug_utils import benchmark
 from .matrix_utils import get_nonzero_values, is_sparse_matrix_symmetric
 from .merge import calculate_arc_merge_error
 
+if TYPE_CHECKING:
+    from numpy.typing import NDArray
+
+    SparseMatrix = TypeVar(
+        "SparseMatrix",
+        sparse.coo_array,
+        sparse.bsr_array,
+        sparse.csc_array,
+        sparse.csr_array,
+        sparse.dia_array,
+        sparse.dok_array,
+        sparse.lil_array,
+        sparse.coo_matrix,
+        sparse.bsr_matrix,
+        sparse.csc_matrix,
+        sparse.csr_matrix,
+        sparse.dia_matrix,
+        sparse.dok_matrix,
+        sparse.lil_matrix,
+    )
+    SparseArray = TypeVar(
+        "SparseArray",
+        sparse.coo_array,
+        sparse.bsr_array,
+        sparse.csc_array,
+        sparse.csr_array,
+        sparse.dia_array,
+        sparse.dok_array,
+        sparse.lil_array,
+    )
+    SparseMatrixSupportsIndex = TypeVar(
+        "SparseMatrixSupportsIndex",
+        sparse.csc_array,
+        sparse.csr_array,
+        sparse.dok_array,
+        sparse.lil_array,
+        sparse.csc_matrix,
+        sparse.csr_matrix,
+        sparse.dok_matrix,
+        sparse.lil_matrix,
+    )
+    SparseArraySupportsIndex = TypeVar(
+        "SparseArraySupportsIndex",
+        sparse.csc_array,
+        sparse.csr_array,
+        sparse.dok_array,
+        sparse.lil_array,
+    )
+
+
 log: logging.Logger = logging.getLogger(__name__)
 
 
 FloatType = np.float32
 
-SparseMatrix = TypeVar(
-    "SparseMatrix",
-    sparse.coo_array,
-    sparse.bsr_array,
-    sparse.csc_array,
-    sparse.csr_array,
-    sparse.dia_array,
-    sparse.dok_array,
-    sparse.lil_array,
-    sparse.coo_matrix,
-    sparse.bsr_matrix,
-    sparse.csc_matrix,
-    sparse.csr_matrix,
-    sparse.dia_matrix,
-    sparse.dok_matrix,
-    sparse.lil_matrix,
-)
-SparseArray = TypeVar(
-    "SparseArray",
-    sparse.coo_array,
-    sparse.bsr_array,
-    sparse.csc_array,
-    sparse.csr_array,
-    sparse.dia_array,
-    sparse.dok_array,
-    sparse.lil_array,
-)
-SparseMatrixSupportsIndex = TypeVar(
-    "SparseMatrixSupportsIndex",
-    sparse.csc_array,
-    sparse.csr_array,
-    sparse.dok_array,
-    sparse.lil_array,
-    sparse.csc_matrix,
-    sparse.csr_matrix,
-    sparse.dok_matrix,
-    sparse.lil_matrix,
-)
-SparseArraySupportsIndex = TypeVar(
-    "SparseArraySupportsIndex",
-    sparse.csc_array,
-    sparse.csr_array,
-    sparse.dok_array,
-    sparse.lil_array,
-)
-
 
 @dataclass
 class GenerateClustersSettings:
+    """Settings to configure generate_orientation_field.
+
+    Attributes
+    ----------
+    stop_threshold: float
+        The minimum similarity allowed between clusters before stopping
+        merges.
+    error_ratio_threshold : float
+        The maximum error ratio allowed for a merge between two clusters
+        to be permitted. This error ratio is the ratio of an arc fit's error to
+        the merged cluster relative to the error of two arc fits to the clusters
+        individually.
+    merge_check_minimum_cluster_size : int
+        The maximum size of each cluster before their merges become checked and
+        potentially stopped.
+    remove_central_cluster : bool
+        Set this flag to remove clusters that touch the centre.
+
+    """
+
     stop_threshold: float = 0.15
     error_ratio_threshold: float = 2.5
     merge_check_minimum_cluster_size: int = 25
@@ -77,40 +100,61 @@ class GenerateClustersSettings:
     remove_central_cluster: bool = True
 
 
+DEFAULT_CLUSTER_SETTINGS: GenerateClustersSettings = GenerateClustersSettings()
+
+
 class Cluster:
-    """This class represents a cluster of pixels grouped by their similarity and spatial distance.
+    """A cluster of pixels grouped by their similarity and spatial distance.
+
     A cluster should represent a spiral arm segment and be fit well by a log spiral.
     """
 
     def __init__(self, points: Iterable[int]) -> None:
-        """Creates a cluster from a given set of points.
+        """Create a cluster from a given set of points.
 
         Parameters
         ----------
         points : Iterable[int]
             The points the cluster consists of.
+
         """
-        self._points: list[int] = list(points)
+        self.points: list[int] = list(points)
 
     def __str__(self) -> str:
+        """Return a string representation of OrientationField."""
         return f"Cluster(size={self.size}, hash={hash(self):X})"
 
     def __repr__(self) -> str:
+        """Return a string representation of OrientationField."""
         return str(self)
 
-    def __contains__(self, item: object) -> bool:
+    def __contains__(self, item: Iterable[int] | int) -> bool:
+        """Check whether a point or a set of points is contained by the cluster.
+
+        Parameters
+        ----------
+        item : Iterable[int] | int
+            Either a single index or an iterable of point indices.
+
+        Returns
+        -------
+        bool
+            This is `True` if the point is contained or all points are contained within
+            the cluster.
+
+        """
         if isinstance(item, Iterable):
             elements: Iterable[Any] = item
-            return any([elem in self._points for elem in elements])
-        return item in self._points
+            return any(elem in self.points for elem in elements)
+        return item in self.points
 
     @property
     def size(self) -> int:
         """int: The number of points the cluster contains."""
-        return len(self._points)
+        return len(self.points)
 
     def get_masked_image(self, image: NDArray[FloatType]) -> NDArray[FloatType]:
-        """Returns the given image masked by the cluster.
+        """Return the given image masked by the cluster.
 
         Parameter
         ---------
@@ -121,11 +165,10 @@ class Cluster:
         -------
         masked_image : NDArray[FloatType]
             The masked image.
+
         """
         num_rows, num_columns = image.shape
-        row_indices, column_indices = np.unravel_index(
-            self._points, (num_rows, num_columns)
-        )
+        row_indices, column_indices = np.unravel_index(self.points, (num_rows, num_columns))
         mask = np.ones_like(image, dtype=np.bool_)
         mask[row_indices, column_indices] = False
         masked_image = image.copy()
@@ -133,11 +176,8 @@ class Cluster:
         return masked_image
 
     @staticmethod
-    def list_to_array(
-        image: NDArray[FloatType], clusters: Iterable[Cluster]
-    ) -> Optional[NDArray[FloatType]]:
-        """Converts a list of clusters and an image into an array of the same image
-        masked by each different cluster.
+    def list_to_array(image: NDArray[FloatType], clusters: Iterable[Cluster]) -> NDArray[FloatType] | None:
+        """Convert a list of clusters and an image into an array of the same image masked by each different cluster.
 
         Parameters
         ----------
@@ -149,9 +189,10 @@ class Cluster:
 
         Returns
         -------
-        Optional[NDArray[FloatType]]
+        NDArray[FloatType] | None
             The image masked by the different clusters. This returns None if there
             are no clusters given.
+
         """
         array_list = [cluster.get_masked_image(image) for cluster in clusters]
         if len(array_list) == 0:
@@ -160,7 +201,7 @@ class Cluster:
 
     @staticmethod
     def combine(left: Cluster, right: Cluster) -> Cluster:
-        """Returns the merging of two clusters.
+        """Return the merging of two clusters.
 
         Parameters
         ----------
@@ -173,8 +214,9 @@ class Cluster:
         -------
         Cluster
             The merged cluster.
+
         """
-        all_points = left._points + right._points
+        all_points = left.points + right.points
         return Cluster(all_points)
 
 
@@ -186,9 +228,11 @@ def generate_clusters(
     error_ratio_threshold: float,
     merge_check_minimum_cluster_size: int,
     minimum_cluster_size: int,
+    *,
     remove_central_cluster: bool,
-) -> Optional[NDArray[FloatType]]:
-    """Performs single linkage clustering on an image given its corresponding similarity matrix.
+) -> NDArray[FloatType] | None:
+    """Perform single linkage clustering on an image given its corresponding similarity matrix.
+
     The clusters are merged using single linkage clustering with a single modification. Sufficiently
     large cluster pairs will first be checked if their resulting merged cluster will fit a spiral
     sufficiently well compared to the clusters individually before being merged. If the merged cluster
@@ -198,7 +242,7 @@ def generate_clusters(
     ----------
     image : NDArray[FloatType]
         The image to find clusters in.
-    similarity_matrix : SparseArray
+    input_similarity_matrix : SparseArray
         The similarity matrix representing pixel similarities in the image.
     stop_threshold : float
         The minimum similarity value where cluster merging can happen.
@@ -216,16 +260,19 @@ def generate_clusters(
     cluster_arrays : Optional[NDArray[FloatType]]
         The image masked by each cluster. This function may not find any suitable clusters in which case
         it will return None.
+
     """
     # The image must be 2D
     if len(image.shape) != 2:
-        raise ValueError("The image must be a 2D array!")
+        msg = "The image must be a 2D array!"
+        raise ValueError(msg)
 
     # Verify symmetry and implicitly squareness
     if not is_sparse_matrix_symmetric(input_similarity_matrix):
-        raise ValueError("Similarity matrix must be symmetric!")
+        msg = "Similarity matrix must be symmetric!"
+        raise ValueError(msg)
 
-    # TODO: Should check that the input matrix is not self-similar
+    # TODO(pavyamsiri): Should check that the input matrix is not self-similar
 
     # Change to an index that supports indexing
     similarity_matrix: sparse.csr_array = input_similarity_matrix.tocsr()
@@ -233,9 +280,8 @@ def generate_clusters(
     num_pixels_from_matrix = similarity_matrix.shape[0]
     num_pixels_from_image = image.shape[0] * image.shape[1]
     if num_pixels_from_image != num_pixels_from_matrix:
-        raise ValueError(
-            "The similarity matrix's size is inconsistent with the image's size."
-        )
+        msg = "The similarity matrix's size is inconsistent with the image's size."
+        raise ValueError(msg)
 
     # Diagnostics
     check_arc_merge_count: int = 0
@@ -263,18 +309,13 @@ def generate_clusters(
         first_cluster = clusters[first_idx]
         second_cluster = clusters[second_idx]
         # Perform a merge check on sufficiently large cluster pairs
-        if (
-            min(first_cluster.size, second_cluster.size)
-            > merge_check_minimum_cluster_size
-        ):
+        if min(first_cluster.size, second_cluster.size) > merge_check_minimum_cluster_size:
             check_arc_merge_count += 1
             first_cluster_array = first_cluster.get_masked_image(image)
             second_cluster_array = second_cluster.get_masked_image(image)
             # Check if merging will result in a sufficently worse spiral fit than
             # if the clusters were separate.
-            merge_error = calculate_arc_merge_error(
-                first_cluster_array, second_cluster_array
-            )
+            merge_error = calculate_arc_merge_error(first_cluster_array, second_cluster_array)
             # Error after merging is sufficiently bad to halt merging
             if merge_error > error_ratio_threshold:
                 merge_stop_count += 1
@@ -291,37 +332,27 @@ def generate_clusters(
         del clusters[second_idx]
 
         # Update the similarity matrix with the inclusion of the merged cluster
-        similarity_matrix = _update_similarity_matrix(
-            similarity_matrix, first_idx, second_idx
-        )
+        similarity_matrix = _update_similarity_matrix(similarity_matrix, first_idx, second_idx)
         # Remove the links associated with the deleted cluster
-        similarity_matrix = _clear_similarity_matrix_row_column(
-            similarity_matrix, second_idx
-        )
+        similarity_matrix = _clear_similarity_matrix_row_column(similarity_matrix, second_idx)
 
     # Remove clusters below minimum size
     clusters_list = list(clusters.values())
-    clusters_list = [
-        cluster for cluster in clusters_list if cluster.size >= minimum_cluster_size
-    ]
+    clusters_list = [cluster for cluster in clusters_list if cluster.size >= minimum_cluster_size]
 
     # Remove cluster that contains the centre
     if remove_central_cluster:
         log.info("[green]DIAGNOST[/green]: Removing central cluster...")
         central_points = get_origin_points_unnested(image)
         central_idx = np.ravel_multi_index(central_points, image.shape)
-        clusters_list = [
-            cluster for cluster in clusters_list if central_idx not in cluster
-        ]
+        clusters_list = [cluster for cluster in clusters_list if central_idx not in cluster]
 
     cluster_arrays = Cluster.list_to_array(image, clusters_list)
 
     # Show diagnostics of merging step
-    log.info(f"[green]DIAGNOST[/green]: Number of clusters = {len(clusters)}")
-    log.info(
-        f"[green]DIAGNOST[/green]: Checked {check_arc_merge_count} possible cluster merges"
-    )
-    log.info(f"[green]DIAGNOST[/green]: Stopped {merge_stop_count} cluster merges")
+    log.info("[green]DIAGNOST[/green]: Number of clusters = %d", len(clusters))
+    log.info("[green]DIAGNOST[/green]: Checked %d possible cluster merges", check_arc_merge_count)
+    log.info("[green]DIAGNOST[/green]: Stopped %d cluster merges", merge_stop_count)
     return cluster_arrays
 
 
@@ -330,9 +361,10 @@ def _update_similarity_matrix(
     target_idx: int,
     source_idx: int,
 ) -> sparse.csr_array:
-    """Returns the similarity matrix updated to have new similarity values after the merging
-    of two clusters. The target cluster's row and column is updated to have the maximum similarity value
-    between the two clusters. Note that this function does not remove the other cluster's similarity values.
+    """Return the similarity matrix updated to have new similarity values after the merging of two clusters.
+
+    The target cluster's row and column is updated to have the maximum similarity value between the two clusters.
+    Note that this function does not remove the other cluster's similarity values.
 
     Parameters
     ----------
@@ -349,13 +381,12 @@ def _update_similarity_matrix(
     -------
     updated_matrix : sparse.csr_array
         The matrix with its rows and columns updated with the new similarity values.
+
     """
     # Merged cluster similarity is the maximum possible similarity from the set of cluster points
     old_similarity_values = similarity_matrix[[target_idx], :]
     # The updated values max(Ti, Si)
-    new_similarity_values = similarity_matrix[[target_idx], :].maximum(
-        similarity_matrix[[source_idx], :]
-    )
+    new_similarity_values = similarity_matrix[[target_idx], :].maximum(similarity_matrix[[source_idx], :])
     # Remove self-similarity
     new_similarity_values[0, [target_idx]] = 0
 
@@ -391,9 +422,10 @@ def _update_similarity_matrix(
 
 
 def _clear_similarity_matrix_row_column(
-    similarity_matrix: SparseMatrixSupportsIndex, clear_idx: int
+    similarity_matrix: SparseMatrixSupportsIndex,
+    clear_idx: int,
 ) -> SparseMatrixSupportsIndex:
-    """Returns the similarity matrix with the row and column at the given index cleared to zero.
+    """Return the similarity matrix with the row and column at the given index cleared to zero.
 
     Parameters
     ----------
@@ -406,6 +438,7 @@ def _clear_similarity_matrix_row_column(
     -------
     updated_matrix : sparse.csr_array
         The matrix with one of its rows and columns cleared.
+
     """
     # Construct matrix such that when added the target row and column are cleared
     values = get_nonzero_values(similarity_matrix[[clear_idx], :])
@@ -427,6 +460,4 @@ def _clear_similarity_matrix_row_column(
     )
 
     # Add matrix
-    updated_matrix = similarity_matrix - clear_matrix
-
-    return updated_matrix
+    return similarity_matrix - clear_matrix

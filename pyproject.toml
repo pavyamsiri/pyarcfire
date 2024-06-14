@@ -47,3 +47,19 @@ reportMissingTypeArgument = true
 reportUnknownArgumentType = true
 reportUnknownParameterType = true
 reportUnknownVariableType = true
+
+[tool.ruff]
+line-length = 130
+
+[tool.ruff.lint]
+select = ["ALL"]
+ignore = [
+    "ANN101",
+    "D203",
+    "D213",
+    "PLR0913"
+    "PLR0915",
+    "PLR2004",
+    "S101",
+    "TD003",
+]

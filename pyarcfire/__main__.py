@@ -1,7 +1,9 @@
+"""Finds spiral arcs in images of galaxies or anything with a spiral structure."""
+
 import argparse
 import logging
-import os
 from collections.abc import Sequence
+from pathlib import Path
 from typing import Any, cast
 
 import matplotlib as mpl
@@ -32,6 +34,14 @@ IMAGE_SIZE: int = 256
 
 
 def main(raw_args: Sequence[str]) -> None:
+    """Run the CLI.
+
+    Parameters
+    ----------
+    raw_args : Sequence[str]
+        The command line arguments.
+
+    """
     args = _parse_args(raw_args)
 
     if not args.debug_flag:
@@ -43,14 +53,22 @@ def main(raw_args: Sequence[str]) -> None:
     elif command == "cluster":
         process_cluster(args)
     else:
-        log.critical(f"Command {command} is unrecognised or not yet supported!")
+        log.critical("Command %s is unrecognised or not yet supported!", command)
 
 
 def process_from_image(args: argparse.Namespace) -> None:
+    """Preprocess an image and run it through the SpArcFiRe algorithm.
+
+    Parameters
+    ----------
+    args : argparse.Namespace
+        The parsed command line arguments.
+
+    """
     input_path: str = args.input_path
-    ext = os.path.splitext(input_path)[1].lstrip(".")
     image: NDArray[np.float32]
-    if ext == "npy":
+    extension = Path(input_path).suffix.lstrip(".")
+    if extension == "npy":
         image = np.load(input_path, allow_pickle=True).astype(np.float32)
         image[np.isclose(image, 0)] = 0
         min_value = image.min()
@@ -102,7 +120,7 @@ def process_from_image(args: argparse.Namespace) -> None:
     contrast_axis = fig.add_subplot(232)
     contrast_axis.imshow(contrast_image, cmap="gray")
     contrast_axis.set_title(
-        rf"Unsharp image $\mathrm{{Radius}} = {unsharp_settings.radius}, \; \mathrm{{Amount}} = {unsharp_settings.amount}$"
+        rf"Unsharp image $\mathrm{{Radius}} = {unsharp_settings.radius}, \; \mathrm{{Amount}} = {unsharp_settings.amount}$",
     )
     contrast_axis.set_axis_off()
 
@@ -128,9 +146,7 @@ def process_from_image(args: argparse.Namespace) -> None:
     image_overlay_axis.set_axis_off()
 
     colored_image_overlay_axis = fig.add_subplot(236)
-    colored_image_overlay_axis.set_title(
-        "Original image colored with masks and overlaid with spirals"
-    )
+    colored_image_overlay_axis.set_title("Original image colored with masks and overlaid with spirals")
     colored_image_overlay_axis.set_xlim(-width, width)
     colored_image_overlay_axis.set_ylim(-width, width)
     colored_image_overlay_axis.set_axis_off()
@@ -150,7 +166,7 @@ def process_from_image(args: argparse.Namespace) -> None:
         colored_image[mask, :] *= color_map((cluster_idx + 0.5) / num_clusters)
         cluster_axis.imshow(cluster_mask, extent=(-width, width, -width, width))
         spiral_fit = fit_spiral_to_image(current_array)
-        x, y = spiral_fit.calculate_cartesian_coordinates(100)
+        x, y = spiral_fit.calculate_cartesian_coordinates(100, pixel_to_distance=1)
         cluster_axis.plot(
             x,
             y,
@@ -169,24 +185,28 @@ def process_from_image(args: argparse.Namespace) -> None:
             color=color_map((num_clusters - cluster_idx + 0.5) / num_clusters),
             label=f"Cluster {cluster_idx}",
         )
-    colored_image_overlay_axis.imshow(
-        colored_image, extent=(-width, width, -width, width)
-    )
+    colored_image_overlay_axis.imshow(colored_image, extent=(-width, width, -width, width))
 
     fig.tight_layout()
     if show_flag:
         plt.show()
     else:
         fig.savefig(args.output_path)
-        log.info(
-            f"[yellow]FILESYST[/yellow]: Saved plot to [yellow]{args.output_path}[/yellow]"
-        )
+        log.info("[yellow]FILESYST[/yellow]: Saved plot to [yellow]%s[/yellow]", args.output_path)
     plt.close()
 
 
 def process_cluster(args: argparse.Namespace) -> None:
+    """Load a cluster array and run it through the SpArcFiRe algorithm.
+
+    Parameters
+    ----------
+    args : argparse.Namespace
+        The parsed command line arguments.
+
+    """
     input_path: str = args.input_path
-    extension = os.path.splitext(input_path)[1].lstrip(".")
+    extension = Path(input_path).suffix.lstrip(".")
     if extension == "npy":
         log.info("Loading npy...")
         arr = np.load(input_path)
@@ -198,19 +218,17 @@ def process_cluster(args: argparse.Namespace) -> None:
             arr = arr.reshape((arr.shape[0], arr.shape[1], 1))
         assert len(arr.shape) == 3
     else:
-        log.critical(
-            f"The {extension} data format is not valid or is not yet supported!"
-        )
+        log.critical("The %s data format is not valid or is not yet supported!", extension)
         return
     num_clusters = arr.shape[2]
-    log.debug(f"Loaded {num_clusters} clusters")
+    log.debug("Loaded %d clusters", num_clusters)
 
     fit_spiral_to_image(arr.sum(axis=2))
 
     width = arr.shape[0] / 2 - 0.5
 
     for cluster_idx in range(num_clusters):
-        log.debug(f"Cluster {cluster_idx} sums to = {arr[:, :, cluster_idx].sum()}")
+        log.debug("Cluster %d sums to = %f", cluster_idx, arr[:, :, cluster_idx].sum())
 
     if not args.plot_flag:
         return
@@ -225,7 +243,7 @@ def process_cluster(args: argparse.Namespace) -> None:
         cluster_mask[mask, :] = color_map((cluster_idx + 0.5) / num_clusters)
         axis.imshow(cluster_mask, extent=(-width, width, -width, width))
         spiral_fit = fit_spiral_to_image(current_array)
-        x, y = spiral_fit.calculate_cartesian_coordinates(100)
+        x, y = spiral_fit.calculate_cartesian_coordinates(100, pixel_to_distance=1)
         axis.plot(
             x,
             y,
@@ -256,9 +274,7 @@ def _parse_args(args: Sequence[str]) -> argparse.Namespace:
     )
 
     subparsers = parser.add_subparsers(dest="command")
-    from_image_parser = subparsers.add_parser(
-        "image", help="Process an image.", parents=(base_subparser,)
-    )
+    from_image_parser = subparsers.add_parser("image", help="Process an image.", parents=(base_subparser,))
     _configure_image_command_parser(from_image_parser)
     from_cluster_parser = subparsers.add_parser(
         "cluster",

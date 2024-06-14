@@ -1,4 +1,4 @@
-"""This module contains utilities regarding matrices."""
+"""Utilities regarding matrices."""
 
 from typing import TypeVar
 
@@ -38,7 +38,7 @@ SparseMatrixSupportsIndex = TypeVar(
 
 
 def is_sparse_matrix_hollow(matrix: SparseMatrix) -> bool:
-    """Utility used to assert that a sparse matrix is hollow i.e. no non-zero values in diagonal.
+    """Check that the sparse matrix is hollow i.e. diagonal is all zero.
 
     Parameters
     ----------
@@ -49,13 +49,13 @@ def is_sparse_matrix_hollow(matrix: SparseMatrix) -> bool:
     -------
     is_hollow : bool
         Returns true if the matrix is hollow otherwise false.
+
     """
-    is_hollow = np.allclose(matrix.diagonal(), 0)
-    return is_hollow
+    return np.allclose(matrix.diagonal(), 0)
 
 
 def is_sparse_matrix_symmetric(matrix: SparseMatrix) -> bool:
-    """Utility used to assert that a sparse matrix is symmetric i.e. it is equal to its transpose.
+    """Check that the sparse matrix is symmetric i.e. it is equal to its transpose.
 
     Parameters
     ----------
@@ -66,13 +66,13 @@ def is_sparse_matrix_symmetric(matrix: SparseMatrix) -> bool:
     -------
     is_symmetric : bool
         Returns true if the matrix is symmetric otherwise false.
+
     """
-    is_symmetric = (matrix - matrix.transpose()).count_nonzero() == 0
-    return is_symmetric
+    return (matrix - matrix.transpose()).count_nonzero() == 0
 
 
 def get_nonzero_values(matrix: SparseMatrixSupportsIndex) -> NDArray[np.float32]:
-    """Returns all non-zero values as a flat array.
+    """Return all non-zero values as a flat array.
 
     Parameters
     ----------
@@ -83,5 +83,6 @@ def get_nonzero_values(matrix: SparseMatrixSupportsIndex) -> NDArray[np.float32]
     -------
     NDArray[np.float32]
         The non-zero values.
+
     """
     return np.asarray(matrix[matrix.nonzero()], dtype=np.float32).flatten()
