@@ -29,7 +29,7 @@ def valid_polar_images(
     expected = np.logical_and(
         expected,
         np.logical_and(
-            np.roll(expected, shrink_amount), np.roll(expected, -shrink_amount)
+            np.roll(expected, shrink_amount), np.roll(expected, -shrink_amount),
         ),
     )
 
