@@ -54,6 +54,7 @@ class GenerateOrientationFieldSettings:
     num_orientation_field_levels: int = 3
 
     def __post_init__(self) -> None:
+        """Verify field values."""
         if self.neighbour_distance < 0:
             msg = "The neighbour distance must be nonnegative."
             raise ValueError(msg)
