@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from collections.abc import MutableSequence
 import logging
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, TypeVar
@@ -16,6 +15,8 @@ from .merge import calculate_arc_merge_error
 log: logging.Logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
+    from collections.abc import MutableSequence
+
     from numpy.typing import NDArray
 
     FloatType = TypeVar("FloatType", np.float32, np.float64)
@@ -35,14 +36,13 @@ class MergeClustersByFitSettings:
     stop_threshold: float = 2.5
 
 
-DEFAULT_MERGE_CLUSTER_BY_FIT_SETTINGS: MergeClustersByFitSettings = (
-    MergeClustersByFitSettings()
-)
+DEFAULT_MERGE_CLUSTER_BY_FIT_SETTINGS: MergeClustersByFitSettings = MergeClustersByFitSettings()
 
 
 @benchmark
 def merge_clusters_by_fit(
-    clusters: NDArray[FloatType], stop_threshold: float
+    clusters: NDArray[FloatType],
+    stop_threshold: float,
 ) -> NDArray[FloatType]:
     """Merge clusters by if they are fit spirals decently well when combined.
 
@@ -60,15 +60,11 @@ def merge_clusters_by_fit(
 
     """
     # Maximum pixel distance
-    max_pixel_distance = (
-        np.mean([clusters.shape[0], clusters.shape[1]]).astype(float) / 20
-    )
+    max_pixel_distance = np.mean([clusters.shape[0], clusters.shape[1]]).astype(float) / 20
 
     # Fit spirals to each cluster
     num_clusters: int = clusters.shape[2]
-    cluster_list: MutableSequence[NDArray[FloatType] | None] = [
-        None for _ in range(num_clusters)
-    ]
+    cluster_list: MutableSequence[NDArray[FloatType] | None] = [None for _ in range(num_clusters)]
     for cluster_idx in range(num_clusters):
         cluster_list[cluster_idx] = clusters[:, :, cluster_idx]
 
@@ -79,11 +75,11 @@ def merge_clusters_by_fit(
             left_array = cluster_list[source_idx]
             right_array = cluster_list[target_idx]
             assert left_array is not None, "Should not be None because it was just set."
-            assert (
-                right_array is not None
-            ), "Should not be None because it was just set."
+            assert right_array is not None, "Should not be None because it was just set."
             cluster_distances[source_idx, target_idx] = _calculate_cluster_distance(
-                left_array, right_array, max_pixel_distance
+                left_array,
+                right_array,
+                max_pixel_distance,
             )
 
     num_merges: int = 0
@@ -104,12 +100,8 @@ def merge_clusters_by_fit(
 
         first_cluster_array = cluster_list[first_idx]
         second_cluster_array = cluster_list[second_idx]
-        assert (
-            first_cluster_array is not None
-        ), "Deleted clusters should not have a finite similarity!"
-        assert (
-            second_cluster_array is not None
-        ), "Deleted clusters should not have a finite similarity!"
+        assert first_cluster_array is not None, "Deleted clusters should not have a finite similarity!"
+        assert second_cluster_array is not None, "Deleted clusters should not have a finite similarity!"
         combined_cluster_array = first_cluster_array + second_cluster_array
         cluster_list[second_idx] = None
         cluster_distances[:, second_idx] = np.inf
@@ -117,7 +109,7 @@ def merge_clusters_by_fit(
 
         # Update cluster dictionary
         cluster_list[first_idx] = combined_cluster_array.astype(
-            first_cluster_array.dtype
+            first_cluster_array.dtype,
         )
 
         # Update distances
@@ -128,14 +120,12 @@ def merge_clusters_by_fit(
             right_idx = max(first_idx, other_idx)
             left_array = cluster_list[left_idx]
             right_array = cluster_list[right_idx]
-            assert (
-                left_array is not None
-            ), "Accessing a deleted cluster should be impossible"
-            assert (
-                right_array is not None
-            ), "Accessing a deleted cluster should be impossible"
+            assert left_array is not None, "Accessing a deleted cluster should be impossible"
+            assert right_array is not None, "Accessing a deleted cluster should be impossible"
             cluster_distances[left_idx, right_idx] = _calculate_cluster_distance(
-                left_array, right_array, max_pixel_distance
+                left_array,
+                right_array,
+                max_pixel_distance,
             )
     log.info("[green]DIAGNOST[/green]: Merged %d clusters by fit", num_merges)
     # Combined clusters into arrays

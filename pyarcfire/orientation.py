@@ -17,6 +17,12 @@ import numpy as np
 from scipy import signal
 from skimage import transform
 
+from pyarcfire.assert_utils import (
+    verify_data_can_be_shrunk_orientation,
+    verify_data_is_2d,
+    verify_data_is_normalized,
+)
+
 from .debug_utils import benchmark
 
 if TYPE_CHECKING:
@@ -47,10 +53,20 @@ class GenerateOrientationFieldSettings:
     kernel_radius: int = 5
     num_orientation_field_levels: int = 3
 
+    def __post_init__(self) -> None:
+        """Verify field values."""
+        if self.neighbour_distance < 0:
+            msg = "The neighbour distance must be nonnegative."
+            raise ValueError(msg)
+        if self.kernel_radius < 1:
+            msg = "The kernel radius must be at least 1."
+            raise ValueError(msg)
+        if self.num_orientation_field_levels < 1:
+            msg = "The number of orientation field levels must be at least 1."
+            raise ValueError(msg)
 
-DEFAULT_ORIENTATION_FIELD_SETTINGS: GenerateOrientationFieldSettings = (
-    GenerateOrientationFieldSettings()
-)
+
+DEFAULT_ORIENTATION_FIELD_SETTINGS: GenerateOrientationFieldSettings = GenerateOrientationFieldSettings()
 
 
 class OrientationField:
@@ -81,7 +97,8 @@ class OrientationField:
 
     @staticmethod
     def from_cartesian(
-        x: NDArray[FloatType], y: NDArray[FloatType]
+        x: NDArray[FloatType],
+        y: NDArray[FloatType],
     ) -> OrientationField:
         """Create an orientation field given the x and y components of the orientation field.
 
@@ -99,7 +116,8 @@ class OrientationField:
 
         """
         field: NDArray[FloatType] = np.zeros(
-            (x.shape[0], x.shape[1], 2), dtype=FloatType
+            (x.shape[0], x.shape[1], 2),
+            dtype=FloatType,
         )
         field[:, :, 0] = x
         field[:, :, 1] = y
@@ -107,7 +125,8 @@ class OrientationField:
 
     @staticmethod
     def from_polar(
-        strengths: NDArray[FloatType], directions: NDArray[FloatType]
+        strengths: NDArray[FloatType],
+        directions: NDArray[FloatType],
     ) -> OrientationField:
         """Create an orientation field given orientation strengths and directions.
 
@@ -211,12 +230,13 @@ class OrientationField:
 
         """
         return OrientationField(
-            transform.resize(self.field, (new_height, new_width)).astype(self.dtype)
+            transform.resize(self.field, (new_height, new_width)).astype(self.dtype),
         )
 
     @staticmethod
     def merge(
-        coarser_field: OrientationField, finer_field: OrientationField
+        coarser_field: OrientationField,
+        finer_field: OrientationField,
     ) -> OrientationField:
         """Merge two orientation fields together. The first field must be of a lower resolution than the second field.
 
@@ -236,8 +256,7 @@ class OrientationField:
 
         """
         is_finer_higher_resolution: bool = (
-            coarser_field.num_rows < finer_field.num_rows
-            and coarser_field.num_columns < finer_field.num_columns
+            coarser_field.num_rows < finer_field.num_rows and coarser_field.num_columns < finer_field.num_columns
         )
         if not is_finer_higher_resolution:
             msg = "The finer field must be a higher resolution than the coarser field."
@@ -245,7 +264,8 @@ class OrientationField:
 
         # Upscale coarse field to have same resolution as finer field
         resized_coarse_field = coarser_field.resize(
-            finer_field.num_columns, finer_field.num_rows
+            finer_field.num_columns,
+            finer_field.num_rows,
         )
 
         resized_coarse_strengths = resized_coarse_field.get_strengths()
@@ -258,11 +278,12 @@ class OrientationField:
 
         # Vf' -> Vc + Sf / (Sf + Sc) * (Vf - Vc)
         return resized_coarse_field.add(
-            finer_field.subtract(resized_coarse_field).scalar_field_multiply(gains)
+            finer_field.subtract(resized_coarse_field).scalar_field_multiply(gains),
         )
 
     def scalar_field_multiply(
-        self, scalar_field: NDArray[FloatType]
+        self,
+        scalar_field: NDArray[FloatType],
     ) -> OrientationField:
         """Return the orientation field mulitplied by a scalar field.
 
@@ -280,10 +301,7 @@ class OrientationField:
         if len(scalar_field.shape) != 2:
             msg = "The scalar field must be a 2D array."
             raise ValueError(msg)
-        if (
-            scalar_field.shape[0] != self.num_rows
-            or scalar_field.shape[1] != self.num_columns
-        ):
+        if scalar_field.shape[0] != self.num_rows or scalar_field.shape[1] != self.num_columns:
             msg = "The scalar field must have the same dimensions as the OrientationField."
             raise ValueError(msg)
 
@@ -308,7 +326,8 @@ class OrientationField:
 
         """
         vector_sum, vector_difference, sum_greater = OrientationField._prepare_sum(
-            self, other
+            self,
+            other,
         )
         result = np.zeros_like(vector_sum)
         result[sum_greater] = vector_sum[sum_greater]
@@ -330,7 +349,8 @@ class OrientationField:
 
         """
         vector_sum, vector_difference, sum_greater = OrientationField._prepare_sum(
-            self, other
+            self,
+            other,
         )
         result = np.zeros_like(vector_sum)
         result[~sum_greater] = vector_sum[~sum_greater]
@@ -373,7 +393,7 @@ class OrientationField:
         # Vector difference
         vector_difference = left.field - b
         vector_difference_lengths = np.sqrt(
-            np.sum(np.square(vector_difference), axis=2)
+            np.sum(np.square(vector_difference), axis=2),
         )
 
         sum_greater = vector_sum_lengths > vector_difference_lengths
@@ -413,8 +433,7 @@ class OrientationField:
         for neighbour_idx, neighbour in enumerate(neighbour_arrays):
             product_norm = vector_norm * np.linalg.norm(neighbour, axis=2)
             current_strength = np.maximum(
-                (neighbour * self.field).sum(axis=2)
-                - OrientationField.DENOISE_SUBTRACT_AMOUNT,
+                (neighbour * self.field).sum(axis=2) - OrientationField.DENOISE_SUBTRACT_AMOUNT,
                 0,
             )
             current_strength[product_norm != 0] /= product_norm[product_norm != 0]
@@ -424,14 +443,10 @@ class OrientationField:
         median_strength = np.nanmedian(neighbour_strengths, axis=2)
         combined_mask = vector_norm != 0
         denoised[:, :, 0][combined_mask] = (
-            self.field[:, :, 0][combined_mask]
-            / vector_norm[combined_mask]
-            * median_strength[combined_mask]
+            self.field[:, :, 0][combined_mask] / vector_norm[combined_mask] * median_strength[combined_mask]
         )
         denoised[:, :, 1][combined_mask] = (
-            self.field[:, :, 1][combined_mask]
-            / vector_norm[combined_mask]
-            * median_strength[combined_mask]
+            self.field[:, :, 1][combined_mask] / vector_norm[combined_mask] * median_strength[combined_mask]
         )
 
         return OrientationField(denoised)
@@ -440,9 +455,7 @@ class OrientationField:
 @benchmark
 def generate_orientation_fields(
     image: NDArray[FloatType],
-    num_orientation_field_levels: int,
-    neighbour_distance: int,
-    kernel_radius: int,
+    settings: GenerateOrientationFieldSettings,
 ) -> OrientationField:
     """Generate an orientation field for the given image.
 
@@ -452,13 +465,8 @@ def generate_orientation_fields(
     ----------
     image : NDArray[FloatType]
         The image to generate an orientation field of.
-    num_orientation_field_levels : int, optional
-        The number of orientation fields to create and merge.
-        The resolution shrinks by half for each additional level. Default is 3.
-    neighbour_distance : int, optional
-        The distance in pixels between a pixel and its cardinal neighbours. Default is 5.
-    kernel_radius : int, optional
-        The radius of the orientation filter kernel in pixels. Default is 5.
+    settings : GenerateOrientationFieldSettings
+        The parameters of the generation.
 
     Returns
     -------
@@ -468,42 +476,30 @@ def generate_orientation_fields(
     """
     image = image.astype(np.float32)
 
-    # NOTE: Does it have to be square as well?
-    # The image must be 2D
-    if len(image.shape) != 2:
-        msg = "The image must be a 2D array!"
-        raise ValueError(msg)
-
-    # The dimensions of the image must be divisible by the largest shrink factor
-    maximum_shrink_factor: int = 2**num_orientation_field_levels
-    if (
-        image.shape[0] % maximum_shrink_factor != 0
-        or image.shape[1] % maximum_shrink_factor != 0
-    ):
-        msg = "Image dimensions must be divisible by 2^{num_orientation_field_levels} = {maximum_shrink_factor}"
-        raise ValueError(msg)
-
-    if num_orientation_field_levels < 1:
-        msg = "The number of orientation field levels must be at least 1."
-        raise ValueError(msg)
-    if neighbour_distance < 0:
-        msg = "The neighbour distance must be nonnegative."
-        raise ValueError(msg)
+    verify_data_is_2d(image)
+    verify_data_is_normalized(image)
+    verify_data_can_be_shrunk_orientation(
+        image,
+        num_orientation_field_levels=settings.num_orientation_field_levels,
+    )
 
     # Neighbour distance must be smaller than both dimensions
-    if neighbour_distance >= image.shape[0] or neighbour_distance >= image.shape[1]:
+    if settings.neighbour_distance >= image.shape[0] or settings.neighbour_distance >= image.shape[1]:
         msg = "The neighbour distance must be strictly less than both of the image dimensions."
         raise ValueError(msg)
 
     # Generate all the different orientation field levels
     orientation_field_levels: list[OrientationField] = []
-    for idx in range(num_orientation_field_levels):
+    for idx in range(settings.num_orientation_field_levels):
         # Resize
-        scale_factor: float = 1 / 2 ** (num_orientation_field_levels - idx - 1)
+        scale_factor: float = 1 / 2 ** (settings.num_orientation_field_levels - idx - 1)
         resized_image = transform.rescale(image, scale_factor).astype(FloatType)
 
         # Generate
-        current_level = _generate_raw_orientation_field(resized_image, kernel_radius)
+        current_level = _generate_raw_orientation_field(
+            resized_image,
+            settings.kernel_radius,
+        )
         orientation_field_levels.append(current_level)
 
     # Merge orientation fields
@@ -513,7 +509,9 @@ def generate_orientation_fields(
     )
 
     # Denoise
-    denoised_field = merged_field.denoise(neighbour_distance=neighbour_distance)
+    denoised_field = merged_field.denoise(
+        neighbour_distance=settings.neighbour_distance,
+    )
     num_nonzero_elements = np.count_nonzero(denoised_field.get_strengths())
 
     log.info(
@@ -525,7 +523,8 @@ def generate_orientation_fields(
 
 
 def _generate_raw_orientation_field(
-    image: NDArray[FloatType], kernel_radius: int
+    image: NDArray[FloatType],
+    kernel_radius: int,
 ) -> OrientationField:
     """Generate an orientation field for the given image with no merging or denoising steps.
 
@@ -564,7 +563,8 @@ def _generate_raw_orientation_field(
 
 
 def _generate_orientation_filtered_images(
-    image: NDArray[FloatType], kernel_radius: int
+    image: NDArray[FloatType],
+    kernel_radius: int,
 ) -> NDArray[FloatType]:
     """Convolve the given image with 9 orientation filters and return all results.
 
@@ -586,13 +586,16 @@ def _generate_orientation_filtered_images(
         angle = (idx * np.pi) / 9
         orientation_filter = _generate_orientation_filter_kernel(angle, kernel_radius)
         filtered_images[:, :, idx] = signal.convolve2d(
-            image, orientation_filter, mode="same"
+            image,
+            orientation_filter,
+            mode="same",
         )
     return filtered_images
 
 
 def _generate_orientation_filter_kernel(
-    theta: float, radius: int
+    theta: float,
+    radius: int,
 ) -> NDArray[FloatType]:
     """Generate orientation filter kernel.
 

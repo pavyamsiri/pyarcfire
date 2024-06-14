@@ -77,7 +77,7 @@ def process_from_image(args: argparse.Namespace) -> None:
         if not_normed:
             can_use_log = min_value > 0 and max_value > 0
             if can_use_log:
-                # TODO: Maybe detect if there is a sufficient difference in powers?
+                # TODO(pavyamsiri): Maybe detect if there is a sufficient difference in powers?
                 image = mplcolors.LogNorm(clip=True)(image)
             else:
                 log.info("Normalize using Normalize")
@@ -129,8 +129,9 @@ def process_from_image(args: argparse.Namespace) -> None:
     )
     contrast_axis.set_axis_off()
 
-    space_range = np.arange(field.shape[0])
-    x, y = np.meshgrid(space_range, -space_range)
+    x_space_range = np.arange(field.shape[0])
+    y_space_range = np.arange(field.shape[1])
+    x, y = np.meshgrid(x_space_range, -y_space_range)
     orientation_axis = fig.add_subplot(233)
     orientation_axis.quiver(x, y, field.x, field.y, color="tab:blue", headaxislength=0)
     orientation_axis.set_aspect("equal")
@@ -152,7 +153,7 @@ def process_from_image(args: argparse.Namespace) -> None:
 
     colored_image_overlay_axis = fig.add_subplot(236)
     colored_image_overlay_axis.set_title(
-        "Original image colored with masks and overlaid with spirals"
+        "Original image colored with masks and overlaid with spirals",
     )
     colored_image_overlay_axis.set_xlim(-width, width)
     colored_image_overlay_axis.set_ylim(-width, width)
@@ -193,7 +194,8 @@ def process_from_image(args: argparse.Namespace) -> None:
             label=f"Cluster {cluster_idx}",
         )
     colored_image_overlay_axis.imshow(
-        colored_image, extent=(-width, width, -width, width)
+        colored_image,
+        extent=(-width, width, -width, width),
     )
 
     fig.tight_layout()
@@ -231,7 +233,8 @@ def process_cluster(args: argparse.Namespace) -> None:
         assert len(arr.shape) == 3
     else:
         log.critical(
-            "The %s data format is not valid or is not yet supported!", extension
+            "The %s data format is not valid or is not yet supported!",
+            extension,
         )
         return
     num_clusters = arr.shape[2]
@@ -289,7 +292,9 @@ def _parse_args(args: Sequence[str]) -> argparse.Namespace:
 
     subparsers = parser.add_subparsers(dest="command")
     from_image_parser = subparsers.add_parser(
-        "image", help="Process an image.", parents=(base_subparser,)
+        "image",
+        help="Process an image.",
+        parents=(base_subparser,),
     )
     _configure_image_command_parser(from_image_parser)
     from_cluster_parser = subparsers.add_parser(
