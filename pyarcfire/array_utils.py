@@ -1,12 +1,34 @@
-from numpy.typing import NDArray
-from typing import TypeVar
+"""Utilities related to dealing with NDArrays."""
+
 from collections.abc import Sequence
+from typing import TypeVar
+
 import numpy as np
+from numpy.typing import NDArray
 
 ScalarType_co = TypeVar("ScalarType_co", bound=np.generic, covariant=True)
 
 
 def get_origin_points(image: NDArray[ScalarType_co]) -> Sequence[tuple[int, int]]:
+    """Return points that are either the centre of the image or touching the centre.
+
+    Parameters
+    ----------
+    image : NDArray[ScalarType_co]
+        The image.
+
+    Returns
+    -------
+    Sequence[tuple[int, int]]
+        A sequence of points written in index form that are in the centre.
+
+    Notes
+    -----
+    Dimensions with an odd size have a clear central cell so we can return a single index,
+    however even dimensions have their centre between two cells. In this case we return
+    the indices of the two adjacent cells.
+
+    """
     # Assume that dimensions are even
     is_height_even = image.shape[0] % 2 == 0
     is_width_even = image.shape[1] % 2 == 0
@@ -52,6 +74,30 @@ def get_origin_points(image: NDArray[ScalarType_co]) -> Sequence[tuple[int, int]
 def get_origin_points_unnested(
     image: NDArray[ScalarType_co],
 ) -> tuple[Sequence[int], Sequence[int]]:
+    """Return points that are either the centre of the image or touching the centre.
+
+    This is the same get_origin_points but returns the points as two separate sequences
+    of indices instead of a single sequence of tuples of indices.
+
+    Parameters
+    ----------
+    image : NDArray[ScalarType_co]
+        The image.
+
+    Returns
+    -------
+    row_indices : Sequence[int]
+        The row indices of the central points.
+    column_indices : Sequence[int]
+        The column indices of the central points.
+
+    Notes
+    -----
+    Dimensions with an odd size have a clear central cell so we can return a single index,
+    however even dimensions have their centre between two cells. In this case we return
+    the indices of the two adjacent cells.
+
+    """
     points = get_origin_points(image)
     row_indices = [row_idx for row_idx, _ in points]
     column_indices = [column_idx for _, column_idx in points]
