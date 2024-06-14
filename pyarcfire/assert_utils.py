@@ -43,7 +43,7 @@ def verify_data_is_2d(data: NDArray[Any]) -> None:
 
 
 def verify_data_can_be_shrunk_orientation(
-    data: NDArray[Any], *, num_orientation_field_levels: int
+    data: NDArray[Any], *, num_orientation_field_levels: int,
 ) -> None:
     """Verify that the given data is 2D.
 

@@ -158,11 +158,11 @@ def fit_spiral_to_image(
     need_multiple_revolutions: bool = inner_region is not None
     if inner_region is not None:
         fit_result = _fit_spiral_to_image_multiple_revolution_core(
-            radii, theta, weights, initial_pitch_angle, inner_region
+            radii, theta, weights, initial_pitch_angle, inner_region,
         )
     else:
         fit_result = _fit_spiral_to_image_single_revolution_core(
-            radii, theta, weights, initial_pitch_angle
+            radii, theta, weights, initial_pitch_angle,
         )
 
     arc_bounds = fit_result.arc_bounds
@@ -174,7 +174,7 @@ def fit_spiral_to_image(
 
     # Adjust so that arc bounds is relative to theta
     (theta, arc_bounds, offset) = adjust_theta_to_zero(
-        theta, arc_bounds, offset, use_modulo=not need_multiple_revolutions
+        theta, arc_bounds, offset, use_modulo=not need_multiple_revolutions,
     )
 
     pitch_angle = pitch_angle if not bad_bounds else 0
@@ -201,7 +201,7 @@ def fit_spiral_to_image(
     # Ensure consistency
     square_err_difference_per_pixel = abs(new_error - error) / len(theta)
     inconsistent_fit_after_adjustment = not np.isclose(
-        square_err_difference_per_pixel, 0
+        square_err_difference_per_pixel, 0,
     )
     if inconsistent_fit_after_adjustment:
         log.debug(
@@ -249,7 +249,7 @@ def _fit_spiral_to_image_single_revolution_core(
 
     # Calculate the error from the fit
     initial_radius = calculate_best_initial_radius(
-        radii, rotated_theta, weights, offset, pitch_angle, use_modulo=True
+        radii, rotated_theta, weights, offset, pitch_angle, use_modulo=True,
     )
     error, _ = calculate_log_spiral_error(
         radii,
@@ -358,7 +358,7 @@ def __fit_multiple_revolution_spiral(
     clockwise: bool,
 ) -> tuple[NDArray[FloatType], float, float, float]:
     bad_bounds, (lower_bound, upper_bound), rotation_amount, _ = calculate_bounds(
-        theta[region]
+        theta[region],
     )
     assert not bad_bounds
     rotated_theta = np.subtract(theta, rotation_amount)
@@ -384,7 +384,7 @@ def __fit_multiple_revolution_spiral(
 
     # Calculate the error from the fit
     initial_radius = calculate_best_initial_radius(
-        radii, rotated_theta, weights, offset, pitch_angle, use_modulo=False
+        radii, rotated_theta, weights, offset, pitch_angle, use_modulo=False,
     )
     error, _ = calculate_log_spiral_error(
         radii,
@@ -419,7 +419,7 @@ def __cluster_has_no_endpoints_or_contains_origin(
     structure_element_size = 2 * max_half_gap_fill_for_undefined_bounds + 1
     structure_element = np.ones((structure_element_size, structure_element_size))
     is_hole_or_cluster = ndimage.binary_fill_holes(
-        ndimage.binary_closing(in_cluster, structure=structure_element)
+        ndimage.binary_closing(in_cluster, structure=structure_element),
     )
     assert is_hole_or_cluster is not None
     # NOTE: Check if is_hole_or_cluster is not already a binary array
@@ -459,7 +459,7 @@ def identify_inner_and_outer_spiral(
     min_acceptable_length = 5 * np.ceil(num_theta / 360)
     # Find theta bins which contain only a single revolution
     can_be_single_revolution = _find_single_revolution_regions(
-        image, num_radii, num_theta, min_acceptable_length, shrink_amount
+        image, num_radii, num_theta, min_acceptable_length, shrink_amount,
     )
 
     # Find the start and end of each region
@@ -483,22 +483,22 @@ def identify_inner_and_outer_spiral(
             return None
 
     start_indices, end_indices, wrap_data = __calculate_wrap(
-        can_be_single_revolution, start_indices, end_indices
+        can_be_single_revolution, start_indices, end_indices,
     )
     theta_bin_values: NDArray[FloatType] = np.linspace(
-        2 * np.pi, 0, num_theta, endpoint=False
+        2 * np.pi, 0, num_theta, endpoint=False,
     ).astype(image.dtype)[::-1]
     row_indices, column_indices = image.nonzero()
     cluster_mask = np.zeros_like(image, dtype=np.bool_)
     cluster_mask[row_indices, column_indices] = True
     image_index_to_point_index = np.full(
-        (image.shape[0], image.shape[1]), -1, dtype=np.int32
+        (image.shape[0], image.shape[1]), -1, dtype=np.int32,
     )
     image_index_to_point_index[image > 0] = np.arange(len(row_indices))
     radii, theta, _ = get_polar_coordinates(image)
 
     first_region, second_region, max_length = __split_regions(
-        start_indices, end_indices, theta, theta_bin_values, wrap_data
+        start_indices, end_indices, theta, theta_bin_values, wrap_data,
     )
 
     # Suboptimal: Longest single revolution region length is below the minimum length
@@ -512,20 +512,20 @@ def identify_inner_and_outer_spiral(
     non_region_mask = np.zeros_like(image, dtype=np.int32)
     non_region_mask[
         np.logical_and(
-            cluster_mask, np.logical_and(~first_region_mask, ~second_region_mask)
+            cluster_mask, np.logical_and(~first_region_mask, ~second_region_mask),
         )
     ] = 1
 
     first_region_distance = ndimage.distance_transform_edt(
-        ~first_region_mask, return_distances=True
+        ~first_region_mask, return_distances=True,
     )
     assert isinstance(first_region_distance, np.ndarray)
     second_region_distance = ndimage.distance_transform_edt(
-        ~second_region_mask, return_distances=True
+        ~second_region_mask, return_distances=True,
     )
     assert isinstance(second_region_distance, np.ndarray)
     connected_components, num_components = skimage.measure.label(
-        non_region_mask, return_num=True
+        non_region_mask, return_num=True,
     )
     assert isinstance(connected_components, np.ndarray)
     for label in range(1, num_components + 1):
@@ -533,13 +533,13 @@ def identify_inner_and_outer_spiral(
             connected_components == label
         ).nonzero()
         point_indices = image_index_to_point_index[
-            current_row_indices, current_column_indices
+            current_row_indices, current_column_indices,
         ]
         first_distance = first_region_distance[
-            current_row_indices, current_column_indices
+            current_row_indices, current_column_indices,
         ].min()
         second_distance = second_region_distance[
-            current_row_indices, current_column_indices
+            current_row_indices, current_column_indices,
         ].min()
         if first_distance < max_diagonal_distance:
             first_region[point_indices] = True
@@ -554,7 +554,7 @@ def identify_inner_and_outer_spiral(
     non_region_mask = np.zeros_like(image, dtype=np.int32)
     non_region_mask[
         np.logical_and(
-            cluster_mask, np.logical_and(~first_region_mask, ~second_region_mask)
+            cluster_mask, np.logical_and(~first_region_mask, ~second_region_mask),
         )
     ] = 1
 
@@ -564,15 +564,15 @@ def identify_inner_and_outer_spiral(
     # two regions
 
     first_region_distance = ndimage.distance_transform_edt(
-        ~first_region_mask, return_distances=True
+        ~first_region_mask, return_distances=True,
     )
     assert isinstance(first_region_distance, np.ndarray)
     second_region_distance = ndimage.distance_transform_edt(
-        ~second_region_mask, return_distances=True
+        ~second_region_mask, return_distances=True,
     )
     assert isinstance(second_region_distance, np.ndarray)
     connected_components, num_components = skimage.measure.label(
-        non_region_mask, return_num=True
+        non_region_mask, return_num=True,
     )
     assert isinstance(connected_components, np.ndarray)
     for label in range(1, num_components + 1):
@@ -580,37 +580,37 @@ def identify_inner_and_outer_spiral(
             connected_components == label
         ).nonzero()
         point_indices = image_index_to_point_index[
-            current_row_indices, current_column_indices
+            current_row_indices, current_column_indices,
         ]
         first_distances = first_region_distance[
-            current_row_indices, current_column_indices
+            current_row_indices, current_column_indices,
         ]
         second_distances = second_region_distance[
-            current_row_indices, current_column_indices
+            current_row_indices, current_column_indices,
         ]
         if first_distances.min() < second_distances.min():
             first_region[point_indices] = True
             first_region_mask = np.zeros_like(image, dtype=np.bool_)
             first_region_mask[
-                row_indices[first_region], column_indices[first_region]
+                row_indices[first_region], column_indices[first_region],
             ] = True
             first_region_distance = ndimage.distance_transform_edt(
-                ~first_region_mask, return_distances=True
+                ~first_region_mask, return_distances=True,
             )
             assert isinstance(first_region_distance, np.ndarray)
         else:
             second_region[point_indices] = True
             second_region_mask = np.zeros_like(image, dtype=np.bool_)
             second_region_mask[
-                row_indices[second_region], column_indices[second_region]
+                row_indices[second_region], column_indices[second_region],
             ] = True
             second_region_distance = ndimage.distance_transform_edt(
-                ~second_region_mask, return_distances=True
+                ~second_region_mask, return_distances=True,
             )
             assert isinstance(second_region_distance, np.ndarray)
 
     assert np.all(
-        np.logical_xor(first_region, second_region)
+        np.logical_xor(first_region, second_region),
     ), "First and second regions are inconsistent!"
 
     # Find innermost region
@@ -633,19 +633,19 @@ def _find_single_revolution_regions(
 ) -> NDArray[BoolType]:
     assert shrink_amount <= min_acceptable_length
     polar_image = np.flip(
-        __image_transform_from_cartesian_to_polar(image, num_radii, num_theta), axis=1
+        __image_transform_from_cartesian_to_polar(image, num_radii, num_theta), axis=1,
     )
     polar_image = np.nan_to_num(polar_image, nan=0)
 
     dilated_polar_image: NDArray[BoolType] = ndimage.binary_dilation(
-        polar_image, structure=np.ones((3, 3))
+        polar_image, structure=np.ones((3, 3)),
     )
 
     return _find_single_revolution_regions_polar(dilated_polar_image, shrink_amount)
 
 
 def _find_single_revolution_regions_polar(
-    polar_image: NDArray[BoolType], shrink_amount: int
+    polar_image: NDArray[BoolType], shrink_amount: int,
 ) -> NDArray[BoolType]:
     num_radii: int = polar_image.shape[0]
     num_theta: int = polar_image.shape[1]
@@ -689,7 +689,7 @@ def _find_single_revolution_regions_polar(
         ),
     )
     can_be_single_revolution = functools.reduce(
-        lambda x, y: np.logical_and(x, y), conditions
+        lambda x, y: np.logical_and(x, y), conditions,
     )
 
     conditions = (
@@ -702,7 +702,7 @@ def _find_single_revolution_regions_polar(
 
 
 def __image_transform_from_cartesian_to_polar(
-    image: NDArray[FloatType], num_radii: int, num_theta: int
+    image: NDArray[FloatType], num_radii: int, num_theta: int,
 ) -> NDArray[FloatType]:
     centre_x = image.shape[1] / 2 - 0.5
     centre_y = image.shape[0] / 2 - 0.5
@@ -757,7 +757,7 @@ def __split_regions(
         split_theta_idx %= len(theta_bin_centres)
         split_theta = theta_bin_centres[split_theta_idx]
         first_region = np.logical_and(
-            inner_region, np.logical_and(theta >= split_theta, theta < theta_end)
+            inner_region, np.logical_and(theta >= split_theta, theta < theta_end),
         )
         second_region = np.logical_and(inner_region, ~first_region)
     else:
@@ -915,15 +915,15 @@ def _adjust_theta_for_gap(
         negative_image[row_indices[region], column_indices[region]] = True
 
         negative_distances = ndimage.distance_transform_edt(
-            negative_image, return_distances=True
+            negative_image, return_distances=True,
         )
         assert isinstance(negative_distances, np.ndarray)
 
         min_top_distance = np.min(
-            negative_distances[row_indices[top_half], column_indices[top_half]]
+            negative_distances[row_indices[top_half], column_indices[top_half]],
         )
         min_bottom_distance = np.min(
-            negative_distances[row_indices[bottom_half], column_indices[bottom_half]]
+            negative_distances[row_indices[bottom_half], column_indices[bottom_half]],
         )
         if min_top_distance > min_bottom_distance:
             adjusted_theta[top_half] += 2 * np.pi

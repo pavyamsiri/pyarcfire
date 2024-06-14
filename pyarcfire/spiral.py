@@ -276,7 +276,7 @@ class ClusterSpiralResult:
             )
             return
         log.info(
-            "[yellow]FILESYST[/yellow]: Dumped masks to [yellow]%s[/yellow]", extension
+            "[yellow]FILESYST[/yellow]: Dumped masks to [yellow]%s[/yellow]", extension,
         )
 
     def get_spiral_of(
@@ -317,7 +317,7 @@ class ClusterSpiralResult:
             self._spiral_cache[cluster_idx] = fit_spiral_to_image(current_array)
         spiral_fit = self._spiral_cache[cluster_idx]
         x, y = spiral_fit.calculate_cartesian_coordinates(
-            num_points, pixel_to_distance, flip_y=flip_y
+            num_points, pixel_to_distance, flip_y=flip_y,
         )
         return x, y
 
@@ -455,7 +455,7 @@ def detect_spirals_in_image(
 
     # Unsharp phase
     unsharp_image = filters.unsharp_mask(
-        image, radius=unsharp_mask_settings.radius, amount=unsharp_mask_settings.amount
+        image, radius=unsharp_mask_settings.radius, amount=unsharp_mask_settings.amount,
     )
 
     # Generate orientation fields
@@ -466,7 +466,7 @@ def detect_spirals_in_image(
     # Generate similarity matrix
     log.info("[cyan]PROGRESS[/cyan]: Generating similarity matrix...")
     matrix = generate_similarity_matrix(
-        field, similarity_matrix_settings.similarity_cutoff
+        field, similarity_matrix_settings.similarity_cutoff,
     )
     log.info("[cyan]PROGRESS[/cyan]: Done generating similarity matrix.")
 
@@ -488,7 +488,7 @@ def detect_spirals_in_image(
     # Do some final merges based on fit
     log.info("[cyan]PROGRESS[/cyan]: Merging clusters by fit...")
     merged_clusters = merge_clusters_by_fit(
-        cluster_arrays, merge_clusters_by_fit_settings.stop_threshold
+        cluster_arrays, merge_clusters_by_fit_settings.stop_threshold,
     )
     log.info("[cyan]PROGRESS[/cyan]: Done merging clusters by fit.")
 

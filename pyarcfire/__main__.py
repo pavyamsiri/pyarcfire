@@ -153,7 +153,7 @@ def process_from_image(args: argparse.Namespace) -> None:
 
     colored_image_overlay_axis = fig.add_subplot(236)
     colored_image_overlay_axis.set_title(
-        "Original image colored with masks and overlaid with spirals"
+        "Original image colored with masks and overlaid with spirals",
     )
     colored_image_overlay_axis.set_xlim(-width, width)
     colored_image_overlay_axis.set_ylim(-width, width)
@@ -194,7 +194,7 @@ def process_from_image(args: argparse.Namespace) -> None:
             label=f"Cluster {cluster_idx}",
         )
     colored_image_overlay_axis.imshow(
-        colored_image, extent=(-width, width, -width, width)
+        colored_image, extent=(-width, width, -width, width),
     )
 
     fig.tight_layout()
@@ -232,7 +232,7 @@ def process_cluster(args: argparse.Namespace) -> None:
         assert len(arr.shape) == 3
     else:
         log.critical(
-            "The %s data format is not valid or is not yet supported!", extension
+            "The %s data format is not valid or is not yet supported!", extension,
         )
         return
     num_clusters = arr.shape[2]
@@ -290,7 +290,7 @@ def _parse_args(args: Sequence[str]) -> argparse.Namespace:
 
     subparsers = parser.add_subparsers(dest="command")
     from_image_parser = subparsers.add_parser(
-        "image", help="Process an image.", parents=(base_subparser,)
+        "image", help="Process an image.", parents=(base_subparser,),
     )
     _configure_image_command_parser(from_image_parser)
     from_cluster_parser = subparsers.add_parser(

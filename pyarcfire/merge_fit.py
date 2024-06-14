@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from collections.abc import MutableSequence
 import logging
+from collections.abc import MutableSequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, TypeVar
 
@@ -42,7 +42,7 @@ DEFAULT_MERGE_CLUSTER_BY_FIT_SETTINGS: MergeClustersByFitSettings = (
 
 @benchmark
 def merge_clusters_by_fit(
-    clusters: NDArray[FloatType], stop_threshold: float
+    clusters: NDArray[FloatType], stop_threshold: float,
 ) -> NDArray[FloatType]:
     """Merge clusters by if they are fit spirals decently well when combined.
 
@@ -83,7 +83,7 @@ def merge_clusters_by_fit(
                 right_array is not None
             ), "Should not be None because it was just set."
             cluster_distances[source_idx, target_idx] = _calculate_cluster_distance(
-                left_array, right_array, max_pixel_distance
+                left_array, right_array, max_pixel_distance,
             )
 
     num_merges: int = 0
@@ -117,7 +117,7 @@ def merge_clusters_by_fit(
 
         # Update cluster dictionary
         cluster_list[first_idx] = combined_cluster_array.astype(
-            first_cluster_array.dtype
+            first_cluster_array.dtype,
         )
 
         # Update distances
@@ -135,7 +135,7 @@ def merge_clusters_by_fit(
                 right_array is not None
             ), "Accessing a deleted cluster should be impossible"
             cluster_distances[left_idx, right_idx] = _calculate_cluster_distance(
-                left_array, right_array, max_pixel_distance
+                left_array, right_array, max_pixel_distance,
             )
     log.info("[green]DIAGNOST[/green]: Merged %d clusters by fit", num_merges)
     # Combined clusters into arrays

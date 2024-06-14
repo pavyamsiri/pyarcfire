@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 
 
 def calculate_arc_merge_error(
-    first_cluster_array: NDArray[FloatType], second_cluster_array: NDArray[FloatType]
+    first_cluster_array: NDArray[FloatType], second_cluster_array: NDArray[FloatType],
 ) -> float:
     """Calculate the arc merge error ratio for two clusters.
 

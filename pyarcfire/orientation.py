@@ -98,7 +98,7 @@ class OrientationField:
 
     @staticmethod
     def from_cartesian(
-        x: NDArray[FloatType], y: NDArray[FloatType]
+        x: NDArray[FloatType], y: NDArray[FloatType],
     ) -> OrientationField:
         """Create an orientation field given the x and y components of the orientation field.
 
@@ -116,7 +116,7 @@ class OrientationField:
 
         """
         field: NDArray[FloatType] = np.zeros(
-            (x.shape[0], x.shape[1], 2), dtype=FloatType
+            (x.shape[0], x.shape[1], 2), dtype=FloatType,
         )
         field[:, :, 0] = x
         field[:, :, 1] = y
@@ -124,7 +124,7 @@ class OrientationField:
 
     @staticmethod
     def from_polar(
-        strengths: NDArray[FloatType], directions: NDArray[FloatType]
+        strengths: NDArray[FloatType], directions: NDArray[FloatType],
     ) -> OrientationField:
         """Create an orientation field given orientation strengths and directions.
 
@@ -228,12 +228,12 @@ class OrientationField:
 
         """
         return OrientationField(
-            transform.resize(self.field, (new_height, new_width)).astype(self.dtype)
+            transform.resize(self.field, (new_height, new_width)).astype(self.dtype),
         )
 
     @staticmethod
     def merge(
-        coarser_field: OrientationField, finer_field: OrientationField
+        coarser_field: OrientationField, finer_field: OrientationField,
     ) -> OrientationField:
         """Merge two orientation fields together. The first field must be of a lower resolution than the second field.
 
@@ -262,7 +262,7 @@ class OrientationField:
 
         # Upscale coarse field to have same resolution as finer field
         resized_coarse_field = coarser_field.resize(
-            finer_field.num_columns, finer_field.num_rows
+            finer_field.num_columns, finer_field.num_rows,
         )
 
         resized_coarse_strengths = resized_coarse_field.get_strengths()
@@ -275,11 +275,11 @@ class OrientationField:
 
         # Vf' -> Vc + Sf / (Sf + Sc) * (Vf - Vc)
         return resized_coarse_field.add(
-            finer_field.subtract(resized_coarse_field).scalar_field_multiply(gains)
+            finer_field.subtract(resized_coarse_field).scalar_field_multiply(gains),
         )
 
     def scalar_field_multiply(
-        self, scalar_field: NDArray[FloatType]
+        self, scalar_field: NDArray[FloatType],
     ) -> OrientationField:
         """Return the orientation field mulitplied by a scalar field.
 
@@ -325,7 +325,7 @@ class OrientationField:
 
         """
         vector_sum, vector_difference, sum_greater = OrientationField._prepare_sum(
-            self, other
+            self, other,
         )
         result = np.zeros_like(vector_sum)
         result[sum_greater] = vector_sum[sum_greater]
@@ -347,7 +347,7 @@ class OrientationField:
 
         """
         vector_sum, vector_difference, sum_greater = OrientationField._prepare_sum(
-            self, other
+            self, other,
         )
         result = np.zeros_like(vector_sum)
         result[~sum_greater] = vector_sum[~sum_greater]
@@ -390,7 +390,7 @@ class OrientationField:
         # Vector difference
         vector_difference = left.field - b
         vector_difference_lengths = np.sqrt(
-            np.sum(np.square(vector_difference), axis=2)
+            np.sum(np.square(vector_difference), axis=2),
         )
 
         sum_greater = vector_sum_lengths > vector_difference_lengths
@@ -481,7 +481,7 @@ def generate_orientation_fields(
     verify_data_is_2d(image)
     verify_data_is_normalized(image)
     verify_data_can_be_shrunk_orientation(
-        image, num_orientation_field_levels=settings.num_orientation_field_levels
+        image, num_orientation_field_levels=settings.num_orientation_field_levels,
     )
 
     # Neighbour distance must be smaller than both dimensions
@@ -501,7 +501,7 @@ def generate_orientation_fields(
 
         # Generate
         current_level = _generate_raw_orientation_field(
-            resized_image, settings.kernel_radius
+            resized_image, settings.kernel_radius,
         )
         orientation_field_levels.append(current_level)
 
@@ -513,7 +513,7 @@ def generate_orientation_fields(
 
     # Denoise
     denoised_field = merged_field.denoise(
-        neighbour_distance=settings.neighbour_distance
+        neighbour_distance=settings.neighbour_distance,
     )
     num_nonzero_elements = np.count_nonzero(denoised_field.get_strengths())
 
@@ -526,7 +526,7 @@ def generate_orientation_fields(
 
 
 def _generate_raw_orientation_field(
-    image: NDArray[FloatType], kernel_radius: int
+    image: NDArray[FloatType], kernel_radius: int,
 ) -> OrientationField:
     """Generate an orientation field for the given image with no merging or denoising steps.
 
@@ -565,7 +565,7 @@ def _generate_raw_orientation_field(
 
 
 def _generate_orientation_filtered_images(
-    image: NDArray[FloatType], kernel_radius: int
+    image: NDArray[FloatType], kernel_radius: int,
 ) -> NDArray[FloatType]:
     """Convolve the given image with 9 orientation filters and return all results.
 
@@ -587,13 +587,13 @@ def _generate_orientation_filtered_images(
         angle = (idx * np.pi) / 9
         orientation_filter = _generate_orientation_filter_kernel(angle, kernel_radius)
         filtered_images[:, :, idx] = signal.convolve2d(
-            image, orientation_filter, mode="same"
+            image, orientation_filter, mode="same",
         )
     return filtered_images
 
 
 def _generate_orientation_filter_kernel(
-    theta: float, radius: int
+    theta: float, radius: int,
 ) -> NDArray[FloatType]:
     """Generate orientation filter kernel.
 
