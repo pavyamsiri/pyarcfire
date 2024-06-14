@@ -129,8 +129,9 @@ def process_from_image(args: argparse.Namespace) -> None:
     )
     contrast_axis.set_axis_off()
 
-    space_range = np.arange(field.shape[0])
-    x, y = np.meshgrid(space_range, -space_range)
+    x_space_range = np.arange(field.shape[0])
+    y_space_range = np.arange(field.shape[1])
+    x, y = np.meshgrid(x_space_range, -y_space_range)
     orientation_axis = fig.add_subplot(233)
     orientation_axis.quiver(x, y, field.x, field.y, color="tab:blue", headaxislength=0)
     orientation_axis.set_aspect("equal")

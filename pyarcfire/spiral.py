@@ -11,9 +11,12 @@ import numpy as np
 import scipy.io
 from skimage import filters
 
-from pyarcfire.arc.utils import get_polar_coordinates
-
 from .arc import LogSpiralFitResult, fit_spiral_to_image
+from .arc.utils import get_polar_coordinates
+from .assert_utils import (
+    verify_data_is_2d,
+    verify_data_is_normalized,
+)
 from .cluster import (
     DEFAULT_CLUSTER_SETTINGS,
     GenerateClustersSettings,
@@ -446,6 +449,10 @@ def detect_spirals_in_image(
     have dimensions divisible by 2^n where n is the number of orientation field levels (this is a setting you can adjust).
 
     """
+    # Checks
+    verify_data_is_normalized(image)
+    verify_data_is_2d(image)
+
     # Unsharp phase
     unsharp_image = filters.unsharp_mask(
         image, radius=unsharp_mask_settings.radius, amount=unsharp_mask_settings.amount
@@ -453,12 +460,7 @@ def detect_spirals_in_image(
 
     # Generate orientation fields
     log.info("[cyan]PROGRESS[/cyan]: Generating orientation field...")
-    field = generate_orientation_fields(
-        unsharp_image,
-        num_orientation_field_levels=orientation_field_settings.num_orientation_field_levels,
-        neighbour_distance=orientation_field_settings.neighbour_distance,
-        kernel_radius=orientation_field_settings.kernel_radius,
-    )
+    field = generate_orientation_fields(unsharp_image, orientation_field_settings)
     log.info("[cyan]PROGRESS[/cyan]: Done generating orientation field.")
 
     # Generate similarity matrix
