@@ -356,6 +356,44 @@ class ClusterSpiralResult:
             )
             yield x, y
 
+    def get_spirals_and_clusters(
+        self,
+        num_points: int,
+        pixel_to_distance: float,
+        *,
+        flip_y: bool = False,
+    ) -> Generator[tuple[NDArray[FloatType], NDArray[FloatType], NDArray[FloatType]], None, None]:
+        """Generate Cartesian coordinates for spirals fitted to each cluster.
+
+        Parameters
+        ----------
+        num_points : int
+            The number of points to generate for each spiral.
+        pixel_to_distance : float
+            Conversion factor from pixel units to physical distance units.
+        flip_y : bool, optional
+            Whether to flip the y-coordinate, by default False.
+
+        Yields
+        ------
+        x : NDArray[FloatType]
+            The x coordinate of the arc.
+        y : NDArray[FloatType]
+            The y coordinate of the arc.
+        cluster_array : NDArray[FloatType]
+            The cluster in array format.
+
+        """
+        num_clusters: int = self.get_num_clusters()
+        for cluster_idx in range(num_clusters):
+            spiral_fit = self._get_fit(cluster_idx)
+            x, y = spiral_fit.calculate_cartesian_coordinates(
+                num_points,
+                pixel_to_distance,
+                flip_y=flip_y,
+            )
+            yield x, y, self.get_cluster_array(cluster_idx)[0]
+
     def get_arc_bounds(self, cluster_idx: int) -> tuple[float, float]:
         """Return the arc bounds in radians for a given cluster.
 
