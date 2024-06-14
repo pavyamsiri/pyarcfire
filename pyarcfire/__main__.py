@@ -9,11 +9,9 @@ from typing import Any, cast
 import matplotlib as mpl
 import numpy as np
 import scipy.io
-from matplotlib import colors as mplcolors
 from matplotlib import pyplot as plt
 from numpy.typing import NDArray
 from PIL import Image
-from skimage import transform
 
 from pyarcfire import (
     GenerateClustersSettings,
@@ -22,7 +20,6 @@ from pyarcfire import (
     MergeClustersByFitSettings,
     UnsharpMaskSettings,
 )
-from pyarcfire.preprocess import preprocess_image
 
 from .arc import fit_spiral_to_image
 from .log_utils import setup_logging
