@@ -34,6 +34,7 @@ from .orientation import (
     OrientationField,
     generate_orientation_fields,
 )
+from .preprocess import preprocess_image
 from .similarity import (
     DEFAULT_SIMILARITY_MATRIX_SETTINGS,
     GenerateSimilarityMatrixSettings,
@@ -355,6 +356,44 @@ class ClusterSpiralResult:
             )
             yield x, y
 
+    def get_spirals_and_clusters(
+        self,
+        num_points: int,
+        pixel_to_distance: float,
+        *,
+        flip_y: bool = False,
+    ) -> Generator[tuple[NDArray[FloatType], NDArray[FloatType], NDArray[FloatType]], None, None]:
+        """Generate Cartesian coordinates for spirals fitted to each cluster.
+
+        Parameters
+        ----------
+        num_points : int
+            The number of points to generate for each spiral.
+        pixel_to_distance : float
+            Conversion factor from pixel units to physical distance units.
+        flip_y : bool, optional
+            Whether to flip the y-coordinate, by default False.
+
+        Yields
+        ------
+        x : NDArray[FloatType]
+            The x coordinate of the arc.
+        y : NDArray[FloatType]
+            The y coordinate of the arc.
+        cluster_array : NDArray[FloatType]
+            The cluster in array format.
+
+        """
+        num_clusters: int = self.get_num_clusters()
+        for cluster_idx in range(num_clusters):
+            spiral_fit = self._get_fit(cluster_idx)
+            x, y = spiral_fit.calculate_cartesian_coordinates(
+                num_points,
+                pixel_to_distance,
+                flip_y=flip_y,
+            )
+            yield x, y, self.get_cluster_array(cluster_idx)[0]
+
     def get_arc_bounds(self, cluster_idx: int) -> tuple[float, float]:
         """Return the arc bounds in radians for a given cluster.
 
@@ -410,6 +449,8 @@ def detect_spirals_in_image(
     similarity_matrix_settings: GenerateSimilarityMatrixSettings = DEFAULT_SIMILARITY_MATRIX_SETTINGS,
     generate_clusters_settings: GenerateClustersSettings = DEFAULT_CLUSTER_SETTINGS,
     merge_clusters_by_fit_settings: MergeClustersByFitSettings = DEFAULT_MERGE_CLUSTER_BY_FIT_SETTINGS,
+    *,
+    preprocess: bool = False,
 ) -> ClusterSpiralResult | None:
     """Run the spiral arc finder algorithm on the given image.
 
@@ -429,6 +470,8 @@ def detect_spirals_in_image(
         Settings for generating clusters, by default GenerateClustersSettings().
     merge_clusters_by_fit_settings : MergeClustersByFitSettings, optional
         Settings for merging clusters based on fit criteria, by default MergeClustersByFitSettings().
+    preprocess : bool
+        Set this flag to preprocess the image to ensure it is compatible.
 
     Returns
     -------
@@ -441,6 +484,9 @@ def detect_spirals_in_image(
     have dimensions divisible by 2^n where n is the number of orientation field levels (this is a setting you can adjust).
 
     """
+    if preprocess:
+        image = preprocess_image(image, num_orientation_field_levels=orientation_field_settings.num_orientation_field_levels)
+
     # Checks
     verify_data_is_normalized(image)
     verify_data_is_2d(image)
