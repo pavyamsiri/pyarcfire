@@ -16,7 +16,9 @@ if TYPE_CHECKING:
     FloatType = TypeVar("FloatType", np.float32, np.float64)
 
 
-def calculate_arc_merge_error(first_cluster_array: NDArray[FloatType], second_cluster_array: NDArray[FloatType]) -> float:
+def calculate_arc_merge_error(
+    first_cluster_array: NDArray[FloatType], second_cluster_array: NDArray[FloatType]
+) -> float:
     """Calculate the arc merge error ratio for two clusters.
 
     This is a measure of how well the merged cluster of the two clusters given fit to a log spiral
@@ -24,9 +26,9 @@ def calculate_arc_merge_error(first_cluster_array: NDArray[FloatType], second_cl
 
     Parameters
     ----------
-    first_cluster_array : Array2D
+    first_cluster_array : NDArray[FloatType]
         The first cluster in the form of an array.
-    second_cluster_array : Array2D
+    second_cluster_array : NDArray[FloatType]
         The second cluster in the form of an array.
 
     Returns
@@ -43,14 +45,14 @@ def calculate_arc_merge_error(first_cluster_array: NDArray[FloatType], second_cl
         raise ValueError(msg)
     total_sum = first_sum + second_sum
     # Adjust weights
-    first_cluster_array *= total_sum / first_sum
-    second_cluster_array *= total_sum / second_sum
+    first_reweighted_array = first_cluster_array * total_sum / first_sum
+    second_reweighted_array = second_cluster_array * total_sum / second_sum
 
     # Fit spirals to each cluster individually
-    first_fit = fit_spiral_to_image(first_cluster_array)
-    second_fit = fit_spiral_to_image(second_cluster_array)
+    first_fit = fit_spiral_to_image(first_reweighted_array)
+    second_fit = fit_spiral_to_image(second_reweighted_array)
 
-    combined_cluster_array = first_cluster_array + second_cluster_array
+    combined_cluster_array = first_reweighted_array + second_reweighted_array
     # Fit a spiral to both clusters at the same time
     first_merged_fit = fit_spiral_to_image(
         combined_cluster_array,
@@ -62,7 +64,7 @@ def calculate_arc_merge_error(first_cluster_array: NDArray[FloatType], second_cl
     )
     first_fit_is_better = first_merged_fit.total_error <= second_merged_fit.total_error
     merged_fit = first_merged_fit if first_fit_is_better else second_merged_fit
-    first_cluster_indices = (first_cluster_array > 0)[combined_cluster_array > 0]
+    first_cluster_indices = (first_reweighted_array > 0)[combined_cluster_array > 0]
     # Get the error of the merged spiral for each individual cluster
     first_cluster_errors = merged_fit.errors[first_cluster_indices].sum()
     second_cluster_errors = merged_fit.errors[~first_cluster_indices].sum()
