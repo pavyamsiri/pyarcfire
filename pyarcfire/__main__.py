@@ -77,7 +77,7 @@ def process_from_image(args: argparse.Namespace) -> None:
         if not_normed:
             can_use_log = min_value > 0 and max_value > 0
             if can_use_log:
-                # TODO: Maybe detect if there is a sufficient difference in powers?
+                # TODO(pavyamsiri): Maybe detect if there is a sufficient difference in powers?
                 image = mplcolors.LogNorm(clip=True)(image)
             else:
                 log.info("Normalize using Normalize")
