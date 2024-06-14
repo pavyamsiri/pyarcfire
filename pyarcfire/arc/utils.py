@@ -1,3 +1,5 @@
+"""Useful utilities to use in the arc module."""
+
 from typing import TypeVar
 
 import numpy as np
@@ -6,9 +8,30 @@ from numpy.typing import NDArray
 FloatType = TypeVar("FloatType", np.float32, np.float64)
 
 
+BAD_BOUNDS_THRESHOLD: float = 0.1
+
+
 def get_polar_coordinates(
     image: NDArray[FloatType],
 ) -> tuple[NDArray[FloatType], NDArray[FloatType], NDArray[FloatType]]:
+    """Return the polar coordinates of the pixels in a cluster.
+
+    Parameters
+    ----------
+    image : NDArray[FloatType]
+        The cluster encoded as an image, where each non-zero pixel is considered
+        part of the cluster.
+
+    Returns
+    -------
+    radii : NDArray[FloatType]
+        The radii of the cluster's pixels.
+    theta : NDArray[FloatType]
+        The polar angle of the cluster's pixels.
+    weights : NDArray[FloatType]
+        The pixel value of each of the cluster's pixels.
+
+    """
     row_indices, column_indices = image.nonzero()
     row_offset = image.shape[0] / 2 - 0.5
     column_offset = image.shape[1] / 2 - 0.5
@@ -26,8 +49,35 @@ def adjust_theta_to_zero(
     theta: NDArray[FloatType],
     arc_bounds: tuple[float, float],
     offset: float,
+    *,
     use_modulo: bool,
 ) -> tuple[NDArray[FloatType], tuple[float, float], float]:
+    """Adjust the arc bounds so it starts at zero.
+
+    This means the log spiral will span angles `[offset, offset + arc_bounds[1]]`.
+
+    Parameters
+    ----------
+    theta : NDArray[FloatType]
+        The polar angle of the cluster's pixels.
+    arc_bounds : tuple[float, float]
+        The bounds of the spiral arc in radians.
+    offset : float
+        The offset angle of the log spiral in radians.
+    use_modulo : bool
+        Set this flag to apply the modulo operator to `theta - offset` such that it is in
+        the range `[0, 2 * pi)`
+
+    Returns
+    -------
+    theta : NDArray[FloatType]
+        The polar angle of the cluster's pixels after being adjusted.
+    arc_bounds : tuple[float, float]
+        The arc bounds after being adjusted.
+    new_offset: NDArray[FloatType]
+        The offset angle after being adjusted.
+
+    """
     if use_modulo:
         theta = np.add(np.mod(theta - offset, 2 * np.pi), offset)
     arc_start, _ = arc_bounds
@@ -40,9 +90,28 @@ def adjust_theta_to_zero(
     return (theta, arc_bounds, new_offset)
 
 
-def get_arc_bounds(
-    offset: float, rotation_amount: float, lower_bound: float, upper_bound: float
-) -> tuple[float, float]:
+def get_arc_bounds(offset: float, rotation_amount: float, lower_bound: float, upper_bound: float) -> tuple[float, float]:
+    """Determine the bounds of a cluster.
+
+    Parameters
+    ----------
+    offset : float
+        The offset angle in radians.
+    rotation_amount : float
+        The amount in radians to rotate the angles to avoid crossing the polar axis.
+    lower_bound : float
+        The lower bound of the polar angles of the cluster after being adjusted
+        to not cross the polar axis.
+    upper_bound : float
+        The upper bound of the polar angles of the cluster after being adjusted
+        to not cross the polar axis.
+
+    Returns
+    -------
+    arc_bounds : tuple[float, float]
+        The bounds of the cluster in polar angles.
+
+    """
     arc_size = 2 * np.pi - (upper_bound - lower_bound)
     arc_start = np.min(
         (
@@ -52,14 +121,12 @@ def get_arc_bounds(
             )
             + rotation_amount
         )
-        % (2 * np.pi)
+        % (2 * np.pi),
     )
     return (float(arc_start), float(arc_start) + arc_size)
 
 
-def __calculate_angle_distance(
-    from_angle: NDArray[FloatType], to_angle: NDArray[FloatType]
-) -> NDArray[FloatType]:
+def __calculate_angle_distance(from_angle: NDArray[FloatType], to_angle: NDArray[FloatType]) -> NDArray[FloatType]:
     is_wrapping = from_angle > to_angle
     distance: NDArray[FloatType] = np.subtract(to_angle, from_angle)
     distance[is_wrapping] += 2 * np.pi
@@ -69,7 +136,8 @@ def __calculate_angle_distance(
 def calculate_bounds(
     theta: NDArray[FloatType],
 ) -> tuple[bool, tuple[float, float], float, float]:
-    """Calculates optimisation bounds for the theta offset.
+    """Calculate optimisation bounds for the theta offset.
+
     If the bounds would cross the polar axis, then the bounds must be
     split into two. To avoid this, the theta values can be rotated so that
     the bounds can be expressed as a single bound.
@@ -90,6 +158,7 @@ def calculate_bounds(
         The amount to rotate the theta values so that the bounds can be singular.
     max_gap_size : float
         The largest gap between nearby theta values.
+
     """
     sorted_theta = np.sort(theta)
     gaps = np.diff(sorted_theta)
@@ -105,7 +174,6 @@ def calculate_bounds(
     # this case, we temporarily rotate the points to allievate this
     # problem, fit the log-spiral model to the set of rotated points,
     # and then reverse the rotation on the fitted model.
-    BAD_BOUNDS_THRESHOLD: float = 0.1
     if not gap_crosses_axis:
         rotation_amount = 0
         max_gap_size_idx = np.argmax(gaps)
