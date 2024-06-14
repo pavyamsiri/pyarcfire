@@ -61,5 +61,7 @@ def verify_data_can_be_shrunk_orientation(
         data.shape[0] % maximum_shrink_factor != 0
         or data.shape[1] % maximum_shrink_factor != 0
     ):
-        msg = f"Image dimensions must be divisible by 2^{num_orientation_field_levels} = {maximum_shrink_factor}"
+        msg = f"""Image dimensions must be divisible by 2^{num_orientation_field_levels} = {maximum_shrink_factor}.
+    Either resize or adjust the number of orientation field levels.
+        """
         raise ValueError(msg)
