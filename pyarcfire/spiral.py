@@ -440,6 +440,11 @@ def detect_spirals_in_image(
     ClusterSpiralResult | None
         The result of the spiral detection algorithm, or None if detection failed.
 
+    Notes
+    -----
+    The input image must be normalized to the range [0, 1] before running this algorithm. Additionally it must also
+    have dimensions divisible by 2^n where n is the number of orientation field levels (this is a setting you can adjust).
+
     """
     # Unsharp phase
     unsharp_image = filters.unsharp_mask(
@@ -480,7 +485,9 @@ def detect_spirals_in_image(
 
     # Do some final merges based on fit
     log.info("[cyan]PROGRESS[/cyan]: Merging clusters by fit...")
-    merged_clusters = merge_clusters_by_fit(cluster_arrays, merge_clusters_by_fit_settings.stop_threshold)
+    merged_clusters = merge_clusters_by_fit(
+        cluster_arrays, merge_clusters_by_fit_settings.stop_threshold
+    )
     log.info("[cyan]PROGRESS[/cyan]: Done merging clusters by fit.")
 
     return ClusterSpiralResult(
