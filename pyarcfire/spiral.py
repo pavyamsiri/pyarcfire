@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import warnings
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -50,6 +51,8 @@ log: logging.Logger = logging.getLogger(__name__)
 
 
 FloatType = np.float32
+
+MAX_SIZE_BEFORE_WARN: int = 256
 
 
 @dataclass
@@ -490,6 +493,15 @@ def detect_spirals_in_image(
     # Checks
     verify_data_is_normalized(image)
     verify_data_is_2d(image)
+
+    log.info(r"[green]DIAGNOST[/green]: The image has dimensions %dx%d.", image.shape[0], image.shape[1])
+    # Warn about large sizes
+    max_size = max(image.shape)
+    if max_size > MAX_SIZE_BEFORE_WARN:
+        warning_msg = (
+            "Note that the spiral arc finding algorithm scales really badly with image size. Please consider downscaling."
+        )
+        warnings.warn(warning_msg, UserWarning, stacklevel=2)
 
     # Unsharp phase
     unsharp_image = filters.unsharp_mask(
