@@ -1,17 +1,18 @@
 """Finds spiral arcs in images of galaxies or anything with a spiral structure."""
 
+from __future__ import annotations
+
 import argparse
 import logging
-from collections.abc import Sequence
 from pathlib import Path
-from typing import Any, cast
+from typing import TYPE_CHECKING
 
 import matplotlib as mpl
 import numpy as np
 import scipy.io
 from matplotlib import pyplot as plt
-from numpy.typing import NDArray
 from PIL import Image
+from skimage import transform
 
 from pyarcfire import (
     GenerateClustersSettings,
@@ -24,6 +25,12 @@ from pyarcfire import (
 from .arc import fit_spiral_to_image
 from .log_utils import setup_logging
 from .spiral import detect_spirals_in_image
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+    from typing import Any
+
+    from numpy.typing import NDArray
 
 log: logging.Logger = logging.getLogger(__name__)
 
@@ -71,6 +78,12 @@ def process_from_image(args: argparse.Namespace) -> None:
     else:
         # Load image
         image = np.asarray(Image.open(input_path).convert("L")).astype(np.float32) / 255
+    # Rescale
+    scaling_factor: float | None = args.scaling_factor
+    if scaling_factor is not None:
+        log.info("Rescaling image by factor %f...", scaling_factor)
+        image = transform.rescale(image, scaling_factor)
+
     width: float = image.shape[0] / 2 - 0.5
 
     result = detect_spirals_in_image(
@@ -210,7 +223,7 @@ def process_cluster(args: argparse.Namespace) -> None:
     elif extension == "mat":
         log.info("Loading mat...")
         data: dict[str, Any] = scipy.io.loadmat(input_path)
-        arr = cast(NDArray[np.float32], data["image"])
+        arr = data["image"]
         if len(arr.shape) == 2:
             arr = arr.reshape((arr.shape[0], arr.shape[1], 1))
         assert len(arr.shape) == 3
@@ -306,6 +319,9 @@ def _configure_image_command_parser(parser: argparse.ArgumentParser) -> None:
         dest="cluster_path",
         help="Path to output data array of clusters.",
         required=False,
+    )
+    parser.add_argument(
+        "-scale", "--scale", type=float, dest="scaling_factor", help="Give this flag a number to scale the image with."
     )
 
 
