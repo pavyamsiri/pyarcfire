@@ -40,7 +40,7 @@ def preprocess_image(image: NDArray[FloatType], *, num_orientation_field_levels:
     """
     log.debug("[green]DIAGNOST[/green]: Standardizing image...")
     warning_msg = "This function is a WIP and may not produce satisfactory results. Image preprocessing is best done yourself."
-    warnings.warn(warning_msg, DeprecationWarning, stacklevel=1)
+    warnings.warn(warning_msg, UserWarning, stacklevel=1)
     processed_image = image.copy()
     verify_data_is_2d(processed_image)
 
