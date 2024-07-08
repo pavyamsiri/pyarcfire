@@ -49,6 +49,22 @@ class LogSpiralFitResult(Generic[FloatType]):
     errors: NDArray[FloatType]
     has_multiple_revolutions: bool
 
+    def __post_init__(self) -> None:
+        """Calculate properties of the log spiral."""
+        self._pitch_angle = np.arctan(self.growth_factor)
+        start_angle = self.offset
+        end_angle = start_angle + self.arc_bounds[1]
+        lengths = log_spiral(
+            np.asarray(
+                [start_angle, end_angle],
+            ),
+            self.offset,
+            self.growth_factor,
+            self.initial_radius,
+            use_modulo=self.has_multiple_revolutions,
+        )
+        self._arc_length: float = abs(lengths[1] - lengths[0]) / np.sin(self._pitch_angle)
+
     def calculate_cartesian_coordinates(
         self,
         num_points: int,
@@ -90,3 +106,25 @@ class LogSpiralFitResult(Generic[FloatType]):
         x = np.multiply(radii, np.cos(theta))
         y = y_flip_factor * np.multiply(radii, np.sin(theta))
         return (x, y)
+
+    def pitch_angle_in_degrees(self) -> float:
+        """Return the pitch angle of the spiral in degrees.
+
+        Returns
+        -------
+        pitch_angle : float
+            The pitch angle in degrees from [-180, 180].
+
+        """
+        return np.rad2deg(self._pitch_angle)
+
+    def arc_length(self) -> float:
+        """Return the arc length in pixel units.
+
+        Returns
+        -------
+        arc_length : float
+            The arc length in pixel units.
+
+        """
+        return self._arc_length
