@@ -44,7 +44,7 @@ class LogSpiralFitResult(Generic[FloatType]):
     offset: float
     growth_factor: float
     initial_radius: float
-    arc_bounds: tuple[float, float]
+    arc_extent: float
     total_error: float
     errors: NDArray[FloatType]
     has_multiple_revolutions: bool
@@ -53,7 +53,7 @@ class LogSpiralFitResult(Generic[FloatType]):
         """Calculate properties of the log spiral."""
         self._pitch_angle = np.arctan(self.growth_factor)
         start_angle = self.offset
-        end_angle = start_angle + self.arc_bounds[1]
+        end_angle = start_angle + self.arc_extent
         lengths = log_spiral(
             np.asarray(
                 [start_angle, end_angle],
@@ -63,7 +63,11 @@ class LogSpiralFitResult(Generic[FloatType]):
             self.initial_radius,
             use_modulo=self.has_multiple_revolutions,
         )
-        self._arc_length: float = abs(lengths[1] - lengths[0]) / np.sin(self._pitch_angle)
+        self._arc_length: float
+        if np.isclose(np.sin(self._pitch_angle), 0):
+            self._arc_length = self.initial_radius * self.arc_extent
+        else:
+            self._arc_length = abs(lengths[1] - lengths[0]) / np.sin(self._pitch_angle)
 
     def calculate_cartesian_coordinates(
         self,
@@ -93,7 +97,7 @@ class LogSpiralFitResult(Generic[FloatType]):
         """
         y_flip_factor: float = 1.0 if not flip_y else -1.0
         start_angle = self.offset
-        end_angle = start_angle + self.arc_bounds[1]
+        end_angle = start_angle + self.arc_extent
 
         theta = np.linspace(start_angle, end_angle, num_points, dtype=np.float32)
         radii = pixel_to_distance * log_spiral(

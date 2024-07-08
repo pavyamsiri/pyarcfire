@@ -435,7 +435,7 @@ class ClusterSpiralResult:
         """
         current_fit = self._get_fit(cluster_idx)
         start_angle = current_fit.offset
-        end_angle = start_angle + current_fit.arc_bounds[1]
+        end_angle = start_angle + current_fit.arc_extent
         return (start_angle, end_angle)
 
     def calculate_fit_error_to_cluster(

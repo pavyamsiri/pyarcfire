@@ -172,7 +172,7 @@ def fit_spiral_to_image(
     bad_bounds = fit_result.bad_bounds
 
     # Adjust so that arc bounds is relative to theta
-    (theta, arc_bounds, offset) = adjust_theta_to_zero(
+    (theta, arc_extent, offset) = adjust_theta_to_zero(
         theta,
         arc_bounds,
         offset,
@@ -216,7 +216,7 @@ def fit_spiral_to_image(
         offset=offset,
         growth_factor=growth_factor,
         initial_radius=initial_radius,
-        arc_bounds=arc_bounds,
+        arc_extent=arc_extent,
         total_error=new_error,
         errors=np.square(residuals),
         has_multiple_revolutions=need_multiple_revolutions,

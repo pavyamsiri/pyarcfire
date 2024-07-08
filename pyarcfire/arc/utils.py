@@ -51,7 +51,7 @@ def adjust_theta_to_zero(
     offset: float,
     *,
     use_modulo: bool,
-) -> tuple[NDArray[FloatType], tuple[float, float], float]:
+) -> tuple[NDArray[FloatType], float, float]:
     """Adjust the arc bounds so it starts at zero.
 
     This means the log spiral will span angles `[offset, offset + arc_bounds[1]]`.
@@ -60,8 +60,8 @@ def adjust_theta_to_zero(
     ----------
     theta : NDArray[FloatType]
         The polar angle of the cluster's pixels.
-    arc_bounds : tuple[float, float]
-        The bounds of the spiral arc in radians.
+    arc_extent : float
+        The extent of the arc in radians.
     offset : float
         The offset angle of the log spiral in radians.
     use_modulo : bool
@@ -82,12 +82,8 @@ def adjust_theta_to_zero(
         theta = np.add(np.mod(theta - offset, 2 * np.pi), offset)
     arc_start, _ = arc_bounds
     new_offset = float(offset + arc_start)
-    theta += np.subtract(new_offset, np.min(theta))
-    arc_bounds = (
-        float(arc_bounds[0] - arc_start),
-        float(arc_bounds[1] - arc_start),
-    )
-    return (theta, arc_bounds, new_offset)
+    new_theta = theta - np.subtract(new_offset, np.min(theta))
+    return (new_theta, arc_bounds[1] - arc_start, new_offset)
 
 
 def get_arc_bounds(offset: float, rotation_amount: float, lower_bound: float, upper_bound: float) -> tuple[float, float]:
