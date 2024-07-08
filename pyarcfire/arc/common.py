@@ -100,6 +100,10 @@ class LogSpiralFitResult(Generic[FloatType]):
         else:
             self._chirality = Chirality.COUNTER_CLOCKWISE
 
+        # Errors
+        self._total_error_arc_length: float = self.total_error / self._arc_length
+        self._total_error_pixels: float = self.total_error / len(self.errors)
+
     def calculate_cartesian_coordinates(
         self,
         num_points: int,
@@ -166,3 +170,41 @@ class LogSpiralFitResult(Generic[FloatType]):
     def chirality_sign(self) -> float:
         """float: The sign of the pitch angle."""
         return np.sign(self._pitch_angle)
+
+    def get_total_error_normalised_by_arc_length(self) -> float:
+        """Return the sum of square residuals normalised by the arc length.
+
+        Returns
+        -------
+        total_error : float
+            The error normalised by the arc length.
+
+        """
+        return self._total_error_arc_length
+
+    def get_total_error_normalised_by_num_pixels(self) -> float:
+        """Return the sum of square residuals normalised by the number of pixels in the cluster.
+
+        Returns
+        -------
+        total_error : float
+            The error normalised by the number of pixels in the cluster.
+
+        """
+        return self._total_error_pixels
+
+    def get_arc_length_in_units(self, pixel_to_distance: float) -> float:
+        """Return the arc length in the given user units.
+
+        Parameters
+        ----------
+        pixel_to_distance : float
+            The unit conversion factor to convert pixels to another unit.
+
+        Returns
+        -------
+        arc_length : float
+            The arc length in the given units.
+
+        """
+        return pixel_to_distance * self._arc_length

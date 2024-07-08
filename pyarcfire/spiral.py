@@ -342,7 +342,20 @@ class ClusterSpiralResult:
         )
         return x, y
 
-    def _get_fit(self, cluster_idx: int) -> LogSpiralFitResult[FloatType]:
+    def get_fit(self, cluster_idx: int) -> LogSpiralFitResult[FloatType]:
+        """Return the log spiral fit associated with the given cluster index.
+
+        Parameters
+        ----------
+        cluster_idx : int
+            The index of the cluster to get the fit of.
+
+        Returns
+        -------
+        result : LogSpiralFitResult[FloatType]
+            The log spiral fit result.
+
+        """
         if cluster_idx not in self._spiral_cache:
             current_array, _ = self.get_cluster_array(cluster_idx)
             self._spiral_cache[cluster_idx] = fit_spiral_to_image(current_array)
@@ -376,7 +389,7 @@ class ClusterSpiralResult:
         """
         num_clusters: int = self.get_num_clusters()
         for cluster_idx in range(num_clusters):
-            spiral_fit = self._get_fit(cluster_idx)
+            spiral_fit = self.get_fit(cluster_idx)
             x, y = spiral_fit.calculate_cartesian_coordinates(
                 num_points,
                 pixel_to_distance,
@@ -414,7 +427,7 @@ class ClusterSpiralResult:
         """
         num_clusters: int = self.get_num_clusters()
         for cluster_idx in range(num_clusters):
-            spiral_fit = self._get_fit(cluster_idx)
+            spiral_fit = self.get_fit(cluster_idx)
             x, y = spiral_fit.calculate_cartesian_coordinates(
                 num_points,
                 pixel_to_distance,
@@ -436,7 +449,7 @@ class ClusterSpiralResult:
             The arc bounds.
 
         """
-        current_fit = self._get_fit(cluster_idx)
+        current_fit = self.get_fit(cluster_idx)
         start_angle = current_fit.offset
         end_angle = start_angle + current_fit.arc_extent
         return (start_angle, end_angle)
@@ -477,7 +490,7 @@ class ClusterSpiralResult:
             The dominant chirality.
 
         """
-        fits = [self._get_fit(cluster_idx) for cluster_idx in range(self.get_num_clusters())]
+        fits = [self.get_fit(cluster_idx) for cluster_idx in range(self.get_num_clusters())]
         arc_lengths = np.asarray([fit.arc_length for fit in fits])
         chiralities = np.asarray([fit.chirality_sign for fit in fits])
         result = np.sum(arc_lengths * chiralities)
@@ -503,7 +516,7 @@ class ClusterSpiralResult:
 
         """
         dominant_chirality = self.get_dominant_chirality()
-        fits = [self._get_fit(cluster_idx) for cluster_idx in range(self.get_num_clusters())]
+        fits = [self.get_fit(cluster_idx) for cluster_idx in range(self.get_num_clusters())]
         fits = [fit for fit in fits if fit.chirality == dominant_chirality]
         pitch_angles = np.asarray([fit.pitch_angle for fit in fits])
         return float(np.mean(pitch_angles))
