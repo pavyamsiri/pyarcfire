@@ -12,6 +12,8 @@ import numpy as np
 import scipy.io
 from skimage import filters
 
+from pyarcfire.arc import Chirality
+
 from .arc import LogSpiralFitResult, fit_spiral_to_image
 from .arc.utils import get_polar_coordinates
 from .assert_utils import (
@@ -46,6 +48,7 @@ if TYPE_CHECKING:
     from collections.abc import Callable, Generator
 
     from numpy.typing import NDArray
+
 
 log: logging.Logger = logging.getLogger(__name__)
 
@@ -464,6 +467,28 @@ class ClusterSpiralResult:
             np.sqrt(weights),
             (radii - calculate_radii(theta)),
         )
+
+    def get_dominant_chirality(self) -> Chirality:
+        """Determine the dominant chirality by arc length weighted vote.
+
+        Returns
+        -------
+        dominant_chirality : Chirality
+            The dominant chirality.
+
+        """
+        fits = [self._get_fit(cluster_idx) for cluster_idx in range(self.get_num_clusters())]
+        arc_lengths = np.asarray([fit.arc_length for fit in fits])
+        chiralities = np.asarray([fit.chirality_sign for fit in fits])
+        result = np.sum(arc_lengths * chiralities)
+        dominant_chirality: Chirality
+        if result > 0:
+            dominant_chirality = Chirality.CLOCKWISE
+        elif result < 0:
+            dominant_chirality = Chirality.COUNTER_CLOCKWISE
+        else:
+            dominant_chirality = Chirality.NONE
+        return dominant_chirality
 
 
 @benchmark
