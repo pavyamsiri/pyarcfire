@@ -89,7 +89,7 @@ class LogSpiralFitResult(Generic[FloatType]):
         if np.isclose(np.sin(self._pitch_angle), 0):
             self._arc_length = self.initial_radius * self.arc_extent
         else:
-            self._arc_length = abs(lengths[1] - lengths[0]) / np.sin(self._pitch_angle)
+            self._arc_length = abs(lengths[1] - lengths[0] / np.sin(self._pitch_angle))
         # Winding direction
         winding_direction: float = np.sign(self._pitch_angle)
         self._chirality: Chirality
