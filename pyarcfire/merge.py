@@ -57,11 +57,11 @@ def calculate_arc_merge_error(
     # Fit a spiral to both clusters at the same time
     first_merged_fit = fit_spiral_to_image(
         combined_cluster_array,
-        initial_pitch_angle=first_fit.pitch_angle,
+        initial_growth_factor=first_fit.growth_factor,
     )
     second_merged_fit = fit_spiral_to_image(
         combined_cluster_array,
-        initial_pitch_angle=second_fit.pitch_angle,
+        initial_growth_factor=second_fit.growth_factor,
     )
     first_fit_is_better = first_merged_fit.total_error <= second_merged_fit.total_error
     merged_fit = first_merged_fit if first_fit_is_better else second_merged_fit

@@ -18,7 +18,7 @@ from .common import LogSpiralFitResult
 from .functions import (
     calculate_best_initial_radius,
     calculate_log_spiral_error,
-    calculate_log_spiral_error_from_pitch_angle,
+    calculate_log_spiral_error_from_growth_factor,
 )
 from .utils import (
     adjust_theta_to_zero,
@@ -89,8 +89,8 @@ class InternalLogSpiralFitResult(Generic[FloatType]):
         The polar angle of the cluster's pixels in radians.
     offset : float
         The offset in radians.
-    pitch_angle : float
-        The pitch angle. TODO: I think the pitch angle is actually arctan(a)
+    growth_factor : float
+        The growth factor.
     arc_bounds : tuple[float, float]
         The azimuthal bounds of the arc.
     error : float
@@ -102,7 +102,7 @@ class InternalLogSpiralFitResult(Generic[FloatType]):
 
     theta: NDArray[FloatType]
     offset: float
-    pitch_angle: float
+    growth_factor: float
     arc_bounds: tuple[float, float]
     error: float
     bad_bounds: bool
@@ -110,7 +110,7 @@ class InternalLogSpiralFitResult(Generic[FloatType]):
 
 def fit_spiral_to_image(
     image: NDArray[FloatType],
-    initial_pitch_angle: float = 0,
+    initial_growth_factor: float = 0,
     *,
     force_single_revolution: bool = False,
 ) -> LogSpiralFitResult[FloatType]:
@@ -120,8 +120,8 @@ def fit_spiral_to_image(
     ----------
     image : NDArray[FloatType]
         The cluster encoded as an array of non-zero pixels.
-    initial_pitch_angle : float
-        The initial guess of the pitch angle.
+    initial_growth_factor : float
+        The initial guess of the growth factor k.
     force_single_revolution : bool
         Set this flag if you only want single revolution solutions.
 
@@ -153,7 +153,7 @@ def fit_spiral_to_image(
             radii,
             theta,
             weights,
-            initial_pitch_angle,
+            initial_growth_factor,
             inner_region,
         )
     else:
@@ -161,12 +161,12 @@ def fit_spiral_to_image(
             radii,
             theta,
             weights,
-            initial_pitch_angle,
+            initial_growth_factor,
         )
 
     arc_bounds = fit_result.arc_bounds
     offset = fit_result.offset
-    pitch_angle = fit_result.pitch_angle
+    growth_factor = fit_result.growth_factor
     error = fit_result.error
     theta = fit_result.theta
     bad_bounds = fit_result.bad_bounds
@@ -179,7 +179,7 @@ def fit_spiral_to_image(
         use_modulo=not need_multiple_revolutions,
     )
 
-    pitch_angle = pitch_angle if not bad_bounds else 0
+    growth_factor = growth_factor if not bad_bounds else 0
 
     # Recalculate initial radius and error after adjustment
     initial_radius = calculate_best_initial_radius(
@@ -187,7 +187,7 @@ def fit_spiral_to_image(
         theta,
         weights,
         offset,
-        pitch_angle,
+        growth_factor,
         use_modulo=not need_multiple_revolutions,
     )
     new_error, residuals = calculate_log_spiral_error(
@@ -195,7 +195,7 @@ def fit_spiral_to_image(
         theta,
         weights,
         offset,
-        pitch_angle,
+        growth_factor,
         initial_radius,
         use_modulo=not need_multiple_revolutions,
     )
@@ -214,7 +214,7 @@ def fit_spiral_to_image(
 
     return LogSpiralFitResult(
         offset=offset,
-        pitch_angle=pitch_angle,
+        growth_factor=growth_factor,
         initial_radius=initial_radius,
         arc_bounds=arc_bounds,
         total_error=new_error,
@@ -227,28 +227,28 @@ def _fit_spiral_to_image_single_revolution_core(
     radii: NDArray[FloatType],
     theta: NDArray[FloatType],
     weights: NDArray[FloatType],
-    initial_pitch_angle: float,
+    initial_growth_factor: float,
 ) -> InternalLogSpiralFitResult[FloatType]:
     # Find suitable bounds for the offset parameter
     bad_bounds, (lower_bound, upper_bound), rotation_amount, _ = calculate_bounds(theta)
     rotated_theta = np.mod(theta - rotation_amount, 2 * np.pi)
 
-    # Perform a fit to get the pitch angle
+    # Perform a fit to get the growth factor
     offset: float
-    pitch_angle: float
+    growth_factor: float
     if bad_bounds:
         offset = 0
-        pitch_angle = 0
+        growth_factor = 0
     else:
         offset = (lower_bound + upper_bound) / 2
         res = optimize.least_squares(
-            calculate_log_spiral_error_from_pitch_angle,
-            x0=initial_pitch_angle,
+            calculate_log_spiral_error_from_growth_factor,
+            x0=initial_growth_factor,
             args=(radii, rotated_theta, weights, offset),
             kwargs={"use_modulo": True},
         )
-        assert res.success, "Failed to fit pitch angle"
-        pitch_angle = res.x[0]
+        assert res.success, "Failed to fit growth factor"
+        growth_factor = res.x[0]
 
     # Calculate the error from the fit
     initial_radius = calculate_best_initial_radius(
@@ -256,7 +256,7 @@ def _fit_spiral_to_image_single_revolution_core(
         rotated_theta,
         weights,
         offset,
-        pitch_angle,
+        growth_factor,
         use_modulo=True,
     )
     error, _ = calculate_log_spiral_error(
@@ -264,7 +264,7 @@ def _fit_spiral_to_image_single_revolution_core(
         rotated_theta,
         weights,
         offset,
-        pitch_angle,
+        growth_factor,
         initial_radius,
         use_modulo=True,
     )
@@ -278,7 +278,7 @@ def _fit_spiral_to_image_single_revolution_core(
     return InternalLogSpiralFitResult(
         theta=theta_adjust,
         offset=offset,
-        pitch_angle=pitch_angle,
+        growth_factor=growth_factor,
         arc_bounds=arc_bounds,
         error=error,
         bad_bounds=bad_bounds,
@@ -289,7 +289,7 @@ def _fit_spiral_to_image_multiple_revolution_core(
     radii: NDArray[FloatType],
     theta: NDArray[FloatType],
     weights: NDArray[FloatType],
-    initial_pitch_angle: float,
+    initial_growth_factor: float,
     inner_region: NDArray[BoolType],
 ) -> InternalLogSpiralFitResult[FloatType]:
     # fitting depends on the arc bounds, but we don't know what the arc
@@ -305,35 +305,35 @@ def _fit_spiral_to_image_multiple_revolution_core(
     min_theta: float = float(np.min(theta))
     max_theta: float = float(np.max(theta))
 
-    # TODO(pavyamsiri): Pitch angle optimisation is totally wrong
+    # TODO(pavyamsiri): Growth factor optimisation is totally wrong
     # Assume chirality is clockwise and fit a spiral
-    cw_rotated_theta, cw_offset, cw_pitch_angle, cw_error = __fit_multiple_revolution_spiral(
+    cw_rotated_theta, cw_offset, cw_growth_factor, cw_error = __fit_multiple_revolution_spiral(
         radii,
         theta,
         weights,
         ~inner_region,
-        initial_pitch_angle,
+        initial_growth_factor,
         clockwise=True,
     )
     # Assume chirality is counter clockwise and fit a spiral
-    ccw_rotated_theta, ccw_offset, ccw_pitch_angle, ccw_error = __fit_multiple_revolution_spiral(
+    ccw_rotated_theta, ccw_offset, ccw_growth_factor, ccw_error = __fit_multiple_revolution_spiral(
         radii,
         theta,
         weights,
         inner_region,
-        initial_pitch_angle,
+        initial_growth_factor,
         clockwise=False,
     )
 
     if cw_error < ccw_error:
         adjusted_theta = cw_rotated_theta
         offset = cw_offset
-        pitch_angle = cw_pitch_angle
+        growth_factor = cw_growth_factor
         error = cw_error
     else:
         adjusted_theta = ccw_rotated_theta
         offset = ccw_offset
-        pitch_angle = ccw_pitch_angle
+        growth_factor = ccw_growth_factor
         error = ccw_error
 
     # Construct arc bounds
@@ -345,7 +345,7 @@ def _fit_spiral_to_image_multiple_revolution_core(
     return InternalLogSpiralFitResult(
         theta=adjusted_theta,
         offset=offset,
-        pitch_angle=pitch_angle,
+        growth_factor=growth_factor,
         arc_bounds=arc_bounds,
         error=error,
         bad_bounds=False,
@@ -357,7 +357,7 @@ def __fit_multiple_revolution_spiral(
     theta: NDArray[FloatType],
     weights: NDArray[FloatType],
     region: NDArray[BoolType],
-    initial_pitch_angle: float,
+    initial_growth_factor: float,
     *,
     clockwise: bool,
 ) -> tuple[NDArray[FloatType], float, float, float]:
@@ -367,24 +367,24 @@ def __fit_multiple_revolution_spiral(
     assert not bad_bounds
     rotated_theta = np.subtract(theta, rotation_amount)
     offset = (lower_bound + upper_bound) / 2
-    pitch_angle_bounds = (0, np.inf) if clockwise else (-np.inf, 0)
+    growth_factor_bounds = (0, np.inf) if clockwise else (-np.inf, 0)
     # NOTE: Have to invert the guess if counter clockwise to fit in the bounds
-    if not clockwise and initial_pitch_angle > 0:
-        initial_pitch_angle = -initial_pitch_angle
-    if clockwise and initial_pitch_angle < 0:
-        initial_pitch_angle = -initial_pitch_angle
+    if not clockwise and initial_growth_factor > 0:
+        initial_growth_factor = -initial_growth_factor
+    if clockwise and initial_growth_factor < 0:
+        initial_growth_factor = -initial_growth_factor
     res = optimize.least_squares(
-        calculate_log_spiral_error_from_pitch_angle,
-        x0=initial_pitch_angle,
-        bounds=pitch_angle_bounds,
+        calculate_log_spiral_error_from_growth_factor,
+        x0=initial_growth_factor,
+        bounds=growth_factor_bounds,
         args=(radii, rotated_theta, weights, offset),
         kwargs={"use_modulo": False},
         ftol=MULTIPLE_REVOLUTION_TOLERANCE,
         gtol=MULTIPLE_REVOLUTION_TOLERANCE,
         xtol=MULTIPLE_REVOLUTION_TOLERANCE,
     )
-    assert res.success, "Failed to fit pitch angle"
-    pitch_angle: float = cast(float, res.x[0])
+    assert res.success, "Failed to fit growth factor"
+    growth_factor: float = cast(float, res.x[0])
 
     # Calculate the error from the fit
     initial_radius = calculate_best_initial_radius(
@@ -392,7 +392,7 @@ def __fit_multiple_revolution_spiral(
         rotated_theta,
         weights,
         offset,
-        pitch_angle,
+        growth_factor,
         use_modulo=False,
     )
     error, _ = calculate_log_spiral_error(
@@ -400,7 +400,7 @@ def __fit_multiple_revolution_spiral(
         rotated_theta,
         weights,
         offset,
-        pitch_angle,
+        growth_factor,
         initial_radius,
         use_modulo=False,
     )
@@ -408,7 +408,7 @@ def __fit_multiple_revolution_spiral(
     # Rotate back
     offset = (offset + rotation_amount) % (2 * np.pi)
 
-    return (rotated_theta, offset, pitch_angle, error)
+    return (rotated_theta, offset, growth_factor, error)
 
 
 def __cluster_has_no_endpoints_or_contains_origin(

@@ -17,8 +17,8 @@ class LogSpiralFitResult(Generic[FloatType]):
     """The result of a log spiral fit to a cluster.
 
     A log spiral is a curve of the form
-        R = R0 * exp(-a * (theta - phi))
-    where R0 is the initial radius, a is the pitch angle and phi
+        R = R0 * exp(-k * (theta - phi))
+    where R0 is the initial radius, k is the growth factor and phi
     is the offset. R and theta are the radial and polar coordinate
     respectively.
 
@@ -26,8 +26,8 @@ class LogSpiralFitResult(Generic[FloatType]):
     ----------
     offset : float
         The offset in radians.
-    pitch_angle : float
-        The pitch angle. TODO: I think the pitch angle is actually arctan(a)
+    growth_factor : float
+        The growth factor.
     initial_radius : float
         The initial radius in pixels.
     arc_bounds : tuple[float, float]
@@ -42,7 +42,7 @@ class LogSpiralFitResult(Generic[FloatType]):
     """
 
     offset: float
-    pitch_angle: float
+    growth_factor: float
     initial_radius: float
     arc_bounds: tuple[float, float]
     total_error: float
@@ -83,7 +83,7 @@ class LogSpiralFitResult(Generic[FloatType]):
         radii = pixel_to_distance * log_spiral(
             theta,
             self.offset,
-            self.pitch_angle,
+            self.growth_factor,
             self.initial_radius,
             use_modulo=not self.has_multiple_revolutions,
         )

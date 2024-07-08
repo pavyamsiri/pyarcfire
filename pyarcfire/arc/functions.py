@@ -146,7 +146,7 @@ def calculate_log_spiral_error_from_growth_factor(
     Parameters
     ----------
     growth_factor : float
-        The pitch angle.
+        The growth factor.
     radii : NDArray[FloatType]
         The polar radii of the cluster's pixels in pixels.
     theta : NDArray[FloatType]
