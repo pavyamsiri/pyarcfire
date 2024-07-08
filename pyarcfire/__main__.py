@@ -107,6 +107,9 @@ def process_from_image(args: argparse.Namespace) -> None:
     contrast_image = result.get_unsharp_image()
     field = result.get_field()
 
+    log.debug("Dominant chirality %s", result.get_dominant_chirality())
+    log.debug("Overall pitch angle %.2f degrees", np.rad2deg(result.get_overall_pitch_angle()))
+
     if args.cluster_path is not None:
         result.dump(args.cluster_path)
 
