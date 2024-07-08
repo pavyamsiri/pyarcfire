@@ -172,6 +172,28 @@ class ClusterSpiralResult:
         """
         return self._cluster_masks.shape[2]
 
+    def get_image_height(self) -> int:
+        """Return the original image height.
+
+        Returns
+        -------
+        width : int
+            The image height in pixels.
+
+        """
+        return self._image.shape[0]
+
+    def get_image_width(self) -> int:
+        """Return the original image width.
+
+        Returns
+        -------
+        width : int
+            The image width in pixels.
+
+        """
+        return self._image.shape[1]
+
     def get_image(self) -> NDArray[FloatType]:
         """Return the original image.
 

@@ -84,8 +84,6 @@ def process_from_image(args: argparse.Namespace) -> None:
         log.info("Rescaling image by factor %f...", scaling_factor)
         image = transform.rescale(image, scaling_factor)
 
-    width: float = image.shape[0] / 2 - 0.5
-
     result = detect_spirals_in_image(
         image,
         UnsharpMaskSettings(),
@@ -99,6 +97,8 @@ def process_from_image(args: argparse.Namespace) -> None:
     if result is None:
         log.critical("Could not find any suitable clusters!")
         return
+    width: float = result.get_image_width() / 2 - 0.5
+    height: float = result.get_image_height() / 2 - 0.5
 
     unsharp_settings = result.unsharp_mask_settings
     cluster_arrays = result.get_cluster_arrays()
@@ -137,14 +137,14 @@ def process_from_image(args: argparse.Namespace) -> None:
     cluster_axis = fig.add_subplot(234)
     cluster_axis.set_title("Clusters")
     cluster_axis.set_xlim(-width, width)
-    cluster_axis.set_ylim(-width, width)
+    cluster_axis.set_ylim(-height, height)
     cluster_axis.set_axis_off()
 
     image_overlay_axis = fig.add_subplot(235)
-    image_overlay_axis.imshow(image, extent=(-width, width, -width, width), cmap="gray")
+    image_overlay_axis.imshow(image, extent=(-height, height, -width, width), cmap="gray")
     image_overlay_axis.set_title("Original image overlaid with spirals")
     image_overlay_axis.set_xlim(-width, width)
-    image_overlay_axis.set_ylim(-width, width)
+    image_overlay_axis.set_ylim(-height, height)
     image_overlay_axis.set_axis_off()
 
     colored_image_overlay_axis = fig.add_subplot(236)
@@ -152,7 +152,7 @@ def process_from_image(args: argparse.Namespace) -> None:
         "Original image colored with masks and overlaid with spirals",
     )
     colored_image_overlay_axis.set_xlim(-width, width)
-    colored_image_overlay_axis.set_ylim(-width, width)
+    colored_image_overlay_axis.set_ylim(-height, height)
     colored_image_overlay_axis.set_axis_off()
 
     color_map = mpl.colormaps["hsv"]
@@ -168,7 +168,7 @@ def process_from_image(args: argparse.Namespace) -> None:
         cluster_mask = np.zeros((current_array.shape[0], current_array.shape[1], 4))
         cluster_mask[mask, :] = color_map((cluster_idx + 0.5) / num_clusters)
         colored_image[mask, :] *= color_map((cluster_idx + 0.5) / num_clusters)
-        cluster_axis.imshow(cluster_mask, extent=(-width, width, -width, width))
+        cluster_axis.imshow(cluster_mask, extent=(-height, height, -width, width))
         spiral_fit = fit_spiral_to_image(current_array)
         x, y = spiral_fit.calculate_cartesian_coordinates(100, pixel_to_distance=1)
         cluster_axis.plot(
@@ -191,7 +191,7 @@ def process_from_image(args: argparse.Namespace) -> None:
         )
     colored_image_overlay_axis.imshow(
         colored_image,
-        extent=(-width, width, -width, width),
+        extent=(-height, height, -width, width),
     )
 
     fig.tight_layout()
