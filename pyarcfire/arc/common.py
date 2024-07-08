@@ -111,24 +111,12 @@ class LogSpiralFitResult(Generic[FloatType]):
         y = y_flip_factor * np.multiply(radii, np.sin(theta))
         return (x, y)
 
+    @property
     def pitch_angle_in_degrees(self) -> float:
-        """Return the pitch angle of the spiral in degrees.
-
-        Returns
-        -------
-        pitch_angle : float
-            The pitch angle in degrees from [-180, 180].
-
-        """
+        """float: The pitch angle in degrees from [-180, 180]."""
         return np.rad2deg(self._pitch_angle)
 
+    @property
     def arc_length(self) -> float:
-        """Return the arc length in pixel units.
-
-        Returns
-        -------
-        arc_length : float
-            The arc length in pixel units.
-
-        """
+        """float: The arc length in pixel units."""
         return self._arc_length
