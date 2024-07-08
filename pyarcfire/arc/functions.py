@@ -11,7 +11,7 @@ FloatType = TypeVar("FloatType", np.float32, np.float64)
 def log_spiral(
     theta: NDArray[FloatType],
     offset: float,
-    pitch_angle: float,
+    growth_factor: float,
     initial_radius: float,
     *,
     use_modulo: bool,
@@ -24,8 +24,8 @@ def log_spiral(
         The polar angle of the log spiral in radians.
     offset : float
         The offset angle in radians.
-    pitch_angle : float
-        The pitch angle.
+    growth_factor : float
+        The growth factor.
     initial_radius : float
         The initial radius in pixels.
     use_modulo : bool
@@ -35,7 +35,7 @@ def log_spiral(
     angles = theta - offset
     if use_modulo:
         angles %= 2 * np.pi
-    result: NDArray[FloatType] = np.multiply(initial_radius, np.exp(np.multiply(-pitch_angle, angles)))
+    result: NDArray[FloatType] = np.multiply(initial_radius, np.exp(np.multiply(-growth_factor, angles)))
     return result
 
 
@@ -44,7 +44,7 @@ def calculate_log_spiral_residual_vector(
     theta: NDArray[FloatType],
     weights: NDArray[FloatType],
     offset: float,
-    pitch_angle: float,
+    growth_factor: float,
     initial_radius: float,
     *,
     use_modulo: bool,
@@ -61,8 +61,8 @@ def calculate_log_spiral_residual_vector(
         The weights of the cluster's pixels in pixels.
     offset : float
         The offset angle in radians.
-    pitch_angle : float
-        The pitch angle.
+    growth_factor : float
+        The growth factor.
     initial_radius : float
         The initial radius in pixels.
     use_modulo : bool
@@ -76,7 +76,7 @@ def calculate_log_spiral_residual_vector(
     """
     return np.multiply(
         np.sqrt(weights),
-        (radii - log_spiral(theta, offset, pitch_angle, initial_radius, use_modulo=use_modulo)),
+        (radii - log_spiral(theta, offset, growth_factor, initial_radius, use_modulo=use_modulo)),
     )
 
 
@@ -85,7 +85,7 @@ def calculate_log_spiral_error(
     theta: NDArray[FloatType],
     weights: NDArray[FloatType],
     offset: float,
-    pitch_angle: float,
+    growth_factor: float,
     initial_radius: float,
     *,
     use_modulo: bool,
@@ -102,8 +102,8 @@ def calculate_log_spiral_error(
         The weights of the cluster's pixels in pixels.
     offset : float
         The offset angle in radians.
-    pitch_angle : float
-        The pitch angle.
+    growth_factor : float
+        The growth factor.
     initial_radius : float
         The initial radius in pixels.
     use_modulo : bool
@@ -122,7 +122,7 @@ def calculate_log_spiral_error(
         theta,
         weights,
         offset,
-        pitch_angle,
+        growth_factor,
         initial_radius,
         use_modulo=use_modulo,
     )
@@ -130,8 +130,8 @@ def calculate_log_spiral_error(
     return (sum_square_error, residuals)
 
 
-def calculate_log_spiral_error_from_pitch_angle(
-    pitch_angle: float,
+def calculate_log_spiral_error_from_growth_factor(
+    growth_factor: float,
     radii: NDArray[FloatType],
     theta: NDArray[FloatType],
     weights: NDArray[FloatType],
@@ -141,11 +141,11 @@ def calculate_log_spiral_error_from_pitch_angle(
 ) -> NDArray[FloatType]:
     """Return the residuals of a log spiral fit to the given cluster.
 
-    This function automatically determines the optimal initial radius given an offset and pitch angle.
+    This function automatically determines the optimal initial radius given an offset and the growth factor.
 
     Parameters
     ----------
-    pitch_angle : float
+    growth_factor : float
         The pitch angle.
     radii : NDArray[FloatType]
         The polar radii of the cluster's pixels in pixels.
@@ -166,13 +166,13 @@ def calculate_log_spiral_error_from_pitch_angle(
         The residual associated with each pixel in the cluster.
 
     """
-    initial_radius = calculate_best_initial_radius(radii, theta, weights, offset, pitch_angle, use_modulo=use_modulo)
+    initial_radius = calculate_best_initial_radius(radii, theta, weights, offset, growth_factor, use_modulo=use_modulo)
     return calculate_log_spiral_residual_vector(
         radii,
         theta,
         weights,
         offset,
-        pitch_angle,
+        growth_factor,
         initial_radius,
         use_modulo=use_modulo,
     )
@@ -183,13 +183,13 @@ def calculate_best_initial_radius(
     theta: NDArray[FloatType],
     weights: NDArray[FloatType],
     offset: float,
-    pitch_angle: float,
+    growth_factor: float,
     *,
     use_modulo: bool,
 ) -> float:
-    """Determine the most optimal initial radius given a pitch angle and offset.
+    """Determine the most optimal initial radius given a growth factor and offset.
 
-    This function automatically determines the optimal initial radius given an offset and pitch angle.
+    This function automatically determines the optimal initial radius given an offset and growth factor.
 
     Parameters
     ----------
@@ -201,8 +201,8 @@ def calculate_best_initial_radius(
         The weights of the cluster's pixels in pixels.
     offset : float
         The offset angle in radians.
-    pitch_angle : float
-        The pitch angle.
+    growth_factor : float
+        The growth factor.
     use_modulo : bool
         Set this flag to apply the modulo operator to the angles before computing the radii.
 
@@ -212,5 +212,5 @@ def calculate_best_initial_radius(
         The optimal initial radius.
 
     """
-    log_spiral_term = log_spiral(theta, offset, pitch_angle, 1, use_modulo=use_modulo)
+    log_spiral_term = log_spiral(theta, offset, growth_factor, 1, use_modulo=use_modulo)
     return float(np.sum(radii * weights * log_spiral_term) / np.sum(weights * np.square(log_spiral_term)))
