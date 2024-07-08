@@ -156,3 +156,8 @@ class LogSpiralFitResult(Generic[FloatType]):
     def chirality(self) -> Chirality:
         """Chirality: The chirality of the spiral."""
         return self._chirality
+
+    @property
+    def chirality_sign(self) -> float:
+        """float: The sign of the pitch angle."""
+        return np.sign(self._pitch_angle)
