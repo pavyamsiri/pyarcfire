@@ -1,6 +1,7 @@
 """A dataclass that stores the results of a log spiral fit."""
 
 from dataclasses import dataclass
+from enum import Enum, auto
 from typing import Generic, TypeVar
 
 import numpy as np
@@ -10,6 +11,25 @@ from numpy.typing import NDArray
 from .functions import log_spiral
 
 FloatType = TypeVar("FloatType", float32, float64)
+
+
+class Chirality(Enum):
+    """Chirality of a log spiral.
+
+    Variants
+    --------
+    CLOCKWISE
+        The spiral winds clockwise or "Z"-wise.
+    COUNTER_CLOCKWISE
+        The spiral winds counter-clockwise or "S"-wise.
+    NONE
+        The spiral does not wind at all i.e. when pitch angle is exactly zero.
+
+    """
+
+    CLOCKWISE = auto()
+    COUNTER_CLOCKWISE = auto()
+    NONE = auto()
 
 
 @dataclass
@@ -51,7 +71,9 @@ class LogSpiralFitResult(Generic[FloatType]):
 
     def __post_init__(self) -> None:
         """Calculate properties of the log spiral."""
+        # Pitch angle
         self._pitch_angle = np.arctan(self.growth_factor)
+        # Arc length
         start_angle = self.offset
         end_angle = start_angle + self.arc_extent
         lengths = log_spiral(
@@ -68,6 +90,15 @@ class LogSpiralFitResult(Generic[FloatType]):
             self._arc_length = self.initial_radius * self.arc_extent
         else:
             self._arc_length = abs(lengths[1] - lengths[0]) / np.sin(self._pitch_angle)
+        # Winding direction
+        winding_direction: float = np.sign(self._pitch_angle)
+        self._chirality: Chirality
+        if np.isclose(winding_direction, 0):
+            self._chirality = Chirality.NONE
+        elif winding_direction > 0:
+            self._chirality = Chirality.CLOCKWISE
+        else:
+            self._chirality = Chirality.COUNTER_CLOCKWISE
 
     def calculate_cartesian_coordinates(
         self,
@@ -120,3 +151,8 @@ class LogSpiralFitResult(Generic[FloatType]):
     def arc_length(self) -> float:
         """float: The arc length in pixel units."""
         return self._arc_length
+
+    @property
+    def chirality(self) -> Chirality:
+        """Chirality: The chirality of the spiral."""
+        return self._chirality
