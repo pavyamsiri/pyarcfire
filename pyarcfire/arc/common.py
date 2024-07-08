@@ -30,8 +30,8 @@ class LogSpiralFitResult(Generic[FloatType]):
         The growth factor.
     initial_radius : float
         The initial radius in pixels.
-    arc_bounds : tuple[float, float]
-        The azimuthal bounds of the arc.
+    arc_extent : float
+        The azimuthal extent of the arc in radians.
     total_error : float
         The sum of the square residuals.
     errors : NDArray[FloatType]
