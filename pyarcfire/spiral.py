@@ -490,6 +490,24 @@ class ClusterSpiralResult:
             dominant_chirality = Chirality.NONE
         return dominant_chirality
 
+    def get_overall_pitch_angle(self) -> float:
+        """Determine the overall pitch angle in radians.
+
+        The overall pitch angle is the average pitch angle of all the arcs that agree with the
+        dominant chirality.
+
+        Returns
+        -------
+        overall_pitch_angle : float
+            The overall pitch angle in radians.
+
+        """
+        dominant_chirality = self.get_dominant_chirality()
+        fits = [self._get_fit(cluster_idx) for cluster_idx in range(self.get_num_clusters())]
+        fits = [fit for fit in fits if fit.chirality == dominant_chirality]
+        pitch_angles = np.asarray([fit.pitch_angle for fit in fits])
+        return float(np.mean(pitch_angles))
+
 
 @benchmark
 def detect_spirals_in_image(

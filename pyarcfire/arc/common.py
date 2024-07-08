@@ -143,6 +143,11 @@ class LogSpiralFitResult(Generic[FloatType]):
         return (x, y)
 
     @property
+    def pitch_angle(self) -> float:
+        """float: The pitch angle in radians from [-pi, pi]."""
+        return self._pitch_angle
+
+    @property
     def pitch_angle_in_degrees(self) -> float:
         """float: The pitch angle in degrees from [-180, 180]."""
         return np.rad2deg(self._pitch_angle)
