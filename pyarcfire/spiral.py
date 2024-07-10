@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import warnings
 from dataclasses import dataclass
+from enum import Enum, auto
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -56,6 +57,24 @@ log: logging.Logger = logging.getLogger(__name__)
 FloatType = np.float32
 
 MAX_SIZE_BEFORE_WARN: int = 256
+
+
+class FitErrorKind(Enum):
+    """The normalisation scheme used to compute the total error.
+
+    The total error being the sum of th square residuals of a model fit to a spiral cluster.
+
+    Variants
+    --------
+    NONORM
+        The total error is left as is.
+    NUM_PIXELS_NORM
+        The total error is divided by the number of pixels in the cluster.
+
+    """
+
+    NONORM = auto()
+    NUM_PIXELS_NORM = auto()
 
 
 @dataclass
@@ -458,7 +477,10 @@ class ClusterSpiralResult:
         self,
         calculate_radii: Callable[[NDArray[FloatType]], NDArray[FloatType]],
         cluster_idx: int,
-    ) -> NDArray[FloatType]:
+        *,
+        pixel_to_distance: float,
+        fit_error_kind: FitErrorKind = FitErrorKind.NONORM,
+    ) -> float:
         """Calculate the residuals of the given function with respect to a cluster.
 
         Parameters
@@ -467,6 +489,10 @@ class ClusterSpiralResult:
             A function that takes in an array of angles and returns radii.
         cluster_idx : int
             The index of the cluster.
+        pixel_to_distance : float
+            Conversion factor from pixel units to physical distance units.
+        fit_error_kind : FitErrorKind
+            The kind of normalisation scheme to apply to the fit error before returning it.
 
         Returns
         -------
@@ -476,10 +502,19 @@ class ClusterSpiralResult:
         """
         current_array, _ = self.get_cluster_array(cluster_idx)
         radii, theta, weights = get_polar_coordinates(current_array)
-        return np.multiply(
+        residuals = np.multiply(
             np.sqrt(weights),
-            (radii - calculate_radii(theta)),
+            (pixel_to_distance * radii - calculate_radii(theta)),
         )
+        total_error = np.sum(np.square(residuals))
+        if fit_error_kind == FitErrorKind.NONORM:
+            pass
+        elif fit_error_kind == FitErrorKind.NUM_PIXELS_NORM:
+            num_pixels = np.count_nonzero(current_array)
+            total_error /= num_pixels
+        else:
+            log.warning("%s is an invalid fit error type! Defaulting to no normalisation...", fit_error_kind)
+        return total_error
 
     def get_dominant_chirality(self) -> Chirality:
         """Determine the dominant chirality by arc length weighted vote.
