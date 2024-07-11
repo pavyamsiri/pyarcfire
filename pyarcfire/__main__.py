@@ -120,11 +120,11 @@ def process_from_image(args: argparse.Namespace) -> None:
     )
     contrast_axis.set_axis_off()
 
-    x_space_range = np.arange(field.shape[0])
-    y_space_range = np.arange(field.shape[1])
-    x, y = np.meshgrid(x_space_range, -y_space_range)
+    x_space_range = np.arange(field.shape[1])
+    y_space_range = np.arange(field.shape[0])
+    x, y = np.meshgrid(x_space_range, y_space_range)
     orientation_axis = fig.add_subplot(233)
-    orientation_axis.quiver(x, y, field.x, field.y, color="tab:blue", headaxislength=0)
+    orientation_axis.quiver(y, x, field.y, field.x, color="tab:blue", headaxislength=0)
     orientation_axis.set_aspect("equal")
     orientation_axis.set_title("Orientation field")
     orientation_axis.set_axis_off()
@@ -166,31 +166,33 @@ def process_from_image(args: argparse.Namespace) -> None:
         current_array = cluster_arrays[:, :, cluster_idx]
         mask = current_array > 0
         cluster_mask = np.zeros((current_array.shape[0], current_array.shape[1], 4))
-        cluster_mask[mask, :] = color_map((cluster_idx + 0.5) / num_clusters)
-        colored_image[mask, :] *= color_map((cluster_idx + 0.5) / num_clusters)
+        cluster_color = color_map((cluster_idx + 0.5) / num_clusters)
+        arc_color = color_map((num_clusters - cluster_idx + 0.5) / num_clusters)
+        cluster_mask[mask, :] = cluster_color
+        colored_image[mask, :] *= cluster_color
         cluster_axis.imshow(
             np.swapaxes(cluster_mask, 0, 1),
             origin="lower",
             extent=(-width, width, -height, height),
         )
         spiral_fit = fit_spiral_to_image(current_array)
-        x, y = spiral_fit.calculate_cartesian_coordinates(100, pixel_to_distance=1)
+        x, y = spiral_fit.calculate_cartesian_coordinates(100, pixel_to_distance=1, flip_y=True)
         cluster_axis.plot(
-            x,
             y,
-            color=color_map((num_clusters - cluster_idx + 0.5) / num_clusters),
+            x,
+            color=arc_color,
             label=f"Cluster {cluster_idx}",
         )
         image_overlay_axis.plot(
-            x,
             y,
-            color=color_map((num_clusters - cluster_idx + 0.5) / num_clusters),
+            x,
+            color=arc_color,
             label=f"Cluster {cluster_idx}",
         )
         colored_image_overlay_axis.plot(
-            x,
             y,
-            color=color_map((num_clusters - cluster_idx + 0.5) / num_clusters),
+            x,
+            color=arc_color,
             label=f"Cluster {cluster_idx}",
         )
     colored_image_overlay_axis.imshow(
