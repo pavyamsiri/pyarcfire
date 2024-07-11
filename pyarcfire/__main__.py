@@ -99,12 +99,22 @@ def process_from_image(args: argparse.Namespace) -> None:
 
     fig = plt.figure(figsize=(14, 8))
     original_axis = fig.add_subplot(231)
-    original_axis.imshow(image, cmap="gray")
+    original_axis.imshow(
+        np.swapaxes(image, 0, 1),
+        origin="lower",
+        extent=(-width, width, -height, height),
+        cmap="gray",
+    )
     original_axis.set_title("Original image")
     original_axis.set_axis_off()
 
     contrast_axis = fig.add_subplot(232)
-    contrast_axis.imshow(contrast_image, cmap="gray")
+    contrast_axis.imshow(
+        np.swapaxes(contrast_image, 0, 1),
+        origin="lower",
+        extent=(-width, width, -height, height),
+        cmap="gray",
+    )
     contrast_axis.set_title(
         rf"Unsharp image $\mathrm{{Radius}} = {unsharp_settings.radius}, \; \mathrm{{Amount}} = {unsharp_settings.amount}$",
     )
@@ -126,7 +136,12 @@ def process_from_image(args: argparse.Namespace) -> None:
     cluster_axis.set_axis_off()
 
     image_overlay_axis = fig.add_subplot(235)
-    image_overlay_axis.imshow(image, extent=(-height, height, -width, width), cmap="gray")
+    image_overlay_axis.imshow(
+        np.swapaxes(image, 0, 1),
+        origin="lower",
+        extent=(-width, width, -height, height),
+        cmap="gray",
+    )
     image_overlay_axis.set_title("Original image overlaid with spirals")
     image_overlay_axis.set_xlim(-width, width)
     image_overlay_axis.set_ylim(-height, height)
@@ -153,7 +168,11 @@ def process_from_image(args: argparse.Namespace) -> None:
         cluster_mask = np.zeros((current_array.shape[0], current_array.shape[1], 4))
         cluster_mask[mask, :] = color_map((cluster_idx + 0.5) / num_clusters)
         colored_image[mask, :] *= color_map((cluster_idx + 0.5) / num_clusters)
-        cluster_axis.imshow(cluster_mask, extent=(-height, height, -width, width))
+        cluster_axis.imshow(
+            np.swapaxes(cluster_mask, 0, 1),
+            origin="lower",
+            extent=(-width, width, -height, height),
+        )
         spiral_fit = fit_spiral_to_image(current_array)
         x, y = spiral_fit.calculate_cartesian_coordinates(100, pixel_to_distance=1)
         cluster_axis.plot(
@@ -175,8 +194,9 @@ def process_from_image(args: argparse.Namespace) -> None:
             label=f"Cluster {cluster_idx}",
         )
     colored_image_overlay_axis.imshow(
-        colored_image,
-        extent=(-height, height, -width, width),
+        np.swapaxes(colored_image, 0, 1),
+        origin="lower",
+        extent=(-width, width, -height, height),
     )
 
     fig.tight_layout()
@@ -218,6 +238,7 @@ def _load_image(input_path: Path) -> NDArray[float32]:
     else:
         # Load image
         image = np.asarray(Image.open(input_path).convert("L")).astype(float32) / 255
+        image = np.fliplr(image.T)
     return image
 
 
