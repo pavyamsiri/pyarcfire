@@ -9,10 +9,9 @@ from typing import TYPE_CHECKING
 
 import matplotlib as mpl
 import numpy as np
-import scipy.io
 from matplotlib import pyplot as plt
+from numpy import float32
 from PIL import Image
-from skimage import transform
 
 from pyarcfire import (
     GenerateClustersSettings,
@@ -28,7 +27,6 @@ from .spiral import detect_spirals_in_image
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
-    from typing import Any
 
     from numpy.typing import NDArray
 
@@ -55,8 +53,6 @@ def main(raw_args: Sequence[str]) -> None:
     command: str = args.command
     if command == "image":
         process_from_image(args)
-    elif command == "cluster":
-        process_cluster(args)
     else:
         log.critical("Command %s is unrecognised or not yet supported!", command)
 
@@ -70,19 +66,8 @@ def process_from_image(args: argparse.Namespace) -> None:
         The parsed command line arguments.
 
     """
-    input_path: str = args.input_path
-    image: NDArray[np.float32]
-    extension = Path(input_path).suffix.lstrip(".")
-    if extension == "npy":
-        image = np.load(input_path, allow_pickle=True).astype(np.float32)
-    else:
-        # Load image
-        image = np.asarray(Image.open(input_path).convert("L")).astype(np.float32) / 255
-    # Rescale
-    scaling_factor: float | None = args.scaling_factor
-    if scaling_factor is not None:
-        log.info("Rescaling image by factor %f...", scaling_factor)
-        image = transform.rescale(image, scaling_factor)
+    input_path: Path = Path(args.input_path)
+    image: NDArray[float32] = _load_image(input_path)
 
     result = detect_spirals_in_image(
         image,
@@ -109,9 +94,6 @@ def process_from_image(args: argparse.Namespace) -> None:
 
     log.debug("Dominant chirality %s", result.get_dominant_chirality())
     log.debug("Overall pitch angle %.2f degrees", np.rad2deg(result.get_overall_pitch_angle()))
-
-    if args.cluster_path is not None:
-        result.dump(args.cluster_path)
 
     show_flag: bool = args.output_path is None
 
@@ -209,69 +191,34 @@ def process_from_image(args: argparse.Namespace) -> None:
     plt.close()
 
 
-def process_cluster(args: argparse.Namespace) -> None:
-    """Load a cluster array and run it through the SpArcFiRe algorithm.
+def _load_image(input_path: Path) -> NDArray[float32]:
+    """Load an image from a file.
+
+    The returned image should in row-major storage form that is the first
+    index indexes into rows while the second indexes into columns. The lowest
+    indices also correspond to the most negative coordinates.
 
     Parameters
     ----------
-    args : argparse.Namespace
-        The parsed command line arguments.
+    input_path : Path
+        The path to the image.
+
+    Returns
+    -------
+    image : NDArray[float32]
+        The image in row-major form.
 
     """
-    input_path: str = args.input_path
+    image: NDArray[float32]
     extension = Path(input_path).suffix.lstrip(".")
+    # Numpy arrays from npy are already in row major form
     if extension == "npy":
-        log.info("Loading npy...")
-        arr = np.load(input_path)
-    elif extension == "mat":
-        log.info("Loading mat...")
-        data: dict[str, Any] = scipy.io.loadmat(input_path)
-        arr = data["image"]
-        if len(arr.shape) == 2:
-            arr = arr.reshape((arr.shape[0], arr.shape[1], 1))
-        assert len(arr.shape) == 3
+        image = np.load(input_path).astype(float32)
+    # Assume it is an image format like .png
     else:
-        log.critical(
-            "The %s data format is not valid or is not yet supported!",
-            extension,
-        )
-        return
-    num_clusters = arr.shape[2]
-    log.debug("Loaded %d clusters", num_clusters)
-
-    fit_spiral_to_image(arr.sum(axis=2))
-
-    width = arr.shape[0] / 2 - 0.5
-
-    for cluster_idx in range(num_clusters):
-        log.debug("Cluster %d sums to = %f", cluster_idx, arr[:, :, cluster_idx].sum())
-
-    if not args.plot_flag:
-        return
-
-    fig = plt.figure()
-    axis = fig.add_subplot(111)
-    color_map = mpl.colormaps["hsv"]
-    for cluster_idx in range(num_clusters):
-        current_array = arr[:, :, cluster_idx]
-        mask = current_array > 0
-        cluster_mask = np.zeros((current_array.shape[0], current_array.shape[1], 4))
-        cluster_mask[mask, :] = color_map((cluster_idx + 0.5) / num_clusters)
-        axis.imshow(cluster_mask, extent=(-width, width, -width, width))
-        spiral_fit = fit_spiral_to_image(current_array)
-        x, y = spiral_fit.calculate_cartesian_coordinates(100, pixel_to_distance=1)
-        axis.plot(
-            x,
-            y,
-            color=color_map((num_clusters - cluster_idx + 0.5) / num_clusters),
-            label=f"Cluster {cluster_idx}",
-        )
-    axis.legend()
-    axis.set_xlim(-width, width)
-    axis.set_ylim(-width, width)
-
-    plt.show()
-    plt.close()
+        # Load image
+        image = np.asarray(Image.open(input_path).convert("L")).astype(float32) / 255
+    return image
 
 
 def _parse_args(args: Sequence[str]) -> argparse.Namespace:
@@ -296,51 +243,10 @@ def _parse_args(args: Sequence[str]) -> argparse.Namespace:
         parents=(base_subparser,),
     )
     _configure_image_command_parser(from_image_parser)
-    from_cluster_parser = subparsers.add_parser(
-        "cluster",
-        help="Process a cluster stored in as a data array.",
-        parents=(base_subparser,),
-    )
-    _configure_cluster_command_parser(from_cluster_parser)
     return parser.parse_args(args)
 
 
 def _configure_image_command_parser(parser: argparse.ArgumentParser) -> None:
-    __add_input_path_to_parser(parser)
-    parser.add_argument(
-        "-o",
-        "--o",
-        type=str,
-        dest="output_path",
-        help="Path to save plot to. If this argument is not given, the plot will be shown in a GUI instead.",
-        required=False,
-    )
-    parser.add_argument(
-        "-co",
-        "--co",
-        type=str,
-        dest="cluster_path",
-        help="Path to output data array of clusters.",
-        required=False,
-    )
-    parser.add_argument(
-        "-scale", "--scale", type=float, dest="scaling_factor", help="Give this flag a number to scale the image with."
-    )
-
-
-def _configure_cluster_command_parser(parser: argparse.ArgumentParser) -> None:
-    __add_input_path_to_parser(parser)
-    parser.add_argument(
-        "-plot",
-        "--plot",
-        action="store_true",
-        dest="plot_flag",
-        help="Turn on plotting.",
-        required=False,
-    )
-
-
-def __add_input_path_to_parser(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "-i",
         "--i",
@@ -348,6 +254,14 @@ def __add_input_path_to_parser(parser: argparse.ArgumentParser) -> None:
         dest="input_path",
         help="Path to the input image.",
         required=True,
+    )
+    parser.add_argument(
+        "-o",
+        "--o",
+        type=str,
+        dest="output_path",
+        help="Path to save plot to. If this argument is not given, the plot will be shown in a GUI instead.",
+        required=False,
     )
 
 
