@@ -60,8 +60,8 @@ def adjust_theta_to_zero(
     ----------
     theta : NDArray[FloatType]
         The polar angle of the cluster's pixels.
-    arc_extent : float
-        The extent of the arc in radians.
+    arc_bounds : tuple[float, float]
+        The azimuthal bounds of the arc in radians.
     offset : float
         The offset angle of the log spiral in radians.
     use_modulo : bool

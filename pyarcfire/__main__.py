@@ -82,8 +82,6 @@ def process_from_image(args: argparse.Namespace) -> None:
     if result is None:
         log.critical("Could not find any suitable clusters!")
         return
-    width: float = result.get_image_width() / 2 - 0.5
-    height: float = result.get_image_height() / 2 - 0.5
 
     unsharp_settings = result.unsharp_mask_settings
     cluster_arrays = result.get_cluster_arrays()
@@ -92,6 +90,10 @@ def process_from_image(args: argparse.Namespace) -> None:
     contrast_image = result.get_unsharp_image()
     field = result.get_field()
 
+    width: float = result.get_image_width() / 2 - 0.5
+    height: float = result.get_image_height() / 2 - 0.5
+    num_horizontal_pixels: int = result.get_image_width()
+    num_vertical_pixels: int = result.get_image_height()
     log.debug("Dominant chirality %s", result.get_dominant_chirality())
     log.debug("Overall pitch angle %.2f degrees", np.rad2deg(result.get_overall_pitch_angle()))
 
@@ -100,8 +102,7 @@ def process_from_image(args: argparse.Namespace) -> None:
     fig = plt.figure(figsize=(14, 8))
     original_axis = fig.add_subplot(231)
     original_axis.imshow(
-        np.swapaxes(image, 0, 1),
-        origin="lower",
+        image,
         extent=(-width, width, -height, height),
         cmap="gray",
     )
@@ -110,8 +111,7 @@ def process_from_image(args: argparse.Namespace) -> None:
 
     contrast_axis = fig.add_subplot(232)
     contrast_axis.imshow(
-        np.swapaxes(contrast_image, 0, 1),
-        origin="lower",
+        contrast_image,
         extent=(-width, width, -height, height),
         cmap="gray",
     )
@@ -120,11 +120,11 @@ def process_from_image(args: argparse.Namespace) -> None:
     )
     contrast_axis.set_axis_off()
 
-    x_space_range = np.arange(field.shape[1])
-    y_space_range = np.arange(field.shape[0])
-    x, y = np.meshgrid(x_space_range, y_space_range)
+    x_space_range = np.linspace(-width, width, num_horizontal_pixels)
+    y_space_range = np.linspace(-height, height, num_vertical_pixels)
+    x, y = np.meshgrid(x_space_range, -y_space_range)
     orientation_axis = fig.add_subplot(233)
-    orientation_axis.quiver(y, x, field.y, field.x, color="tab:blue", headaxislength=0)
+    orientation_axis.quiver(x, y, field.x, field.y, color="tab:blue", headaxislength=0)
     orientation_axis.set_aspect("equal")
     orientation_axis.set_title("Orientation field")
     orientation_axis.set_axis_off()
@@ -137,8 +137,7 @@ def process_from_image(args: argparse.Namespace) -> None:
 
     image_overlay_axis = fig.add_subplot(235)
     image_overlay_axis.imshow(
-        np.swapaxes(image, 0, 1),
-        origin="lower",
+        image,
         extent=(-width, width, -height, height),
         cmap="gray",
     )
@@ -171,33 +170,31 @@ def process_from_image(args: argparse.Namespace) -> None:
         cluster_mask[mask, :] = cluster_color
         colored_image[mask, :] *= cluster_color
         cluster_axis.imshow(
-            np.swapaxes(cluster_mask, 0, 1),
-            origin="lower",
+            cluster_mask,
             extent=(-width, width, -height, height),
         )
         spiral_fit = fit_spiral_to_image(current_array)
-        x, y = spiral_fit.calculate_cartesian_coordinates(100, pixel_to_distance=1, flip_y=True)
+        x, y = spiral_fit.calculate_cartesian_coordinates(100, pixel_to_distance=1, flip_y=False)
         cluster_axis.plot(
-            y,
             x,
+            y,
             color=arc_color,
             label=f"Cluster {cluster_idx}",
         )
         image_overlay_axis.plot(
-            y,
             x,
+            y,
             color=arc_color,
             label=f"Cluster {cluster_idx}",
         )
         colored_image_overlay_axis.plot(
-            y,
             x,
+            y,
             color=arc_color,
             label=f"Cluster {cluster_idx}",
         )
     colored_image_overlay_axis.imshow(
-        np.swapaxes(colored_image, 0, 1),
-        origin="lower",
+        colored_image,
         extent=(-width, width, -height, height),
     )
 
@@ -239,8 +236,8 @@ def _load_image(input_path: Path) -> NDArray[float32]:
     # Assume it is an image format like .png
     else:
         # Load image
-        image = np.asarray(Image.open(input_path).convert("L")).astype(float32) / 255
-        image = np.fliplr(image.T)
+        raw_image = Image.open(input_path).convert("L")
+        image = np.asarray(raw_image).astype(float32) / 255
     return image
 
 

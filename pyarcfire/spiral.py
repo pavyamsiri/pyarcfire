@@ -607,7 +607,7 @@ def detect_spirals_in_image(
     verify_data_is_normalized(image)
     verify_data_is_2d(image)
 
-    log.info(r"[green]DIAGNOST[/green]: The image has dimensions %dx%d.", image.shape[0], image.shape[1])
+    log.info(r"[green]DIAGNOST[/green]: The image has dimensions %dx%d (width x height)", image.shape[1], image.shape[0])
     # Warn about large sizes
     max_size = max(image.shape)
     if max_size > MAX_SIZE_BEFORE_WARN:
