@@ -45,47 +45,6 @@ def get_polar_coordinates(
     return (radii, theta, weights)
 
 
-def adjust_theta_to_zero(
-    theta: NDArray[FloatType],
-    arc_bounds: tuple[float, float],
-    offset: float,
-    *,
-    use_modulo: bool,
-) -> tuple[NDArray[FloatType], float, float]:
-    """Adjust the arc bounds so it starts at zero.
-
-    This means the log spiral will span angles `[offset, offset + arc_bounds[1]]`.
-
-    Parameters
-    ----------
-    theta : NDArray[FloatType]
-        The polar angle of the cluster's pixels.
-    arc_bounds : tuple[float, float]
-        The azimuthal bounds of the arc in radians.
-    offset : float
-        The offset angle of the log spiral in radians.
-    use_modulo : bool
-        Set this flag to apply the modulo operator to `theta - offset` such that it is in
-        the range `[0, 2 * pi)`
-
-    Returns
-    -------
-    theta : NDArray[FloatType]
-        The polar angle of the cluster's pixels after being adjusted.
-    arc_bounds : tuple[float, float]
-        The arc bounds after being adjusted.
-    new_offset: NDArray[FloatType]
-        The offset angle after being adjusted.
-
-    """
-    if use_modulo:
-        theta = np.add(np.mod(theta - offset, 2 * np.pi), offset)
-    arc_start, _ = arc_bounds
-    new_offset = float(offset + arc_start)
-    new_theta = theta - np.subtract(new_offset, np.min(theta))
-    return (new_theta, arc_bounds[1] - arc_start, new_offset)
-
-
 def get_arc_bounds(offset: float, rotation_amount: float, lower_bound: float, upper_bound: float) -> tuple[float, float]:
     """Determine the bounds of a cluster.
 
@@ -119,7 +78,7 @@ def get_arc_bounds(offset: float, rotation_amount: float, lower_bound: float, up
         )
         % (2 * np.pi),
     )
-    return (float(arc_start), float(arc_start) + arc_size)
+    return (float(arc_start) + offset, float(arc_start) + arc_size + offset)
 
 
 def __calculate_angle_distance(from_angle: NDArray[FloatType], to_angle: NDArray[FloatType]) -> NDArray[FloatType]:

@@ -21,7 +21,6 @@ from .functions import (
     calculate_log_spiral_error_from_growth_factor,
 )
 from .utils import (
-    adjust_theta_to_zero,
     calculate_bounds,
     get_arc_bounds,
     get_polar_coordinates,
@@ -125,77 +124,19 @@ def fit_spiral_to_image(
             inner_region = None
         else:
             theta = _remove_theta_discontinuities(theta, image, inner_region)
-    need_multiple_revolutions: bool = inner_region is not None
     if inner_region is not None:
-        fit_result, theta, bad_bounds = _fit_spiral_to_image_multiple_revolution_core(
+        return _fit_spiral_to_image_multiple_revolution_core(
             radii,
             theta,
             weights,
             initial_growth_factor,
             inner_region,
         )
-    else:
-        fit_result, theta, bad_bounds = _fit_spiral_to_image_single_revolution_core(
-            radii,
-            theta,
-            weights,
-            initial_growth_factor,
-        )
-
-    arc_bounds = fit_result.arc_bounds
-    offset = fit_result.offset
-    growth_factor = fit_result.growth_factor
-    error = fit_result.total_error
-
-    # Adjust so that arc bounds is relative to theta
-    (theta, arc_extent, offset) = adjust_theta_to_zero(
-        theta,
-        arc_bounds,
-        offset,
-        use_modulo=not need_multiple_revolutions,
-    )
-
-    growth_factor = growth_factor if not bad_bounds else 0
-
-    # Recalculate initial radius and error after adjustment
-    initial_radius = calculate_best_initial_radius(
+    return _fit_spiral_to_image_single_revolution_core(
         radii,
         theta,
         weights,
-        offset,
-        growth_factor,
-        use_modulo=not need_multiple_revolutions,
-    )
-    new_error, residuals = calculate_log_spiral_error(
-        radii,
-        theta,
-        weights,
-        offset,
-        growth_factor,
-        initial_radius,
-        use_modulo=not need_multiple_revolutions,
-    )
-
-    # Ensure consistency
-    square_err_difference_per_pixel = abs(new_error - error) / len(theta)
-    inconsistent_fit_after_adjustment = not np.isclose(
-        square_err_difference_per_pixel,
-        0,
-    )
-    if inconsistent_fit_after_adjustment:
-        log.debug(
-            "[red]SUBOPTIM[/red]: Inconsistent fit when eliminating theta offset. Difference = %f",
-            square_err_difference_per_pixel,
-        )
-
-    return LogSpiralFitResult(
-        offset=offset,
-        growth_factor=growth_factor,
-        initial_radius=initial_radius,
-        arc_bounds=(offset, offset + arc_extent),
-        total_error=new_error,
-        errors=residuals,
-        has_multiple_revolutions=need_multiple_revolutions,
+        initial_growth_factor,
     )
 
 
@@ -204,7 +145,7 @@ def _fit_spiral_to_image_single_revolution_core(
     theta: NDArray[FloatType],
     weights: NDArray[FloatType],
     initial_growth_factor: float,
-) -> tuple[LogSpiralFitResult[FloatType], NDArray[FloatType], bool]:
+) -> LogSpiralFitResult[FloatType]:
     # Find suitable bounds for the offset parameter
     bad_bounds, (lower_bound, upper_bound), rotation_amount, _ = calculate_bounds(theta)
     rotated_theta = np.mod(theta - rotation_amount, 2 * np.pi)
@@ -248,21 +189,17 @@ def _fit_spiral_to_image_single_revolution_core(
     # Rotate back
     offset += rotation_amount
 
-    theta_adjust = np.add(np.mod(theta - offset, 2 * np.pi), offset)
     # Get arc bounds
     arc_bounds = get_arc_bounds(offset, rotation_amount, lower_bound, upper_bound)
-    return (
-        LogSpiralFitResult(
-            offset=offset,
-            growth_factor=growth_factor,
-            initial_radius=initial_radius,
-            arc_bounds=arc_bounds,
-            total_error=error,
-            errors=residuals,
-            has_multiple_revolutions=False,
-        ),
-        theta_adjust,
-        bad_bounds,
+
+    return LogSpiralFitResult(
+        offset=offset,
+        growth_factor=growth_factor,
+        initial_radius=initial_radius,
+        arc_bounds=arc_bounds,
+        total_error=error,
+        errors=residuals,
+        has_multiple_revolutions=False,
     )
 
 
@@ -272,7 +209,7 @@ def _fit_spiral_to_image_multiple_revolution_core(
     weights: NDArray[FloatType],
     initial_growth_factor: float,
     inner_region: NDArray[BoolType],
-) -> tuple[LogSpiralFitResult[FloatType], NDArray[FloatType], bool]:
+) -> LogSpiralFitResult[FloatType]:
     # fitting depends on the arc bounds, but we don't know what the arc
     # bounds are (i.e., whether to calculate the bounds from the inner or
     # outer points) until we know the chirality.  Since we only know the
@@ -309,23 +246,16 @@ def _fit_spiral_to_image_multiple_revolution_core(
     result: _LogSpiralFitResult = min(cw_result, ccw_result, key=lambda x: x.total_error)
 
     # Construct arc bounds
-    if result.offset > min_theta:
-        arc_bounds = (min_theta - result.offset, max_theta - result.offset)
-    else:
-        arc_bounds = (min_theta - result.offset + 2 * np.pi, max_theta - result.offset + 2 * np.pi)
+    arc_bounds = (min_theta, max_theta) if result.offset > min_theta else (min_theta + 2 * np.pi, max_theta + 2 * np.pi)
 
-    return (
-        LogSpiralFitResult(
-            offset=result.offset,
-            growth_factor=result.growth_factor,
-            initial_radius=result.initial_radius,
-            arc_bounds=arc_bounds,
-            total_error=result.total_error,
-            errors=result.residuals,
-            has_multiple_revolutions=True,
-        ),
-        result.theta,
-        False,
+    return LogSpiralFitResult(
+        offset=result.offset,
+        growth_factor=result.growth_factor,
+        initial_radius=result.initial_radius,
+        arc_bounds=arc_bounds,
+        total_error=result.total_error,
+        errors=result.residuals,
+        has_multiple_revolutions=True,
     )
 
 
