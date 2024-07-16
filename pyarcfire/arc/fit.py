@@ -216,7 +216,7 @@ def fit_spiral_to_image(
         offset=offset,
         growth_factor=growth_factor,
         initial_radius=initial_radius,
-        arc_extent=arc_extent,
+        arc_bounds=(offset, offset + arc_extent),
         total_error=new_error,
         errors=np.square(residuals),
         has_multiple_revolutions=need_multiple_revolutions,

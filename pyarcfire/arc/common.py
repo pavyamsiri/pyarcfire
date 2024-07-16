@@ -50,8 +50,8 @@ class LogSpiralFitResult(Generic[FloatType]):
         The growth factor.
     initial_radius : float
         The initial radius in pixels.
-    arc_extent : float
-        The azimuthal extent of the arc in radians.
+    arc_bounds : tuple[float, float]
+        The azimuthal bounds of the arc in radians.
     total_error : float
         The sum of the square residuals.
     errors : NDArray[FloatType]
@@ -64,7 +64,7 @@ class LogSpiralFitResult(Generic[FloatType]):
     offset: float
     growth_factor: float
     initial_radius: float
-    arc_extent: float
+    arc_bounds: tuple[float, float]
     total_error: float
     errors: NDArray[FloatType]
     has_multiple_revolutions: bool
@@ -74,8 +74,8 @@ class LogSpiralFitResult(Generic[FloatType]):
         # Pitch angle
         self._pitch_angle = np.arctan(self.growth_factor)
         # Arc length
-        start_angle = self.offset
-        end_angle = start_angle + self.arc_extent
+        start_angle, end_angle = self.arc_bounds
+        arc_extent: float = end_angle - start_angle
         lengths = log_spiral(
             np.asarray(
                 [start_angle, end_angle],
@@ -87,7 +87,7 @@ class LogSpiralFitResult(Generic[FloatType]):
         )
         self._arc_length: float
         if np.isclose(np.sin(self._pitch_angle), 0):
-            self._arc_length = self.initial_radius * self.arc_extent
+            self._arc_length = self.initial_radius * arc_extent
         else:
             self._arc_length = abs(lengths[1] - lengths[0] / np.sin(self._pitch_angle))
         # Winding direction
@@ -131,8 +131,7 @@ class LogSpiralFitResult(Generic[FloatType]):
 
         """
         y_flip_factor: float = 1.0 if not flip_y else -1.0
-        start_angle = self.offset
-        end_angle = start_angle + self.arc_extent
+        start_angle, end_angle = self.arc_bounds
 
         theta = np.linspace(start_angle, end_angle, num_points, dtype=np.float32)
         radii = pixel_to_distance * log_spiral(
