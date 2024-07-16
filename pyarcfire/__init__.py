@@ -4,7 +4,7 @@ Please see [SpArcFiRe](https://github.com/waynebhayes/SpArcFiRe) for SpArcFiRe i
 the corresponding [paper](https://ui.adsabs.harvard.edu/abs/2014ApJ...790...87D/abstract).
 """
 
-from .arc import fit_spiral_to_image
+from .arc import LogSpiralFitResult, fit_spiral_to_image, log_spiral
 from .cluster import GenerateClustersSettings, generate_clusters
 from .merge_fit import MergeClustersByFitSettings, merge_clusters_by_fit
 from .orientation import GenerateOrientationFieldSettings, generate_orientation_fields
@@ -19,6 +19,7 @@ __all__ = [
     "GenerateClustersSettings",
     "GenerateOrientationFieldSettings",
     "GenerateSimilarityMatrixSettings",
+    "LogSpiralFitResult",
     "MergeClustersByFitSettings",
     "UnsharpMaskSettings",
     "detect_spirals_in_image",
@@ -26,5 +27,6 @@ __all__ = [
     "generate_clusters",
     "generate_orientation_fields",
     "generate_similarity_matrix",
+    "log_spiral",
     "merge_clusters_by_fit",
 ]
