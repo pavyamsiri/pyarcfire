@@ -79,6 +79,26 @@ class UnsharpMaskSettings:
 DEFAULT_UNSHARP_MASK: UnsharpMaskSettings = UnsharpMaskSettings()
 
 
+@dataclass
+class FitErrorSettings:
+    """Filter out clusters with poor fit errors.
+
+    Attributes
+    ----------
+    kind : FitErrorKind
+        The normalisation scheme to use.
+    max_error : float
+        The maximum allowed error.
+    pixel_to_distance : float
+        The unit conversion factor to translate from pixels to the user's desired units.
+
+    """
+
+    kind: FitErrorKind
+    max_error: float
+    pixel_to_distance: float
+
+
 class ClusterSpiralResult:
     """Data structure that contains the results of the spiral finding algorithm."""
 
@@ -540,12 +560,13 @@ class ClusterSpiralResult:
 @benchmark
 def detect_spirals_in_image(
     image: NDArray[FloatType],
+    *,
     unsharp_mask_settings: UnsharpMaskSettings = DEFAULT_UNSHARP_MASK,
     orientation_field_settings: GenerateOrientationFieldSettings = DEFAULT_ORIENTATION_FIELD_SETTINGS,
     similarity_matrix_settings: GenerateSimilarityMatrixSettings = DEFAULT_SIMILARITY_MATRIX_SETTINGS,
     generate_clusters_settings: GenerateClustersSettings = DEFAULT_CLUSTER_SETTINGS,
     merge_clusters_by_fit_settings: MergeClustersByFitSettings = DEFAULT_MERGE_CLUSTER_BY_FIT_SETTINGS,
-    *,
+    fit_error_settings: FitErrorSettings | None = None,
     preprocess: bool = False,
 ) -> ClusterSpiralResult | None:
     """Run the spiral arc finder algorithm on the given image.
@@ -566,6 +587,9 @@ def detect_spirals_in_image(
         Settings for generating clusters, by default GenerateClustersSettings().
     merge_clusters_by_fit_settings : MergeClustersByFitSettings, optional
         Settings for merging clusters based on fit criteria, by default MergeClustersByFitSettings().
+    fit_error_settings : FitErrorSettings | None
+        The maximum allowed fit error for a cluster and a normalisation scheme. If this is `None` then all
+        clusters are allowed.
     preprocess : bool
         Set this flag to preprocess the image to ensure it is compatible.
 
@@ -637,18 +661,31 @@ def detect_spirals_in_image(
 
     # Do some final merges based on fit
     log.info("[cyan]PROGRESS[/cyan]: Merging clusters by fit...")
-    merged_clusters = merge_clusters_by_fit(
+    cluster_list = merge_clusters_by_fit(
         cluster_arrays,
         merge_clusters_by_fit_settings.stop_threshold,
     )
     log.info("[cyan]PROGRESS[/cyan]: Done merging clusters by fit.")
 
-    merged_clusters = np.dstack(merged_clusters)
+    if fit_error_settings is not None:
+        cluster_list = [
+            current_cluster
+            for current_cluster in cluster_list
+            if fit_spiral_to_image(current_cluster).get_normalised_total_error(
+                fit_error_settings.kind, pixel_to_distance=fit_error_settings.pixel_to_distance
+            )
+            <= fit_error_settings.max_error
+        ]
+
+    if len(cluster_list) == 0:
+        return None
+
+    detected_clusters = np.dstack(cluster_list)
     return ClusterSpiralResult(
         image=image,
         unsharp_image=unsharp_image,
         field=field,
-        cluster_masks=merged_clusters,
+        cluster_masks=detected_clusters,
         unsharp_mask_settings=unsharp_mask_settings,
         orientation_field_settings=orientation_field_settings,
         similarity_matrix_settings=similarity_matrix_settings,
