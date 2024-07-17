@@ -189,25 +189,27 @@ class LogSpiralFitResult(Generic[FloatType]):
         """float: The sign of the pitch angle."""
         return np.sign(self._pitch_angle)
 
-    def get_normalised_total_error(self, kind: FitErrorKind) -> float:
+    def get_normalised_total_error(self, kind: FitErrorKind, *, pixel_to_distance: float) -> float:
         """Return the fit error normalised by the chosen scheme.
 
         Parameters
         ----------
         kind : FitErrorKind
             The chosen normalisation scheme.
+        pixel_to_distance : float
+            The unit conversion factor to convert pixels to another unit.
 
         Returns
         -------
         error : float
-            The normalised error.
+            The normalised error in the units of distance squared.
 
         """
         error: float
         if kind == FitErrorKind.NONORM:
-            error = self.total_error
+            error = self.total_error * pixel_to_distance**2
         elif kind == FitErrorKind.NUM_PIXELS_NORM:
-            error = self._total_error_pixels
+            error = self._total_error_pixels * pixel_to_distance**2
         else:
             assert_never(kind)
         return error
