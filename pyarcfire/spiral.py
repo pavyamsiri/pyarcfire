@@ -5,17 +5,17 @@ from __future__ import annotations
 import logging
 import warnings
 from dataclasses import dataclass
-from enum import Enum, auto
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 import numpy as np
 import scipy.io
 from skimage import filters
+from typing_extensions import assert_never
 
 from pyarcfire.arc import Chirality
 
-from .arc import LogSpiralFitResult, fit_spiral_to_image
+from .arc import FitErrorKind, LogSpiralFitResult, fit_spiral_to_image
 from .arc.utils import get_polar_coordinates
 from .assert_utils import (
     verify_data_is_2d,
@@ -57,24 +57,6 @@ log: logging.Logger = logging.getLogger(__name__)
 FloatType = np.float32
 
 MAX_SIZE_BEFORE_WARN: int = 256
-
-
-class FitErrorKind(Enum):
-    """The normalisation scheme used to compute the total error.
-
-    The total error being the sum of th square residuals of a model fit to a spiral cluster.
-
-    Variants
-    --------
-    NONORM
-        The total error is left as is.
-    NUM_PIXELS_NORM
-        The total error is divided by the number of pixels in the cluster.
-
-    """
-
-    NONORM = auto()
-    NUM_PIXELS_NORM = auto()
 
 
 @dataclass
@@ -511,7 +493,7 @@ class ClusterSpiralResult:
             num_pixels = np.count_nonzero(current_array)
             total_error /= num_pixels
         else:
-            log.warning("%s is an invalid fit error type! Defaulting to no normalisation...", fit_error_kind)
+            assert_never(fit_error_kind)
         return total_error
 
     def get_dominant_chirality(self) -> Chirality:

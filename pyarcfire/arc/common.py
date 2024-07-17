@@ -7,10 +7,29 @@ from typing import Generic, TypeVar
 import numpy as np
 from numpy import float32, float64
 from numpy.typing import NDArray
+from typing_extensions import assert_never
 
 from .functions import log_spiral
 
 FloatType = TypeVar("FloatType", float32, float64)
+
+
+class FitErrorKind(Enum):
+    """The normalisation scheme used to compute the total error.
+
+    The total error being the sum of th square residuals of a model fit to a spiral cluster.
+
+    Variants
+    --------
+    NONORM
+        The total error is left as is.
+    NUM_PIXELS_NORM
+        The total error is divided by the number of pixels in the cluster.
+
+    """
+
+    NONORM = auto()
+    NUM_PIXELS_NORM = auto()
 
 
 class Chirality(Enum):
@@ -170,27 +189,28 @@ class LogSpiralFitResult(Generic[FloatType]):
         """float: The sign of the pitch angle."""
         return np.sign(self._pitch_angle)
 
-    def get_total_error_normalised_by_arc_length(self) -> float:
-        """Return the sum of square residuals normalised by the arc length.
+    def get_normalised_total_error(self, kind: FitErrorKind) -> float:
+        """Return the fit error normalised by the chosen scheme.
+
+        Parameters
+        ----------
+        kind : FitErrorKind
+            The chosen normalisation scheme.
 
         Returns
         -------
-        total_error : float
-            The error normalised by the arc length.
+        error : float
+            The normalised error.
 
         """
-        return self._total_error_arc_length
-
-    def get_total_error_normalised_by_num_pixels(self) -> float:
-        """Return the sum of square residuals normalised by the number of pixels in the cluster.
-
-        Returns
-        -------
-        total_error : float
-            The error normalised by the number of pixels in the cluster.
-
-        """
-        return self._total_error_pixels
+        error: float
+        if kind == FitErrorKind.NONORM:
+            error = self.total_error
+        elif kind == FitErrorKind.NUM_PIXELS_NORM:
+            error = self._total_error_pixels
+        else:
+            assert_never(kind)
+        return error
 
     def get_arc_length_in_units(self, pixel_to_distance: float) -> float:
         """Return the arc length in the given user units.
