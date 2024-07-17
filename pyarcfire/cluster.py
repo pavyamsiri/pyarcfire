@@ -16,6 +16,8 @@ from .matrix_utils import get_nonzero_values, is_sparse_matrix_symmetric
 from .merge import calculate_arc_merge_error
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+
     from numpy.typing import NDArray
 
     SparseMatrix = TypeVar(
@@ -176,7 +178,7 @@ class Cluster:
         return masked_image
 
     @staticmethod
-    def list_to_array(image: NDArray[FloatType], clusters: Iterable[Cluster]) -> NDArray[FloatType] | None:
+    def list_to_arrays(image: NDArray[FloatType], clusters: Iterable[Cluster]) -> Sequence[NDArray[FloatType]]:
         """Convert a list of clusters and an image into an array of the same image masked by each different cluster.
 
         Parameters
@@ -189,15 +191,12 @@ class Cluster:
 
         Returns
         -------
-        NDArray[FloatType] | None
+        cluster_arrays : Sequence[NDArray[FloatType]]
             The image masked by the different clusters. This returns None if there
             are no clusters given.
 
         """
-        array_list = [cluster.get_masked_image(image) for cluster in clusters]
-        if len(array_list) == 0:
-            return None
-        return np.dstack(array_list)
+        return [cluster.get_masked_image(image) for cluster in clusters]
 
     @staticmethod
     def combine(left: Cluster, right: Cluster) -> Cluster:
@@ -230,7 +229,7 @@ def generate_clusters(
     minimum_cluster_size: int,
     *,
     remove_central_cluster: bool,
-) -> NDArray[FloatType] | None:
+) -> Sequence[NDArray[FloatType]]:
     """Perform single linkage clustering on an image given its corresponding similarity matrix.
 
     The clusters are merged using single linkage clustering with a single modification. Sufficiently
@@ -257,9 +256,8 @@ def generate_clusters(
 
     Returns
     -------
-    cluster_arrays : Optional[NDArray[FloatType]]
-        The image masked by each cluster. This function may not find any suitable clusters in which case
-        it will return None.
+    cluster_arrays : Sequence[NDArray[FloatType]]
+        The image masks for each cluster.
 
     """
     # The image must be 2D
@@ -347,7 +345,7 @@ def generate_clusters(
         central_idx = np.ravel_multi_index(central_points, image.shape)
         clusters_list = [cluster for cluster in clusters_list if central_idx not in cluster]
 
-    cluster_arrays = Cluster.list_to_array(image, clusters_list)
+    cluster_arrays = Cluster.list_to_arrays(image, clusters_list)
 
     # Show diagnostics of merging step
     log.info("[green]DIAGNOST[/green]: Number of clusters = %d", len(clusters))

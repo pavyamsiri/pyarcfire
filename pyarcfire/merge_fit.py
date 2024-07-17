@@ -15,7 +15,7 @@ from .merge import calculate_arc_merge_error
 log: logging.Logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
-    from collections.abc import MutableSequence
+    from collections.abc import MutableSequence, Sequence
 
     from numpy.typing import NDArray
 
@@ -41,32 +41,32 @@ DEFAULT_MERGE_CLUSTER_BY_FIT_SETTINGS: MergeClustersByFitSettings = MergeCluster
 
 @benchmark
 def merge_clusters_by_fit(
-    clusters: NDArray[FloatType],
+    clusters: Sequence[NDArray[FloatType]],
     stop_threshold: float,
-) -> NDArray[FloatType]:
+) -> Sequence[NDArray[FloatType]]:
     """Merge clusters by if they are fit spirals decently well when combined.
 
     Parameters
     ----------
-    clusters : NDArray[FloatType]
+    clusters : Sequence[NDArray[FloatType]]
         The clusters stored as series of masked images.
     stop_threshold : float
         The maximum allowed distance between clusters to be merged.
 
     Returns
     -------
-    merged_clusters : NDArray[FloatType]
+    merged_clusters : Sequence[NDArray[FloatType]]
         The clusters after being merged.
 
     """
+    assert len(clusters) > 0
     # Maximum pixel distance
-    max_pixel_distance = np.mean([clusters.shape[0], clusters.shape[1]]).astype(float) / 20
+    num_rows, num_columns = clusters[0].shape
+    max_pixel_distance = np.mean([num_rows, num_columns]).astype(float) / 20
 
     # Fit spirals to each cluster
-    num_clusters: int = clusters.shape[2]
-    cluster_list: MutableSequence[NDArray[FloatType] | None] = [None for _ in range(num_clusters)]
-    for cluster_idx in range(num_clusters):
-        cluster_list[cluster_idx] = clusters[:, :, cluster_idx]
+    num_clusters: int = len(clusters)
+    cluster_list: MutableSequence[NDArray[FloatType] | None] = list(clusters)
 
     # Compute distances between each cluster
     cluster_distances = np.full((num_clusters, num_clusters), np.inf, dtype=np.float32)
@@ -129,7 +129,7 @@ def merge_clusters_by_fit(
             )
     log.info("[green]DIAGNOST[/green]: Merged %d clusters by fit", num_merges)
     # Combined clusters into arrays
-    return np.dstack([cluster for cluster in cluster_list if cluster is not None])
+    return [cluster for cluster in cluster_list if cluster is not None]
 
 
 def _calculate_cluster_distance(

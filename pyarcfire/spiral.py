@@ -46,7 +46,7 @@ from .similarity import (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Generator
+    from collections.abc import Callable, Generator, Sequence
 
     from numpy.typing import NDArray
 
@@ -625,6 +625,8 @@ def detect_spirals_in_image(
     log.info("[cyan]PROGRESS[/cyan]: Generating orientation field...")
     field = generate_orientation_fields(unsharp_image, orientation_field_settings)
     log.info("[cyan]PROGRESS[/cyan]: Done generating orientation field.")
+    if field.count_nonzero() == 0:
+        return None
 
     # Generate similarity matrix
     log.info("[cyan]PROGRESS[/cyan]: Generating similarity matrix...")
@@ -633,10 +635,12 @@ def detect_spirals_in_image(
         similarity_matrix_settings.similarity_cutoff,
     )
     log.info("[cyan]PROGRESS[/cyan]: Done generating similarity matrix.")
+    if matrix.count_nonzero() == 0:
+        return None
 
     # Merge clusters via HAC
     log.info("[cyan]PROGRESS[/cyan]: Generating clusters...")
-    cluster_arrays: NDArray[FloatType] | None = generate_clusters(
+    cluster_arrays: Sequence[NDArray[FloatType]] = generate_clusters(
         image,
         matrix.tocsr(),
         stop_threshold=generate_clusters_settings.stop_threshold,
@@ -646,7 +650,7 @@ def detect_spirals_in_image(
         remove_central_cluster=generate_clusters_settings.remove_central_cluster,
     )
     log.info("[cyan]PROGRESS[/cyan]: Done generating clusters.")
-    if cluster_arrays is None:
+    if len(cluster_arrays) == 0:
         return None
 
     # Do some final merges based on fit
@@ -657,6 +661,7 @@ def detect_spirals_in_image(
     )
     log.info("[cyan]PROGRESS[/cyan]: Done merging clusters by fit.")
 
+    merged_clusters = np.dstack(merged_clusters)
     return ClusterSpiralResult(
         image=image,
         unsharp_image=unsharp_image,

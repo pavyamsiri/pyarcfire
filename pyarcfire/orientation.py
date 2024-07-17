@@ -451,6 +451,17 @@ class OrientationField:
 
         return OrientationField(denoised)
 
+    def count_nonzero(self) -> int:
+        """Count the number of non-zero elements.
+
+        Returns
+        -------
+        num_nonzero_elements : int
+            The number of non-zero elements.
+
+        """
+        return np.count_nonzero(self.get_strengths())
+
 
 @benchmark
 def generate_orientation_fields(
@@ -512,7 +523,7 @@ def generate_orientation_fields(
     denoised_field = merged_field.denoise(
         neighbour_distance=settings.neighbour_distance,
     )
-    num_nonzero_elements = np.count_nonzero(denoised_field.get_strengths())
+    num_nonzero_elements = denoised_field.count_nonzero()
 
     log.info(
         "[green]DIAGNOST[/green]: Orientation field has %d non-zero elements.",
