@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass
 from enum import Enum, auto
-from typing import Generic, TypeVar
+from typing import Generic, Literal, TypeVar
 
 import numpy as np
 from numpy import float32, float64
@@ -49,6 +49,26 @@ class Chirality(Enum):
     CLOCKWISE = auto()
     COUNTER_CLOCKWISE = auto()
     NONE = auto()
+
+    def to_int(self) -> Literal[-1, 0, 1]:
+        """Convert chirality into an integer.
+
+        Returns
+        -------
+        chirality : Literal[-1, 0, 1]
+            The chirality as an integer.
+
+        """
+        value: Literal[-1, 0, 1]
+        if self == Chirality.CLOCKWISE:
+            value = 1
+        elif self == Chirality.COUNTER_CLOCKWISE:
+            value = -1
+        elif self == Chirality.NONE:
+            value = 0
+        else:
+            assert_never(self)
+        return value
 
 
 @dataclass
