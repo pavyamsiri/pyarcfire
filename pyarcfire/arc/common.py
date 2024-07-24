@@ -143,6 +143,35 @@ class LogSpiralFitResult(Generic[FloatType]):
         self._total_error_arc_length: float = self.total_error / self._arc_length
         self._total_error_pixels: float = self.total_error / len(self.errors)
 
+    def calculate_radii(
+        self,
+        theta: NDArray[float32],
+        *,
+        pixel_to_distance: float,
+    ) -> NDArray[float32]:
+        """Calculate the radii corresponding to the given angles.
+
+        Parameters
+        ----------
+        theta : NDArray[float32]
+            The theta values to calculate at.
+        pixel_to_distance : float
+            The unit conversion factor to convert pixels to another unit.
+
+        Returns
+        -------
+        radii : NDArray[float32]
+            The radial coordinates.
+
+        """
+        return pixel_to_distance * log_spiral(
+            theta,
+            self.offset,
+            self.growth_factor,
+            self.initial_radius,
+            use_modulo=not self.has_multiple_revolutions,
+        )
+
     def calculate_cartesian_coordinates(
         self,
         num_points: int,
@@ -173,13 +202,7 @@ class LogSpiralFitResult(Generic[FloatType]):
         start_angle, end_angle = self.arc_bounds
 
         theta = np.linspace(start_angle, end_angle, num_points, dtype=np.float32)
-        radii = pixel_to_distance * log_spiral(
-            theta,
-            self.offset,
-            self.growth_factor,
-            self.initial_radius,
-            use_modulo=not self.has_multiple_revolutions,
-        )
+        radii = self.calculate_radii(theta, pixel_to_distance=pixel_to_distance)
         x = np.multiply(radii, np.cos(theta))
         y = y_flip_factor * np.multiply(radii, np.sin(theta))
         return (x, y)
