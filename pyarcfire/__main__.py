@@ -71,11 +71,6 @@ def process_from_image(args: argparse.Namespace) -> None:
 
     result = detect_spirals_in_image(
         image,
-        UnsharpMaskSettings(),
-        GenerateOrientationFieldSettings(),
-        GenerateSimilarityMatrixSettings(),
-        GenerateClustersSettings(),
-        MergeClustersByFitSettings(),
         preprocess=True,
     )
 
