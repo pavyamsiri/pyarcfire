@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 import scipy.io
+from numpy import int32
 from skimage import filters
 from typing_extensions import assert_never
 
@@ -261,6 +262,25 @@ class ClusterSpiralResult:
 
         """
         return self._sizes
+
+    def get_cluster_mask(self) -> NDArray[int32]:
+        """Return the overall cluster mask.
+
+        The cluster mask being an array of integer values corresponding to the indices
+        of the clusters the pixels belong to.
+
+        Returns
+        -------
+        cluster_mask : NDArray[int]
+            The clusters as an array where non-negative values correspond to the index of the
+            cluster they belong to. Negative values indicate that the pixel belongs to no cluster.
+
+        """
+        mask = np.full((self.get_image_height(), self.get_image_width()), -1, dtype=int32)
+        for cluster_index in range(self.get_num_clusters()):
+            current_mask = self.get_cluster_array(cluster_index)[0]
+            mask[current_mask != 0] = cluster_index
+        return mask
 
     def get_cluster_array(self, cluster_idx: int) -> tuple[NDArray[FloatType], int]:
         """Return the cluster as an array along with its size.
