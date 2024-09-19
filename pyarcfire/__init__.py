@@ -11,7 +11,7 @@ from .orientation import GenerateOrientationFieldSettings, generate_orientation_
 from .similarity import GenerateSimilarityMatrixSettings, generate_similarity_matrix
 from .spiral import ClusterSpiralResult, UnsharpMaskSettings, detect_spirals_in_image
 
-__version__ = "0.0.0.dev3"
+__version__ = "0.0.0.dev4"
 
 
 __all__ = [
