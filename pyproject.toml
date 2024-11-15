@@ -1,12 +1,12 @@
 [project]
 name = "pyarcfire"
-version = "0.0.0.dev4"
+version = "0.0.0.dev3"
 description = "A port of SpArcFiRe, a spiral arc finder"
 authors = [
     { name = "Pavadol Yamsiri" }
 ]
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 license = { text = "BSD 3-Clause License" }
 keywords = ["astronomy", "spiral", "arc", "finder"]
 classifiers = [
@@ -19,11 +19,11 @@ classifiers = [
 dependencies = [
     "numpy>=1.2",
     "scikit-image>=0.18",
-    "scipy>=1.8",
+    "scipy>=1.14",
     "typing_extensions>=3.10",
 ]
 
-[project.optional-dependencies]
+[dependency-groups]
 cli = [
     "matplotlib>=3.5",
     "Pillow",
