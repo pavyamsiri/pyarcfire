@@ -122,7 +122,7 @@ class LogSpiralFitResult(Generic[FloatType]):
             self.offset,
             self.growth_factor,
             self.initial_radius,
-            use_modulo=self.has_multiple_revolutions,
+            use_modulo=not self.has_multiple_revolutions,
         )
         self._arc_length: float
         if np.isclose(np.sin(self._pitch_angle), 0):
