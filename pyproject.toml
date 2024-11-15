@@ -47,14 +47,19 @@ Source = "https://github.com/pavyamsiri/pyarcfire.git"
 Issues = "https://github.com/pavyamsiri/pyarcfire/issues"
 
 [tool.pyright]
-typeCheckingMode = "standard"
+exclude = [".venv"]
+venvPath = "."
+venv = ".venv"
+pythonPlatform = "All"
+typeCheckingMode = "strict"
 deprecateTypingAliases = true
-reportDeprecated = true
-reportMissingParameterType = true
-reportMissingTypeArgument = true
-reportUnknownArgumentType = true
-reportUnknownParameterType = true
-reportUnknownVariableType = true
+enableTypeIgnoreComments = false
+reportIgnoreCommentWithoutRule = true
+reportImplicitRelativeImport = true
+reportInvalidCast = true
+reportPrivateUsage = true
+reportUnnecessaryTypeIgnoreComment = true
+reportUnsafeMultipleInheritance = true
 
 [tool.ruff]
 line-length = 130
