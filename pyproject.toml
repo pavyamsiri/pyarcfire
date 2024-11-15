@@ -1,6 +1,6 @@
 [project]
 name = "pyarcfire"
-version = "0.0.0.dev3"
+version = "0.1.0"
 description = "A port of SpArcFiRe, a spiral arc finder"
 authors = [
     { name = "Pavadol Yamsiri" }
@@ -34,9 +34,6 @@ test = [
     "hypothesis",
 ]
 
-[project.urls]
-Source = "https://github.com/pavyamsiri/pyarcfire.git"
-Issues = "https://github.com/pavyamsiri/pyarcfire/issues"
 
 [build-system]
 requires = ["hatchling"]
@@ -44,6 +41,10 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/pyarcfire"]
+
+[project.urls]
+Source = "https://github.com/pavyamsiri/pyarcfire.git"
+Issues = "https://github.com/pavyamsiri/pyarcfire/issues"
 
 [tool.pyright]
 typeCheckingMode = "standard"

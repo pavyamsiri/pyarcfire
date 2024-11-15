@@ -4,6 +4,8 @@ Please see [SpArcFiRe](https://github.com/waynebhayes/SpArcFiRe) for SpArcFiRe i
 the corresponding [paper](https://ui.adsabs.harvard.edu/abs/2014ApJ...790...87D/abstract).
 """
 
+import importlib.metadata
+
 from .arc import LogSpiralFitResult, fit_spiral_to_image, log_spiral
 from .cluster import GenerateClustersSettings, generate_clusters
 from .merge_fit import MergeClustersByFitSettings, merge_clusters_by_fit
@@ -11,7 +13,7 @@ from .orientation import GenerateOrientationFieldSettings, generate_orientation_
 from .similarity import GenerateSimilarityMatrixSettings, generate_similarity_matrix
 from .spiral import ClusterSpiralResult, UnsharpMaskSettings, detect_spirals_in_image
 
-__version__ = "0.0.0.dev4"
+__version__ = importlib.metadata.version(__name__)
 
 
 __all__ = [
