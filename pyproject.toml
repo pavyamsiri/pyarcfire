@@ -35,7 +35,7 @@ test = [
     "hypothesis",
 ]
 dev = [
-    "scipy-stubs>=1.14.1.3",
+    "scipy-stubs>=1.14.1.3", {include-group = "test"}, {include-group = "cli"}
 ]
 
 
