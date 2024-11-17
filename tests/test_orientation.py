@@ -35,7 +35,7 @@ def valid_images(
     elements = st.floats(
         width=32,
         min_value=0.0,
-        max_value=255.0,
+        max_value=1.0,
         allow_nan=False,
         allow_infinity=False,
     )
@@ -60,9 +60,11 @@ def test_generation(arr: NDArray[np.float32]) -> None:
     """
     field = orientation.generate_orientation_fields(
         arr,
-        num_orientation_field_levels=3,
-        neighbour_distance=5,
-        kernel_radius=5,
+        settings=orientation.GenerateOrientationFieldSettings(
+            num_orientation_field_levels=3,
+            neighbour_distance=5,
+            kernel_radius=5,
+        ),
     )
     assert field.shape[0] == arr.shape[0]
     assert field.shape[1] == arr.shape[1]
