@@ -32,6 +32,7 @@ cli = [
 ]
 test = [
     "pytest",
+    "pytest-xdist",
     "hypothesis",
 ]
 dev = [
