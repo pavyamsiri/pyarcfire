@@ -1,35 +1,45 @@
 """Useful utilities to use in the arc module."""
 
-from typing import TypeVar
+from typing import Any, TypeVar
 
 import numpy as np
-from numpy.typing import NDArray
 
-FloatType = TypeVar("FloatType", np.float32, np.float64)
+from pyarcfire._typing import AnyReal
+
+_SCT = TypeVar("_SCT", bound=np.generic, default=np.float64)
+_SCT_f = TypeVar("_SCT_f", bound=np.floating[Any], default=np.float64)
+_Shape = TypeVar("_Shape", bound=tuple[int, ...], default=tuple[int])
+_Array1D = np.ndarray[tuple[int], np.dtype[_SCT]]
+_Array2D = np.ndarray[tuple[int, int], np.dtype[_SCT]]
+_ArrayND = np.ndarray[_Shape, np.dtype[_SCT]]
 
 
 BAD_BOUNDS_THRESHOLD: float = 0.1
 
 
 def get_polar_coordinates(
-    image: NDArray[FloatType],
-) -> tuple[NDArray[FloatType], NDArray[FloatType], NDArray[FloatType]]:
+    image: _Array2D[_SCT_f],
+) -> tuple[_Array1D[_SCT_f], _Array1D[_SCT_f], _Array1D[_SCT_f]]:
     """Return the polar coordinates of the pixels in a cluster.
 
     Parameters
     ----------
-    image : NDArray[FloatType]
+    image : Array2D[float]
         The cluster encoded as an image, where each non-zero pixel is considered
         part of the cluster.
 
     Returns
     -------
-    radii : NDArray[FloatType]
-        The radii of the cluster's pixels.
-    theta : NDArray[FloatType]
-        The polar angle of the cluster's pixels.
-    weights : NDArray[FloatType]
-        The pixel value of each of the cluster's pixels.
+    radii : Array1D[float]
+        The radii of the cluster's non-zero pixels.
+    theta : Array1D[float]
+        The polar angle of the cluster's non-zero pixels.
+    weights : Array1D[float]
+        The pixel value of each of the cluster's non-zero pixels.
+
+    Notes
+    -----
+    The results are returned as flattened arrays in an arbitrary order.
 
     """
     row_indices, column_indices = image.nonzero()
@@ -39,13 +49,13 @@ def get_polar_coordinates(
     y = -(row_indices - row_offset)
 
     # Compute polar coordinates and get weights
-    radii: NDArray[FloatType] = np.sqrt(np.square(x) + np.square(y))
-    theta: NDArray[FloatType] = np.mod(np.arctan2(y, x) + 2 * np.pi, 2 * np.pi)
-    weights: NDArray[FloatType] = image[row_indices, column_indices]
+    radii = np.sqrt(np.square(x) + np.square(y))
+    theta = np.mod(np.arctan2(y, x) + 2 * np.pi, 2 * np.pi)
+    weights = image[row_indices, column_indices]
     return (radii, theta, weights)
 
 
-def get_arc_bounds(offset: float, rotation_amount: float, lower_bound: float, upper_bound: float) -> tuple[float, float]:
+def get_arc_bounds(offset: AnyReal, rotation_amount: AnyReal, lower_bound: AnyReal, upper_bound: AnyReal) -> tuple[float, float]:
     """Determine the bounds of a cluster.
 
     Parameters
@@ -67,6 +77,10 @@ def get_arc_bounds(offset: float, rotation_amount: float, lower_bound: float, up
         The bounds of the cluster in polar angles.
 
     """
+    upper_bound = float(upper_bound)
+    lower_bound = float(lower_bound)
+    offset = float(offset)
+
     arc_size = 2 * np.pi - (upper_bound - lower_bound)
     arc_start = np.min(
         (
@@ -81,15 +95,30 @@ def get_arc_bounds(offset: float, rotation_amount: float, lower_bound: float, up
     return (float(arc_start) + offset, float(arc_start) + arc_size + offset)
 
 
-def __calculate_angle_distance(from_angle: NDArray[FloatType], to_angle: NDArray[FloatType]) -> NDArray[FloatType]:
+def __calculate_angle_distance(from_angle: _ArrayND[_Shape], to_angle: _ArrayND[_Shape]) -> _ArrayND[_Shape]:
+    """Calculate the distance between two angles in radians.
+
+    Parameters
+    ----------
+    from_angle : ArrayND[S, F]
+        The starting angles.
+    to_angle : ArrayND[S, F]
+        The ending angles.
+
+    Returns
+    -------
+    distance : ArrayND[S, F]
+        The distances between corresponding angles.
+
+    """
     is_wrapping = from_angle > to_angle
-    distance: NDArray[FloatType] = np.subtract(to_angle, from_angle)
+    distance = np.subtract(to_angle, from_angle)
     distance[is_wrapping] += 2 * np.pi
     return distance
 
 
 def calculate_bounds(
-    theta: NDArray[FloatType],
+    theta: _Array1D[_SCT_f],
 ) -> tuple[bool, tuple[float, float], float, float]:
     """Calculate optimisation bounds for the theta offset.
 
@@ -99,7 +128,7 @@ def calculate_bounds(
 
     Parameters
     ----------
-    theta : NDArray[FloatType]
+    theta : Array1D[float]
         The theta values of the cluster.
 
     Returns
