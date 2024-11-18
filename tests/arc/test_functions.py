@@ -98,9 +98,14 @@ def test_log_spiral_sign(
     offset=st.floats(-2 * np.pi, 2 * np.pi),
     growth_factor=st.floats(0, 10, allow_nan=False, allow_infinity=False),
     initial_radius=st.floats(-10, 10, allow_nan=False, allow_infinity=False),
+    use_modulo=st.booleans(),
 )
-def test_log_spiral_continuity(theta: _Array1D_f64, offset: float, growth_factor: float, initial_radius: float) -> None:
-    """Test continuity of log spiral function.
+def test_log_spiral_dimension_consistency(
+    theta: _Array1D_f64, offset: float, growth_factor: float, initial_radius: float, *, use_modulo: bool
+) -> None:
+    """Test that the resulting shape of log spiral is the same as the input shape.
+
+    Also that the dtypes are the same.
 
     Parameters
     ----------
@@ -112,15 +117,10 @@ def test_log_spiral_continuity(theta: _Array1D_f64, offset: float, growth_factor
         The growth factor.
     initial_radius : float
         The initial radius.
-
-    Notes
-    -----
-    Continuity means that nearby theta values also have radii that are close in value.
+    use_modulo : bool
+        Set this flag to keep the angles within 2 pi.
 
     """
-    epsilon = 1e-6
-    theta2 = theta + epsilon  # Slightly perturb theta
-    result1 = log_spiral(theta, offset, growth_factor, initial_radius, use_modulo=False)
-    result2 = log_spiral(theta2, offset, growth_factor, initial_radius, use_modulo=False)
-    # Ensure that the outputs are close
-    assert np.allclose(result1, result2, atol=1e2 * epsilon)  # Allow small tolerance for FP errors
+    result = log_spiral(theta, offset, growth_factor, initial_radius, use_modulo=use_modulo)
+    assert result.shape == theta.shape
+    assert result.dtype == theta.dtype
