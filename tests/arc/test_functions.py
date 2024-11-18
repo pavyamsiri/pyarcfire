@@ -7,6 +7,8 @@ from hypothesis.extra.numpy import arrays
 
 from pyarcfire.arc.functions import log_spiral
 
+_Array1D_f64 = np.ndarray[tuple[int], np.dtype[np.float64]]
+
 
 def test_log_spiral_basic_no_modulo() -> None:
     """Simple test of log spiral function with some basic inputs for non-modulo mode."""
@@ -44,13 +46,34 @@ def test_log_spiral_basic_use_modulo() -> None:
     use_modulo=st.booleans(),
 )
 def test_log_spiral_sign(
-    theta: np.ndarray[tuple[int], np.dtype[np.float64]],
+    theta: _Array1D_f64,
     offset: float,
     growth_factor: float,
     initial_radius: float,
     *,
     use_modulo: bool,
 ) -> None:
+    """Test sign property of log spiral function.
+
+    Parameters
+    ----------
+    theta : Array1D[f64]
+        The angles to evaluate the radius at.
+    offset : float
+        The offset.
+    growth_factor : float
+        The growth factor.
+    initial_radius : float
+        The initial radius.
+    use_modulo : bool
+        Set this flag to keep the angles within 2 pi.
+
+    Notes
+    -----
+    The sign property is that the sign of the result is the same as the sign of initial radius given that
+    the initial radius is sufficiently large.
+
+    """
     # Tolerance for small values
     atol = 1e-9
 
