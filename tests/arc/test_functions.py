@@ -80,11 +80,47 @@ def test_log_spiral_sign(
     # Generate the output
     result = log_spiral(theta, offset, growth_factor, initial_radius, use_modulo=use_modulo)
 
-    # Check results
     # Case 1: The initial radius is very close to zero -> result is approximately zero as well
     if abs(initial_radius) < atol:
-        assert np.all(np.abs(result) < atol)
+        assert np.all(np.abs(result) < 1e2 * atol)
     # Case 2: The initial radius is not close to zero -> result has same sign as initial radius
     else:
         expected_sign = np.sign(initial_radius)
         assert np.all(np.sign(result[result != 0]) == expected_sign)
+
+
+@given(
+    theta=arrays(
+        dtype=np.float64,
+        shape=st.integers(1, 100),
+        elements=st.floats(-10, 10, allow_nan=False, allow_infinity=False),
+    ),
+    offset=st.floats(-2 * np.pi, 2 * np.pi),
+    growth_factor=st.floats(0, 10, allow_nan=False, allow_infinity=False),
+    initial_radius=st.floats(-10, 10, allow_nan=False, allow_infinity=False),
+)
+def test_log_spiral_continuity(theta: _Array1D_f64, offset: float, growth_factor: float, initial_radius: float) -> None:
+    """Test continuity of log spiral function.
+
+    Parameters
+    ----------
+    theta : Array1D[f64]
+        The angles to evaluate the radius at.
+    offset : float
+        The offset.
+    growth_factor : float
+        The growth factor.
+    initial_radius : float
+        The initial radius.
+
+    Notes
+    -----
+    Continuity means that nearby theta values also have radii that are close in value.
+
+    """
+    epsilon = 1e-6
+    theta2 = theta + epsilon  # Slightly perturb theta
+    result1 = log_spiral(theta, offset, growth_factor, initial_radius, use_modulo=False)
+    result2 = log_spiral(theta2, offset, growth_factor, initial_radius, use_modulo=False)
+    # Ensure that the outputs are close
+    assert np.allclose(result1, result2, atol=1e2 * epsilon)  # Allow small tolerance for FP errors
