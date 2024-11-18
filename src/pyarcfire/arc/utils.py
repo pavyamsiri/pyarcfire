@@ -6,9 +6,9 @@ import numpy as np
 
 from pyarcfire._typing import AnyReal
 
-_SCT = TypeVar("_SCT", bound=np.generic, default=np.float64)
-_SCT_f = TypeVar("_SCT_f", bound=np.floating[Any], default=np.float64)
-_Shape = TypeVar("_Shape", bound=tuple[int, ...], default=tuple[int])
+_SCT = TypeVar("_SCT", bound=np.generic)
+_SCT_f = TypeVar("_SCT_f", bound=np.floating[Any])
+_Shape = TypeVar("_Shape", bound=tuple[int, ...])
 _Array1D = np.ndarray[tuple[int], np.dtype[_SCT]]
 _Array2D = np.ndarray[tuple[int, int], np.dtype[_SCT]]
 _ArrayND = np.ndarray[_Shape, np.dtype[_SCT]]
@@ -95,7 +95,9 @@ def get_arc_bounds(offset: AnyReal, rotation_amount: AnyReal, lower_bound: AnyRe
     return (float(arc_start) + offset, float(arc_start) + arc_size + offset)
 
 
-def __calculate_angle_distance(from_angle: _ArrayND[_Shape], to_angle: _ArrayND[_Shape]) -> _ArrayND[_Shape]:
+def __calculate_angle_distance(
+    from_angle: _ArrayND[_Shape, _SCT_f], to_angle: _ArrayND[_Shape, _SCT_f]
+) -> _ArrayND[_Shape, _SCT_f]:
     """Calculate the distance between two angles in radians.
 
     Parameters
