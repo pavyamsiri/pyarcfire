@@ -11,7 +11,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from functools import reduce
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 import numpy as np
 from scipy import signal
@@ -26,11 +26,22 @@ from pyarcfire.assert_utils import (
 from .debug_utils import benchmark
 
 if TYPE_CHECKING:
-    from numpy.typing import NDArray
+    import optype as op
+
+    from pyarcfire._typing import AnyReal
+
+_SCT = TypeVar("_SCT", bound=np.generic)
+_SCT_f = TypeVar("_SCT_f", bound=np.floating[Any])
+_Shape = TypeVar("_Shape", bound=tuple[int, ...])
+_Array1D = np.ndarray[tuple[int], np.dtype[_SCT]]
+_Array2D = np.ndarray[tuple[int, int], np.dtype[_SCT]]
+_Array3D = np.ndarray[tuple[int, int, int], np.dtype[_SCT]]
+_ArrayND = np.ndarray[_Shape, np.dtype[_SCT]]
+_Array2D_f64 = _Array2D[np.float64]
+_Array3D_f64 = _Array3D[np.float64]
+
 
 log: logging.Logger = logging.getLogger(__name__)
-
-FloatType = np.float32
 
 
 @dataclass
@@ -76,14 +87,14 @@ class OrientationField:
     dependent on how aligned it is with nearby pixels.
     """
 
-    DENOISE_SUBTRACT_AMOUNT: float = np.cos(np.pi / 4)
+    DENOISE_SUBTRACT_AMOUNT: float = float(np.cos(np.pi / 4))
 
-    def __init__(self, field: NDArray[FloatType]) -> None:
+    def __init__(self, field: _Array3D[_SCT_f]) -> None:
         """Initiliases an orientation field from an array.
 
         Parameters
         ----------
-        field : NDArray[FloatType]
+        field : Array3D[F]
             The orientation field array. This is a 3D array of size MxNx2.
 
         """
@@ -93,53 +104,50 @@ class OrientationField:
         if field.shape[0] % 2 != 0 or field.shape[1] % 2 != 0:
             msg = "The dimensions of an OrientationField must both be even."
             raise ValueError(msg)
-        self._field: NDArray[FloatType] = field
+        self._field: _Array3D_f64 = field.astype(np.float64)
 
     @staticmethod
     def from_cartesian(
-        x: NDArray[FloatType],
-        y: NDArray[FloatType],
+        x: _Array2D[_SCT_f],
+        y: _Array2D[_SCT_f],
     ) -> OrientationField:
         """Create an orientation field given the x and y components of the orientation field.
 
         Parameters
         ----------
-        x : NDArray[FloatType]
+        x : Array2D[F]
             The x-component of the orientation field.
-        y : NDArray[FloatType]
+        y : Array2D[F]
             The y-component of the orientation field.
 
         Returns
         -------
-        OrientationField
+        field : OrientationField
             The orientation field.
 
         """
-        field: NDArray[FloatType] = np.zeros(
-            (x.shape[0], x.shape[1], 2),
-            dtype=FloatType,
-        )
+        field = np.zeros((x.shape[0], x.shape[1], 2), dtype=x.dtype)
         field[:, :, 0] = x
         field[:, :, 1] = y
         return OrientationField(field)
 
     @staticmethod
     def from_polar(
-        strengths: NDArray[FloatType],
-        directions: NDArray[FloatType],
+        strengths: _Array2D[_SCT_f],
+        directions: _Array2D[_SCT_f],
     ) -> OrientationField:
         """Create an orientation field given orientation strengths and directions.
 
         Parameters
         ----------
-        strengths : NDArray[FloatType]
+        strengths : Array2D[F]
             A scalar array of orientation field strengths.
-        directions: NDArray[FloatType]
+        directions: Array2D[F]
             A 2D vector array of orientation field directions.
 
         Returns
         -------
-        OrientationField
+        field : OrientationField
             The orientation field.
 
         """
@@ -172,48 +180,43 @@ class OrientationField:
         return (self.num_rows, self.num_columns, 2)
 
     @property
-    def dtype(self) -> np.dtype[FloatType]:
-        """np.dtype: The dtype of the underlying array."""
-        return self._field.dtype
-
-    @property
-    def field(self) -> NDArray[FloatType]:
-        """NDArray[FloatType]: The underlying field array."""
+    def field(self) -> _Array3D_f64:
+        """Array2D[f64]: The underlying field array."""
         return self._field
 
     @property
-    def x(self) -> NDArray[FloatType]:
-        """NDArray[FloatType]: The x-component of the orientation."""
+    def x(self) -> _Array2D_f64:
+        """Array2D[f64]: The x-component of the orientation."""
         return self._field[:, :, 0]
 
     @property
-    def y(self) -> NDArray[FloatType]:
-        """NDArray[FloatType]: The y-component of the orientation."""
+    def y(self) -> _Array2D_f64:
+        """Array2D[f64]: The y-component of the orientation."""
         return self._field[:, :, 1]
 
-    def get_strengths(self) -> NDArray[FloatType]:
+    def get_strengths(self) -> _Array2D_f64:
         """Get the orientation strength of each cell.
 
         Returns
         -------
-        NDArray[FloatType]
+        strengths : Array2D[f64]
             The orientation strength as an array.
 
         """
-        return np.sqrt(np.square(self.x) + np.square(self.y)).astype(self.dtype)
+        return np.sqrt(np.square(self.x) + np.square(self.y)).astype(np.float64)
 
-    def get_directions(self) -> NDArray[FloatType]:
+    def get_directions(self) -> _Array2D_f64:
         """Get the orientation direction of each cell given as angles in the range [0, pi).
 
         Returns
         -------
-        NDArray[FloatType]
+        directions : Array2D[f64]
             The orientation directions in angles in the range [0, pi).
 
         """
         return np.arctan2(self.y, self.x) % np.pi
 
-    def resize(self, new_width: int, new_height: int) -> OrientationField:
+    def resize(self, new_width: op.CanIndex, new_height: op.CanIndex) -> OrientationField:
         """Return the orientation field resized via interpolation.
 
         Parameters
@@ -230,7 +233,7 @@ class OrientationField:
 
         """
         return OrientationField(
-            transform.resize(self.field, (new_height, new_width)).astype(self.dtype),
+            cast(_Array3D_f64, transform.resize(self.field, (new_height, new_width)).astype(np.float64)),  # pyright:ignore[reportUnknownMemberType]
         )
 
     @staticmethod
@@ -283,13 +286,13 @@ class OrientationField:
 
     def scalar_field_multiply(
         self,
-        scalar_field: NDArray[FloatType],
+        scalar_field: _Array2D[_SCT_f],
     ) -> OrientationField:
         """Return the orientation field mulitplied by a scalar field.
 
         Parameters
         ----------
-        scalar_field : NDArray[FloatType]
+        scalar_field : Array2D[F]
             The scalar field to multiply with.
 
         Returns
@@ -361,7 +364,7 @@ class OrientationField:
     def _prepare_sum(
         left: OrientationField,
         right: OrientationField,
-    ) -> tuple[NDArray[FloatType], NDArray[FloatType], NDArray[np.bool_]]:
+    ) -> tuple[_Array3D_f64, _Array3D_f64, _Array2D[np.bool_]]:
         """Calculate the necessary components to perform an orientation field sum or difference.
 
         Parameters
@@ -373,11 +376,11 @@ class OrientationField:
 
         Returns
         -------
-        vector_sum : NDArray[FloatType]
+        vector_sum : Array3D[F]
             The vector sum of the two fields.
-        vector_difference : NDArray[FloatType]
+        vector_difference : Array3D[F]
             The vector difference of the two fields.
-        sum_greater : npt.NDArray[np.bool_]
+        sum_greater : Array2D[bool]
             The mask where true indicates that the norm of vector sum is greater than the
             norm of vector difference.
 
@@ -400,7 +403,7 @@ class OrientationField:
         sum_greater = np.repeat(sum_greater[:, :, np.newaxis], 2, axis=2)
         return (vector_sum, vector_difference, sum_greater)
 
-    def denoise(self, neighbour_distance: int) -> OrientationField:
+    def denoise(self, neighbour_distance: op.CanInt) -> OrientationField:
         """Denoise orientation field.
 
         Parameters
@@ -414,10 +417,12 @@ class OrientationField:
             The denoised field.
 
         """
+        neighbour_distance = int(neighbour_distance)
+
         # Allocate new field
         denoised = np.zeros_like(self.field)
 
-        neighbour_arrays: list[NDArray[FloatType]] = [
+        neighbour_arrays: list[_Array3D_f64] = [
             np.roll(self.field, -neighbour_distance, axis=1),
             np.roll(self.field, neighbour_distance, axis=1),
             np.roll(self.field, -neighbour_distance, axis=0),
@@ -460,12 +465,12 @@ class OrientationField:
             The number of non-zero elements.
 
         """
-        return np.count_nonzero(self.get_strengths())
+        return int(np.count_nonzero(self.get_strengths()))
 
 
 @benchmark
 def generate_orientation_fields(
-    image: NDArray[FloatType],
+    image: _Array2D[_SCT_f],
     settings: GenerateOrientationFieldSettings,
 ) -> OrientationField:
     """Generate an orientation field for the given image.
@@ -474,7 +479,7 @@ def generate_orientation_fields(
 
     Parameters
     ----------
-    image : NDArray[FloatType]
+    image : Array2D[F]
         The image to generate an orientation field of.
     settings : GenerateOrientationFieldSettings
         The parameters of the generation.
@@ -485,8 +490,6 @@ def generate_orientation_fields(
         The orientation field of the given image.
 
     """
-    image = image.astype(np.float32)
-
     verify_data_is_2d(image)
     verify_data_is_normalized(image)
     verify_data_can_be_shrunk_orientation(
@@ -504,7 +507,7 @@ def generate_orientation_fields(
     for idx in range(settings.num_orientation_field_levels):
         # Resize
         scale_factor: float = 1 / 2 ** (settings.num_orientation_field_levels - idx - 1)
-        resized_image = transform.rescale(image, scale_factor).astype(FloatType)
+        resized_image = cast(_Array2D[_SCT_f], transform.rescale(image, scale_factor).astype(image.dtype))  # pyright:ignore[reportUnknownMemberType]
 
         # Generate
         current_level = _generate_raw_orientation_field(
@@ -534,14 +537,14 @@ def generate_orientation_fields(
 
 
 def _generate_raw_orientation_field(
-    image: NDArray[FloatType],
-    kernel_radius: int,
+    image: _Array2D[_SCT_f],
+    kernel_radius: op.CanInt,
 ) -> OrientationField:
     """Generate an orientation field for the given image with no merging or denoising steps.
 
     Parameters
     ----------
-    image : NDArray[FloatType]
+    image : Array2D[_SCT_f]
         The image to generate an orientation field of.
     kernel_radius : int
         The radius of the orientation filter kernel in pixels.
@@ -559,40 +562,40 @@ def _generate_raw_orientation_field(
     filtered_images[filtered_images < 0] = 0
 
     # Construct weighted sum of filtered images
-    weights = np.square(filtered_images, dtype=np.complex64)
+    weights = np.square(filtered_images, dtype=np.complex128)
     for idx in range(9):
         weights[:, :, idx] = weights[:, :, idx] * np.exp(1j * 2 * idx * np.pi / 9)
     weighted_sum = np.sum(weights, axis=2)
 
     # Magnitude
-    strengths = np.abs(weighted_sum)
+    strengths = np.asarray(np.abs(weighted_sum), dtype=np.float64)
     # Angle
-    angles = np.angle(weighted_sum) / 2
+    angles = np.asarray(np.angle(weighted_sum)) / 2  # pyright:ignore[reportUnknownArgumentType]
 
     # Construct the orientation field
-    return OrientationField.from_polar(strengths, angles)
+    return OrientationField.from_polar(strengths, angles.astype(strengths.dtype))
 
 
 def _generate_orientation_filtered_images(
-    image: NDArray[FloatType],
-    kernel_radius: int,
-) -> NDArray[FloatType]:
+    image: _Array2D[_SCT_f],
+    kernel_radius: op.CanInt,
+) -> _Array3D[_SCT_f]:
     """Convolve the given image with 9 orientation filters and return all results.
 
     Parameters
     ----------
-    image : NDArray[FloatType]
+    image : Array2D[F]
         The 2D image to filter.
     kernel_radius : int
         The radius of the orientation filter kernel in pixels.
 
     Returns
     -------
-    filtered_images : NDArray[FloatType]
+    filtered_images : Array3D[F]
         The 3D array of the image filtered through the 9 orientation filters.
 
     """
-    filtered_images = np.zeros((image.shape[0], image.shape[1], 9), dtype=FloatType)
+    filtered_images = np.zeros((image.shape[0], image.shape[1], 9), dtype=image.dtype)
     for idx in range(9):
         angle = (idx * np.pi) / 9
         orientation_filter = _generate_orientation_filter_kernel(angle, kernel_radius)
@@ -605,9 +608,9 @@ def _generate_orientation_filtered_images(
 
 
 def _generate_orientation_filter_kernel(
-    theta: float,
-    radius: int,
-) -> NDArray[FloatType]:
+    theta: AnyReal,
+    radius: op.CanInt,
+) -> _Array2D_f64:
     """Generate orientation filter kernel.
 
     Technically this is 1D Ricker wavelet filter extended in 2D along an angle theta such that the filter response
@@ -622,14 +625,16 @@ def _generate_orientation_filter_kernel(
 
     Returns
     -------
-    kernel : NDArray[FloatType]
+    kernel : Array2D[f64]
         The filter kernel of size [2 * radius + 1, 2 * radius + 1]
 
     """
+    radius = int(radius)
+
     # Mesh size in pixels
-    num_pixels: int = int(2 * np.ceil(radius) + 1)
+    num_pixels = int(2 * np.ceil(radius) + 1)
     # Sample from pixel centres
-    max_value: float = np.pi * 2 * radius / (2 * radius + 1)
+    max_value = np.pi * 2 * radius / (2 * radius + 1)
     # Sample from [-pi, pi] to create the filter
     x, y = np.meshgrid(
         np.linspace(-max_value, max_value, num_pixels),
@@ -651,4 +656,4 @@ def _generate_orientation_filter_kernel(
     kernel = wavelet * gaussian_window
     # Normalise
     kernel /= np.sqrt(np.sum(np.square(kernel)))
-    return kernel
+    return kernel.astype(np.float64)
