@@ -18,7 +18,7 @@ from .merge import calculate_arc_merge_error
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-    from numpy.typing import NDArray
+    import optype as op
 
     SparseMatrix = TypeVar(
         "SparseMatrix",
@@ -67,10 +67,17 @@ if TYPE_CHECKING:
     )
 
 
+_SCT = TypeVar("_SCT", bound=np.generic)
+_SCT_f = TypeVar("_SCT_f", bound=np.floating[Any])
+_Shape = TypeVar("_Shape", bound=tuple[int, ...])
+_Array1D = np.ndarray[tuple[int], np.dtype[_SCT]]
+_Array2D = np.ndarray[tuple[int, int], np.dtype[_SCT]]
+_Array3D = np.ndarray[tuple[int, int, int], np.dtype[_SCT]]
+_ArrayND = np.ndarray[_Shape, np.dtype[_SCT]]
+_Array2D_f64 = _Array2D[np.float64]
+_Array3D_f64 = _Array3D[np.float64]
+
 log: logging.Logger = logging.getLogger(__name__)
-
-
-FloatType = np.float32
 
 
 @dataclass
@@ -111,7 +118,7 @@ class Cluster:
     A cluster should represent a spiral arm segment and be fit well by a log spiral.
     """
 
-    def __init__(self, points: Iterable[int]) -> None:
+    def __init__(self, points: Iterable[op.CanInt]) -> None:
         """Create a cluster from a given set of points.
 
         Parameters
@@ -120,7 +127,7 @@ class Cluster:
             The points the cluster consists of.
 
         """
-        self.points: list[int] = list(points)
+        self.points: list[int] = [int(point) for point in points]
 
     def __str__(self) -> str:
         """Return a string representation of OrientationField."""
@@ -130,7 +137,7 @@ class Cluster:
         """Return a string representation of OrientationField."""
         return str(self)
 
-    def __contains__(self, item: Iterable[int] | int) -> bool:
+    def __contains__(self, item: Iterable[op.CanInt] | op.CanInt) -> bool:
         """Check whether a point or a set of points is contained by the cluster.
 
         Parameters
@@ -147,25 +154,25 @@ class Cluster:
         """
         if isinstance(item, Iterable):
             elements: Iterable[Any] = item
-            return any(elem in self.points for elem in elements)
-        return item in self.points
+            return any(int(elem) in self.points for elem in elements)
+        return int(item) in self.points
 
     @property
     def size(self) -> int:
         """int: The number of points the cluster contains."""
         return len(self.points)
 
-    def get_masked_image(self, image: NDArray[FloatType]) -> NDArray[FloatType]:
+    def get_masked_image(self, image: _Array2D[_SCT_f]) -> _Array2D[_SCT_f]:
         """Return the given image masked by the cluster.
 
         Parameter
         ---------
-        image : NDArray[FloatType]
+        image : Array2D[F]
             The image to mask.
 
         Returns
         -------
-        masked_image : NDArray[FloatType]
+        masked_image : Array2D[F]
             The masked image.
 
         """
@@ -178,12 +185,12 @@ class Cluster:
         return masked_image
 
     @staticmethod
-    def list_to_arrays(image: NDArray[FloatType], clusters: Iterable[Cluster]) -> Sequence[NDArray[FloatType]]:
+    def list_to_arrays(image: _Array2D[_SCT_f], clusters: Iterable[Cluster]) -> Sequence[_Array2D[_SCT_f]]:
         """Convert a list of clusters and an image into an array of the same image masked by each different cluster.
 
         Parameters
         ----------
-        image : NDArray[FloatType]
+        image : Array2D[F]
             The image to mask.
         clusters : Sequence[Cluster]
             The clusters to mask the image with.
@@ -191,7 +198,7 @@ class Cluster:
 
         Returns
         -------
-        cluster_arrays : Sequence[NDArray[FloatType]]
+        cluster_arrays : Sequence[Array2D[F]]
             The image masked by the different clusters. This returns None if there
             are no clusters given.
 
@@ -221,15 +228,15 @@ class Cluster:
 
 @benchmark
 def generate_clusters(
-    image: NDArray[FloatType],
+    image: _Array2D[_SCT_f],
     input_similarity_matrix: SparseArray,
     stop_threshold: float,
     error_ratio_threshold: float,
     merge_check_minimum_cluster_size: int,
     minimum_cluster_size: int,
     *,
-    remove_central_cluster: bool,
-) -> Sequence[NDArray[FloatType]]:
+    remove_central_cluster: op.CanBool,
+) -> Sequence[_Array2D[_SCT_f]]:
     """Perform single linkage clustering on an image given its corresponding similarity matrix.
 
     The clusters are merged using single linkage clustering with a single modification. Sufficiently
@@ -239,7 +246,7 @@ def generate_clusters(
 
     Parameters
     ----------
-    image : NDArray[FloatType]
+    image : Array2D[F]
         The image to find clusters in.
     input_similarity_matrix : SparseArray
         The similarity matrix representing pixel similarities in the image.
@@ -256,7 +263,7 @@ def generate_clusters(
 
     Returns
     -------
-    cluster_arrays : Sequence[NDArray[FloatType]]
+    cluster_arrays : Sequence[Array2D[F]]
         The image masks for each cluster.
 
     """
@@ -271,7 +278,6 @@ def generate_clusters(
         raise ValueError(msg)
 
     # TODO(pavyamsiri): Should check that the input matrix is not self-similar
-
     # Change to an index that supports indexing
     similarity_matrix: sparse.csr_array = input_similarity_matrix.tocsr()
     similarity_matrix.eliminate_zeros()
@@ -293,13 +299,13 @@ def generate_clusters(
     # Merge clusters via single-linkage clustering
     while True:
         # Pop the pair with the largest similarity
-        max_idx = similarity_matrix.argmax()
+        max_idx = int(similarity_matrix.argmax())
         unraveled_idx = np.unravel_index(max_idx, similarity_matrix.shape)
         first_idx = int(unraveled_idx[0])
         second_idx = int(unraveled_idx[1])
 
         # Leave loop if similarity value is below the stop threshold
-        value = similarity_matrix[first_idx, second_idx]
+        value = float(similarity_matrix[first_idx, second_idx])  # pyright:ignore[reportArgumentType]
         if value < stop_threshold:
             break
 
@@ -318,8 +324,8 @@ def generate_clusters(
             if merge_error > error_ratio_threshold:
                 merge_stop_count += 1
                 # Remove links
-                similarity_matrix[first_idx, second_idx] = 0
-                similarity_matrix[second_idx, first_idx] = 0
+                similarity_matrix[first_idx, second_idx] = 0  # pyright:ignore[reportArgumentType]
+                similarity_matrix[second_idx, first_idx] = 0  # pyright:ignore[reportArgumentType]
                 continue
 
         # Combine clusters together
@@ -356,8 +362,8 @@ def generate_clusters(
 
 def _update_similarity_matrix(
     similarity_matrix: sparse.csr_array,
-    target_idx: int,
-    source_idx: int,
+    target_idx: op.CanIndex,
+    source_idx: op.CanIndex,
 ) -> sparse.csr_array:
     """Return the similarity matrix updated to have new similarity values after the merging of two clusters.
 
@@ -382,9 +388,9 @@ def _update_similarity_matrix(
 
     """
     # Merged cluster similarity is the maximum possible similarity from the set of cluster points
-    old_similarity_values = similarity_matrix[[target_idx], :]
+    old_similarity_values = similarity_matrix[[target_idx], :]  # pyright:ignore[reportArgumentType]
     # The updated values max(Ti, Si)
-    new_similarity_values = similarity_matrix[[target_idx], :].maximum(similarity_matrix[[source_idx], :])
+    new_similarity_values = similarity_matrix[[target_idx], :].maximum(similarity_matrix[[source_idx], :])  # pyright:ignore[reportArgumentType]
     # Remove self-similarity
     new_similarity_values[0, [target_idx]] = 0
 
@@ -439,8 +445,8 @@ def _clear_similarity_matrix_row_column(
 
     """
     # Construct matrix such that when added the target row and column are cleared
-    values = get_nonzero_values(similarity_matrix[[clear_idx], :])
-    indices: NDArray[np.int32] = similarity_matrix[[clear_idx], :].nonzero()[1]
+    values = get_nonzero_values(similarity_matrix[[clear_idx], :])  # pyright:ignore[reportArgumentType]
+    indices: _Array1D[np.int32] = similarity_matrix[[clear_idx], :].nonzero()[1]  # pyright:ignore[reportArgumentType]
     num_nonzero = len(indices)
     clear_matrix_row_indices = np.tile(indices, 2)
     clear_matrix_row_indices[num_nonzero:] = clear_idx
