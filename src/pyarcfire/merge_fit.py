@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar
 
 import numpy as np
 from scipy.ndimage import distance_transform_edt
@@ -12,14 +12,17 @@ from scipy.ndimage import distance_transform_edt
 from .debug_utils import benchmark
 from .merge import calculate_arc_merge_error
 
-log: logging.Logger = logging.getLogger(__name__)
-
 if TYPE_CHECKING:
     from collections.abc import MutableSequence, Sequence
 
-    from numpy.typing import NDArray
+    from pyarcfire._typing import AnyReal
 
-    FloatType = TypeVar("FloatType", np.float32, np.float64)
+
+_SCT = TypeVar("_SCT", bound=np.generic)
+_SCT_f = TypeVar("_SCT_f", bound=np.floating[Any])
+_Array2D = np.ndarray[tuple[int, int], np.dtype[_SCT]]
+
+log: logging.Logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -41,35 +44,35 @@ DEFAULT_MERGE_CLUSTER_BY_FIT_SETTINGS: MergeClustersByFitSettings = MergeCluster
 
 @benchmark
 def merge_clusters_by_fit(
-    clusters: Sequence[NDArray[FloatType]],
-    stop_threshold: float,
-) -> Sequence[NDArray[FloatType]]:
+    clusters: Sequence[_Array2D[_SCT_f]],
+    stop_threshold: AnyReal,
+) -> Sequence[_Array2D[_SCT_f]]:
     """Merge clusters by if they are fit spirals decently well when combined.
 
     Parameters
     ----------
-    clusters : Sequence[NDArray[FloatType]]
+    clusters : Sequence[Array2D[F]]
         The clusters stored as series of masked images.
     stop_threshold : float
         The maximum allowed distance between clusters to be merged.
 
     Returns
     -------
-    merged_clusters : Sequence[NDArray[FloatType]]
+    merged_clusters : Sequence[Array2D[F]]
         The clusters after being merged.
 
     """
     assert len(clusters) > 0
     # Maximum pixel distance
     num_rows, num_columns = clusters[0].shape
-    max_pixel_distance = np.mean([num_rows, num_columns]).astype(float) / 20
+    max_pixel_distance = np.mean([num_rows, num_columns]).astype(np.float64) / 20
 
     # Fit spirals to each cluster
     num_clusters: int = len(clusters)
-    cluster_list: MutableSequence[NDArray[FloatType] | None] = list(clusters)
+    cluster_list: MutableSequence[_Array2D[_SCT_f] | None] = list(clusters)
 
     # Compute distances between each cluster
-    cluster_distances = np.full((num_clusters, num_clusters), np.inf, dtype=np.float32)
+    cluster_distances = np.full((num_clusters, num_clusters), np.inf, dtype=np.float64)
     for source_idx in range(num_clusters):
         for target_idx in range(source_idx + 1, num_clusters):
             left_array = cluster_list[source_idx]
@@ -133,17 +136,17 @@ def merge_clusters_by_fit(
 
 
 def _calculate_cluster_distance(
-    first_cluster_array: NDArray[FloatType],
-    second_cluster_array: NDArray[FloatType],
-    max_pixel_distance: float,
+    first_cluster_array: _Array2D[_SCT_f],
+    second_cluster_array: _Array2D[_SCT_f],
+    max_pixel_distance: AnyReal,
 ) -> float:
     """Calculate the "distance" between two clusters.
 
     Parameters
     ----------
-    first_cluster_array : NDArray[FloatType]
+    first_cluster_array : Array2D[F]
         The first cluster in the form of an array.
-    second_cluster_array : NDArray[FloatType]
+    second_cluster_array : Array2D[F]
         The second cluster in the form of an array.
     max_pixel_distance : float
         The maximum allowed distance in pixels between the two clusters for them
