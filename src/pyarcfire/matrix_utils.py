@@ -3,7 +3,6 @@
 from typing import TypeVar
 
 import numpy as np
-from numpy.typing import NDArray
 from scipy import sparse
 
 SparseMatrix = TypeVar(
@@ -35,6 +34,11 @@ SparseMatrixSupportsIndex = TypeVar(
     sparse.dok_matrix,
     sparse.lil_matrix,
 )
+
+
+_SCT = TypeVar("_SCT", bound=np.generic)
+_Array1D = np.ndarray[tuple[int], np.dtype[_SCT]]
+_Array1D_f64 = _Array1D[np.float64]
 
 
 def is_sparse_matrix_hollow(matrix: SparseMatrix) -> bool:
@@ -71,7 +75,7 @@ def is_sparse_matrix_symmetric(matrix: SparseMatrix) -> bool:
     return (matrix - matrix.transpose()).count_nonzero() == 0
 
 
-def get_nonzero_values(matrix: SparseMatrixSupportsIndex) -> NDArray[np.float32]:
+def get_nonzero_values(matrix: SparseMatrixSupportsIndex) -> _Array1D_f64:
     """Return all non-zero values as a flat array.
 
     Parameters
@@ -81,8 +85,8 @@ def get_nonzero_values(matrix: SparseMatrixSupportsIndex) -> NDArray[np.float32]
 
     Returns
     -------
-    NDArray[np.float32]
+    values : Array1D[f64]
         The non-zero values.
 
     """
-    return np.asarray(matrix[matrix.nonzero()], dtype=np.float32).flatten()
+    return np.asarray(matrix[matrix.nonzero()], dtype=np.float64).flatten()
