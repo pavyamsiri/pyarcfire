@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import logging
 import warnings
+from collections.abc import Callable
 from dataclasses import dataclass
+from os import PathLike
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, TypeAlias, TypeVar, cast
 
 import numpy as np
 import scipy.io
@@ -47,17 +49,34 @@ from .similarity import (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Generator, Sequence
+    from collections.abc import Generator, Sequence
 
-    from numpy.typing import NDArray
+    import optype as op
+
+    from pyarcfire._typing import AnyReal
+
+
+MAX_SIZE_BEFORE_WARN: int = 256
+
+
+StrPath: TypeAlias = str | PathLike[str]
+
+_SCT = TypeVar("_SCT", bound=np.generic)
+_SCT_f = TypeVar("_SCT_f", bound=np.floating[Any])
+_Shape = TypeVar("_Shape", bound=tuple[int, ...])
+_Array1D = np.ndarray[tuple[int], np.dtype[_SCT]]
+_Array2D = np.ndarray[tuple[int, int], np.dtype[_SCT]]
+_Array3D = np.ndarray[tuple[int, int, int], np.dtype[_SCT]]
+_ArrayND = np.ndarray[_Shape, np.dtype[_SCT]]
+_Array1D_f64 = _Array1D[np.float64]
+_Array2D_f64 = _Array2D[np.float64]
+_Array3D_f64 = _Array3D[np.float64]
+_Array2D_i32 = _Array2D[np.int32]
+
+_CalculateRadiiFn: TypeAlias = Callable[[_Array1D_f64], _Array1D_f64]
 
 
 log: logging.Logger = logging.getLogger(__name__)
-
-
-FloatType = np.float32
-
-MAX_SIZE_BEFORE_WARN: int = 256
 
 
 @dataclass
@@ -105,10 +124,10 @@ class ClusterSpiralResult:
 
     def __init__(
         self,
-        image: NDArray[FloatType],
-        unsharp_image: NDArray[FloatType],
+        image: _Array2D[_SCT_f],
+        unsharp_image: _Array2D[_SCT_f],
         field: OrientationField,
-        cluster_masks: NDArray[FloatType],
+        cluster_masks: _Array3D[_SCT_f],
         unsharp_mask_settings: UnsharpMaskSettings,
         orientation_field_settings: GenerateOrientationFieldSettings,
         similarity_matrix_settings: GenerateSimilarityMatrixSettings,
@@ -119,13 +138,13 @@ class ClusterSpiralResult:
 
         Parameters
         ----------
-        image : NDArray[FloatType]
+        image : Array2D[F]
             The original input image.
-        unsharp_image : NDArray[FloatType]
+        unsharp_image : Array2D[F]
             The image after applying an unsharp mask.
         field : OrientationField
             The orientation field derived from the input image.
-        cluster_masks : NDArray[FloatType]
+        cluster_masks : Array3D[F]
             A 3D NumPy array where each slice along the third dimension represents a cluster mask.
         unsharp_mask_settings : UnsharpMaskSettings
             Settings used for generating the unsharp mask image.
@@ -139,9 +158,9 @@ class ClusterSpiralResult:
             Settings used for merging clusters based on fit criteria.
 
         """
-        self._image: NDArray[FloatType] = image
-        self._unsharp_image: NDArray[FloatType] = unsharp_image
-        self._cluster_masks: NDArray[FloatType] = cluster_masks
+        self._image: _Array2D_f64 = image.astype(np.float64)
+        self._unsharp_image: _Array2D_f64 = unsharp_image.astype(np.float64)
+        self._cluster_masks: _Array3D_f64 = cluster_masks.astype(np.float64)
         self._field: OrientationField = field
         self._sizes: tuple[int, ...] = tuple(
             [np.count_nonzero(self._cluster_masks[:, :, idx]) for idx in range(self._cluster_masks.shape[2])],
@@ -155,7 +174,7 @@ class ClusterSpiralResult:
         self._merge_clusters_by_fit_settings: MergeClustersByFitSettings = merge_clusters_by_fit_settings
 
         # Cache
-        self._spiral_cache: dict[int, LogSpiralFitResult[FloatType]] = {}
+        self._spiral_cache: dict[int, LogSpiralFitResult] = {}
 
     def __str__(self) -> str:
         """Return a string representation of ClusterSpiralResult."""
@@ -219,23 +238,23 @@ class ClusterSpiralResult:
         """
         return self._image.shape[1]
 
-    def get_image(self) -> NDArray[FloatType]:
+    def get_image(self) -> _Array2D_f64:
         """Return the original image.
 
         Returns
         -------
-        NDArray[FloatType]
+        image : Array2D[f64]
             The original image.
 
         """
         return self._image
 
-    def get_unsharp_image(self) -> NDArray[FloatType]:
+    def get_unsharp_image(self) -> _Array2D_f64:
         """Return the unsharpened image.
 
         Returns
         -------
-        NDArray[FloatType]
+        image : Array2D[f64]
             The unsharpened image.
 
         """
@@ -263,7 +282,7 @@ class ClusterSpiralResult:
         """
         return self._sizes
 
-    def get_cluster_mask(self) -> NDArray[int32]:
+    def get_cluster_mask(self) -> _Array2D_i32:
         """Return the overall cluster mask.
 
         The cluster mask being an array of integer values corresponding to the indices
@@ -271,7 +290,7 @@ class ClusterSpiralResult:
 
         Returns
         -------
-        cluster_mask : NDArray[int]
+        cluster_mask : Array2D[i32]
             The clusters as an array where non-negative values correspond to the index of the
             cluster they belong to. Negative values indicate that the pixel belongs to no cluster.
 
@@ -282,12 +301,12 @@ class ClusterSpiralResult:
             mask[current_mask != 0] = cluster_index
         return mask
 
-    def get_cluster_array(self, cluster_idx: int) -> tuple[NDArray[FloatType], int]:
+    def get_cluster_array(self, cluster_idx: op.CanIndex) -> tuple[_Array2D_f64, int]:
         """Return the cluster as an array along with its size.
 
         Returns
         -------
-        cluster_array : NDArray[FloatType]
+        cluster_array : Array2D[f64]
             The cluster as an array where the non-zero values are where the cluster exists.
         size : int
             The size of the cluster.
@@ -295,18 +314,18 @@ class ClusterSpiralResult:
         """
         return (self._cluster_masks[:, :, cluster_idx], self._sizes[cluster_idx])
 
-    def get_cluster_arrays(self) -> NDArray[FloatType]:
+    def get_cluster_arrays(self) -> _Array3D_f64:
         """Return clusters as a 3D array where each slice is a cluster.
 
         Returns
         -------
-        NDArray[FloatType]
+        arrays : Array3D[f64]
             The array containing every cluster as a 2D slice.
 
         """
         return self._cluster_masks
 
-    def dump(self, path: str) -> None:
+    def dump(self, path: StrPath) -> None:
         """Dump the cluster array into one of the supported formats.
 
         Parameters
@@ -345,8 +364,8 @@ class ClusterSpiralResult:
         num_points: int = 100,
         pixel_to_distance: float = 1,
         *,
-        flip_y: bool = False,
-    ) -> tuple[NDArray[FloatType], NDArray[FloatType]]:
+        flip_y: op.CanBool = False,
+    ) -> tuple[_Array1D_f64, _Array1D_f64]:
         """Return the x and y coordinates of a cluster's spiral arc.
 
         Parameters
@@ -362,9 +381,9 @@ class ClusterSpiralResult:
 
         Returns
         -------
-        x : NDArray[FloatType]
+        x : Array1D[f64]
             The x coordinate of the arc.
-        y : NDArray[FloatType]
+        y : Array1D[f64]
             The y coordinate of the arc.
 
         """
@@ -383,32 +402,34 @@ class ClusterSpiralResult:
         )
         return x, y
 
-    def get_fit(self, cluster_idx: int) -> LogSpiralFitResult[FloatType]:
+    def get_fit(self, cluster_index: op.CanIndex) -> LogSpiralFitResult:
         """Return the log spiral fit associated with the given cluster index.
 
         Parameters
         ----------
-        cluster_idx : int
+        cluster_index : int
             The index of the cluster to get the fit of.
 
         Returns
         -------
-        result : LogSpiralFitResult[FloatType]
+        result : LogSpiralFitResult
             The log spiral fit result.
 
         """
-        if cluster_idx not in self._spiral_cache:
-            current_array, _ = self.get_cluster_array(cluster_idx)
-            self._spiral_cache[cluster_idx] = fit_spiral_to_image(current_array)
-        return self._spiral_cache[cluster_idx]
+        cluster_index = int(cluster_index)
+
+        if cluster_index not in self._spiral_cache:
+            current_array, _ = self.get_cluster_array(cluster_index)
+            self._spiral_cache[cluster_index] = fit_spiral_to_image(current_array)
+        return self._spiral_cache[cluster_index]
 
     def get_spirals(
         self,
-        num_points: int,
-        pixel_to_distance: float,
+        num_points: op.CanIndex,
+        pixel_to_distance: AnyReal,
         *,
-        flip_y: bool = False,
-    ) -> Generator[tuple[NDArray[FloatType], NDArray[FloatType]], None, None]:
+        flip_y: op.CanBool = False,
+    ) -> Generator[tuple[_Array1D_f64, _Array1D_f64], None, None]:
         """Generate Cartesian coordinates for spirals fitted to each cluster.
 
         Parameters
@@ -440,11 +461,11 @@ class ClusterSpiralResult:
 
     def get_spirals_and_clusters(
         self,
-        num_points: int,
-        pixel_to_distance: float,
+        num_points: op.CanIndex,
+        pixel_to_distance: AnyReal,
         *,
-        flip_y: bool = False,
-    ) -> Generator[tuple[NDArray[FloatType], NDArray[FloatType], NDArray[FloatType]], None, None]:
+        flip_y: op.CanBool = False,
+    ) -> Generator[tuple[_Array1D_f64, _Array1D_f64, _Array2D_f64], None, None]:
         """Generate Cartesian coordinates for spirals fitted to each cluster.
 
         Parameters
@@ -458,11 +479,11 @@ class ClusterSpiralResult:
 
         Yields
         ------
-        x : NDArray[FloatType]
+        x : Array1D[f64]
             The x coordinate of the arc.
-        y : NDArray[FloatType]
+        y : Array1D[f64]
             The y coordinate of the arc.
-        cluster_array : NDArray[FloatType]
+        cluster_array : Array2D[f64]
             The cluster in array format.
 
         """
@@ -476,7 +497,7 @@ class ClusterSpiralResult:
             )
             yield x, y, self.get_cluster_array(cluster_idx)[0]
 
-    def get_arc_bounds(self, cluster_idx: int) -> tuple[float, float]:
+    def get_arc_bounds(self, cluster_idx: op.CanIndex) -> tuple[float, float]:
         """Return the arc bounds in radians for a given cluster.
 
         Parameters
@@ -495,19 +516,19 @@ class ClusterSpiralResult:
 
     def calculate_fit_error_to_cluster(
         self,
-        calculate_radii: Callable[[NDArray[FloatType]], NDArray[FloatType]],
-        cluster_idx: int,
+        calculate_radii: _CalculateRadiiFn,
+        cluster_index: op.CanIndex,
         *,
-        pixel_to_distance: float,
+        pixel_to_distance: AnyReal,
         fit_error_kind: FitErrorKind = FitErrorKind.NONORM,
     ) -> float:
         """Calculate the residuals of the given function with respect to a cluster.
 
         Parameters
         ----------
-        calculate_radii : Callable[[NDArray[FloatType]], NDArray[FloatType]]
+        calculate_radii : Callable[[Array1D[f64]], Array1D[f64]]
             A function that takes in an array of angles and returns radii.
-        cluster_idx : int
+        cluster_index : int
             The index of the cluster.
         pixel_to_distance : float
             Conversion factor from pixel units to physical distance units.
@@ -516,11 +537,11 @@ class ClusterSpiralResult:
 
         Returns
         -------
-        residuals : NDArray[FloatType]
-            The residuals.
+        error : float
+            The error.
 
         """
-        current_array, _ = self.get_cluster_array(cluster_idx)
+        current_array, _ = self.get_cluster_array(cluster_index)
         radii, theta, weights = get_polar_coordinates(current_array)
         residuals = np.multiply(
             np.sqrt(weights),
@@ -579,7 +600,7 @@ class ClusterSpiralResult:
 
 @benchmark
 def detect_spirals_in_image(
-    image: NDArray[FloatType],
+    image: _Array2D[_SCT_f],
     *,
     unsharp_mask_settings: UnsharpMaskSettings = DEFAULT_UNSHARP_MASK,
     orientation_field_settings: GenerateOrientationFieldSettings = DEFAULT_ORIENTATION_FIELD_SETTINGS,
@@ -587,7 +608,7 @@ def detect_spirals_in_image(
     generate_clusters_settings: GenerateClustersSettings = DEFAULT_CLUSTER_SETTINGS,
     merge_clusters_by_fit_settings: MergeClustersByFitSettings = DEFAULT_MERGE_CLUSTER_BY_FIT_SETTINGS,
     fit_error_settings: FitErrorSettings | None = None,
-    preprocess: bool = False,
+    preprocess: op.CanBool = False,
 ) -> ClusterSpiralResult | None:
     """Run the spiral arc finder algorithm on the given image.
 
@@ -595,7 +616,7 @@ def detect_spirals_in_image(
 
     Parameters
     ----------
-    image : NDArray[FloatType]
+    image : Array2D[_SCT_f]
         The input image as a NumPy array.
     unsharp_mask_settings : UnsharpMaskSettings, optional
         Settings for the unsharp mask, by default UnsharpMaskSettings().
@@ -641,10 +662,13 @@ def detect_spirals_in_image(
         warnings.warn(warning_msg, UserWarning, stacklevel=2)
 
     # Unsharp phase
-    unsharp_image = filters.unsharp_mask(
-        image,
-        radius=unsharp_mask_settings.radius,
-        amount=unsharp_mask_settings.amount,
+    unsharp_image: _Array2D[_SCT_f] = cast(
+        _Array2D[_SCT_f],
+        filters.unsharp_mask(  # pyright:ignore[reportUnknownMemberType]
+            image,
+            radius=unsharp_mask_settings.radius,
+            amount=unsharp_mask_settings.amount,
+        ),
     )
 
     # Generate orientation fields
@@ -666,7 +690,7 @@ def detect_spirals_in_image(
 
     # Merge clusters via HAC
     log.info("[cyan]PROGRESS[/cyan]: Generating clusters...")
-    cluster_arrays: Sequence[NDArray[FloatType]] = generate_clusters(
+    cluster_arrays: Sequence[_Array2D[_SCT_f]] = generate_clusters(
         image,
         matrix.tocsr(),
         stop_threshold=generate_clusters_settings.stop_threshold,

@@ -17,6 +17,7 @@ _SCT_f = TypeVar("_SCT_f", bound=np.floating[Any])
 _Shape = TypeVar("_Shape", bound=tuple[int, ...])
 _Array1D = np.ndarray[tuple[int], np.dtype[_SCT]]
 _ArrayND = np.ndarray[_Shape, np.dtype[_SCT]]
+_Array1D_f64 = _Array1D[np.float64]
 
 
 class FitErrorKind(Enum):
@@ -186,7 +187,7 @@ class LogSpiralFitResult:
         pixel_to_distance: AnyReal,
         *,
         flip_y: op.CanBool = False,
-    ) -> tuple[_Array1D[_SCT_f], _Array1D[_SCT_f]]:
+    ) -> tuple[_Array1D_f64, _Array1D_f64]:
         """Return the x and y Cartesian coordinates of the log spiral.
 
         Parameters
@@ -200,9 +201,9 @@ class LogSpiralFitResult:
 
         Returns
         -------
-        x : Array1D[F]
+        x : Array1D[f64]
             The x coordinates.
-        z : Array1D[F]
+        z : Array1D[f64]
             The z coordinates.
 
         """
@@ -211,7 +212,7 @@ class LogSpiralFitResult:
 
         theta = np.linspace(start_angle, end_angle, num_points, dtype=np.float32)
         radii = self.calculate_radii(theta, pixel_to_distance=pixel_to_distance)
-        x = np.multiply(radii, np.cos(theta))
+        x = np.multiply(radii, np.cos(theta)).astype(np.float64)
         y = y_flip_factor * np.multiply(radii, np.sin(theta))
         return (x, y.astype(x.dtype))
 
