@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, TypeVar
 
 import numpy as np
 from scipy import sparse
@@ -16,15 +16,16 @@ from .matrix_utils import (
 )
 
 if TYPE_CHECKING:
-    from numpy.typing import NDArray
+    from pyarcfire._typing import AnyReal
 
     from .orientation import OrientationField
 
+_SCT = TypeVar("_SCT", bound=np.generic)
+_Array1D = np.ndarray[tuple[int], np.dtype[_SCT]]
+_Array1D_f64 = _Array1D[np.float64]
+_Array1D_pointer = _Array1D[np.intp]
 
 log: logging.Logger = logging.getLogger(__name__)
-
-FloatType = np.float32
-IndexType = np.intp
 
 
 @dataclass
@@ -45,7 +46,7 @@ DEFAULT_SIMILARITY_MATRIX_SETTINGS: GenerateSimilarityMatrixSettings = GenerateS
 
 
 @benchmark
-def generate_similarity_matrix(orientation: OrientationField, similarity_cutoff: float) -> sparse.coo_array:
+def generate_similarity_matrix(orientation: OrientationField, similarity_cutoff: AnyReal) -> sparse.coo_array:
     """Generate a sparse pixel-to-pixel similarity matrix from an orientation field.
 
     Parameters
@@ -86,11 +87,11 @@ def generate_similarity_matrix(orientation: OrientationField, similarity_cutoff:
 
 def _calculate_pixel_similarities(
     orientation: OrientationField,
-    similarity_cutoff: float,
+    similarity_cutoff: AnyReal,
 ) -> tuple[
-    NDArray[FloatType],
-    NDArray[IndexType],
-    NDArray[IndexType],
+    _Array1D_f64,
+    _Array1D_pointer,
+    _Array1D_pointer,
     int,
 ]:
     """Calculate similarities between pixels by measuring how well aligned their orientation vectors are.
@@ -108,11 +109,11 @@ def _calculate_pixel_similarities(
 
     Returns
     -------
-    similarity_values : NDArray[FloatType]
+    similarity_values : Array1D[f64]
         The non-zero similarity values between pixels.
-    root_indices : NDArray[IndexType]
+    root_indices : Array1D[pointer]
         The corresponding indices of root pixel.
-    child_indices : NDArray[IndexType]
+    child_indices : Array1D[pointer]
         The corresponding indices of child pixel.
     num_vectors : int
         The total number of rows/columns of the similarity matrix.
@@ -127,29 +128,28 @@ def _calculate_pixel_similarities(
     # Ox2 matrix where O is M * N, the number of vectors
     orientation_vectors = np.reshape(orientation.field, (num_vectors, 2))
     # Non-zero indices of flattened strengths matrix
-    nonzero_indices = np.flatnonzero(strengths)
+    nonzero_indices: _Array1D_pointer = np.flatnonzero(strengths)
     num_nonzero_vectors = nonzero_indices.size
 
     # Each non-zero pixel has eight neighbours at distance 1 so we have eight pairs of similarity values.
     # This is a bit redundant but this implementation is relatively simple and it works.
     max_num_elements: int = 8 * num_nonzero_vectors
-    similarity_values: NDArray[FloatType] = np.full(max_num_elements, np.nan, dtype=FloatType)
+    similarity_values = np.full(max_num_elements, np.nan, dtype=np.float64)
 
     # NOTE: Technically both indices are of equal footing, so these are kind of misnomers.
     # The root index of the similarity value pair
-    root_indices = np.zeros(max_num_elements, dtype=IndexType)
+    root_indices = np.zeros(max_num_elements, dtype=np.intp)
     # The child index of the similarity value pair
-    child_indices = np.zeros(max_num_elements, dtype=IndexType)
+    child_indices = np.zeros(max_num_elements, dtype=np.intp)
 
     # Offsets to get neighbour indices
-    add_neighbour_row: NDArray[IndexType] = np.array([-1, -1, -1, 0, 0, +1, +1, +1])
-    add_neighbour_column: NDArray[IndexType] = np.array([-1, 0, +1, -1, +1, -1, 0, +1])
+    add_neighbour_row = np.array([-1, -1, -1, 0, 0, +1, +1, +1])
+    add_neighbour_column = np.array([-1, 0, +1, -1, +1, -1, 0, +1])
 
-    for fill_idx, idx in enumerate(nonzero_indices):
+    for fill_idx in range(len(nonzero_indices)):
+        idx = int(nonzero_indices[fill_idx])
         # Compute similarity values for each neighbour
         row_idx, column_idx = np.unravel_index(idx, (num_rows, num_columns))
-        row_idx = cast(int, row_idx)
-        column_idx = cast(int, column_idx)
         neighbour_row_indices = np.add(row_idx, add_neighbour_row)
         neighbour_column_indices = np.add(column_idx, add_neighbour_column)
         # Remove out of bounds accesses
@@ -169,7 +169,7 @@ def _calculate_pixel_similarities(
         neighbours = orientation_vectors[neighbour_indices]
 
         # Compute similarities
-        neighbour_similarities: NDArray[FloatType] = np.abs(np.dot(neighbours, orientation_vectors[idx]))
+        neighbour_similarities = np.abs(np.dot(neighbours, orientation_vectors[idx]))
         assert len(neighbour_similarities) == len(neighbours)
 
         # Perform similarity cut

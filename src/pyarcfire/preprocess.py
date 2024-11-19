@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 import warnings
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 import numpy as np
 from skimage import transform
@@ -12,29 +12,29 @@ from skimage import transform
 from .assert_utils import verify_data_is_2d
 
 if TYPE_CHECKING:
-    from typing import TypeVar
+    import optype as op
 
-    from numpy.typing import NDArray
-
-    FloatType = TypeVar("FloatType", np.float32, np.float64)
+_SCT = TypeVar("_SCT", bound=np.generic)
+_SCT_f = TypeVar("_SCT_f", bound=np.floating[Any])
+_Array2D = np.ndarray[tuple[int, int], np.dtype[_SCT]]
 
 
 log: logging.Logger = logging.getLogger(__name__)
 
 
-def preprocess_image(image: NDArray[FloatType], *, num_orientation_field_levels: int) -> NDArray[FloatType]:
+def preprocess_image(image: _Array2D[_SCT_f], *, num_orientation_field_levels: op.CanInt) -> _Array2D[_SCT_f]:
     """Process an image so that is compatible with the pyarcfire package.
 
     Parameters
     ----------
-    image : NDArray[FloatType]
+    image : Array2D[F]
         The image to process.
     num_orientation_field_levels : int
         The number of orientation field levels.
 
     Returns
     -------
-    processed_image : NDArray[FloatType]
+    processed_image : Array2D[F]
         The processed image.
 
     """
@@ -45,7 +45,7 @@ def preprocess_image(image: NDArray[FloatType], *, num_orientation_field_levels:
     verify_data_is_2d(processed_image)
 
     # Adjust size to be compatible with orientation field generation
-    maximum_shrink_factor: int = 2**num_orientation_field_levels
+    maximum_shrink_factor: int = 2 ** int(num_orientation_field_levels)
     has_incompatible_size = image.shape[0] % maximum_shrink_factor != 0 or image.shape[1] % maximum_shrink_factor != 0
     if has_incompatible_size:
         processed_image = _resize_image(processed_image, maximum_shrink_factor)
@@ -55,7 +55,7 @@ def preprocess_image(image: NDArray[FloatType], *, num_orientation_field_levels:
 
 
 # TODO(pavyamsiri): Add more normalization options
-def _normalize_image(image: NDArray[FloatType]) -> NDArray[FloatType]:
+def _normalize_image(image: _Array2D[_SCT_f]) -> _Array2D[_SCT_f]:
     log.debug("[green]DIAGNOST[/green]: Normalizing...")
     # Remove nans
     normalized_image = np.nan_to_num(image, nan=0)
@@ -72,17 +72,22 @@ def _normalize_image(image: NDArray[FloatType]) -> NDArray[FloatType]:
     return np.divide(np.subtract(normalized_image, min_value), max_value - min_value)
 
 
-def _resize_image(image: NDArray[FloatType], divisor: int) -> NDArray[FloatType]:
+def _resize_image(image: _Array2D[_SCT], divisor: op.CanInt) -> _Array2D[_SCT]:
+    divisor = int(divisor)
+
     # TODO(pavyamsiri): Make this more sophisicated and add more resizing algorithms
     height: int = image.shape[0]
     width: int = image.shape[1]
     compatible_height = _closest_multiple(height, divisor)
     compatible_width = _closest_multiple(width, divisor)
     log.debug("[green]DIAGNOST[/green]: Resizing image to %dx%d...", compatible_height, compatible_width)
-    return transform.resize(image, (compatible_height, compatible_width)).astype(image.dtype)
+    return cast(_Array2D[_SCT], transform.resize(image, (compatible_height, compatible_width)).astype(image.dtype))  # pyright:ignore[reportUnknownMemberType]
 
 
-def _closest_multiple(num: int, divisor: int) -> int:
+def _closest_multiple(num: op.CanInt, divisor: op.CanInt) -> int:
+    num = int(num)
+    divisor = int(divisor)
+
     quotient = num / divisor
     smaller_multiple = int(np.floor(quotient)) * divisor
     larger_multiple = int(np.ceil(quotient)) * divisor

@@ -2,16 +2,22 @@
 
 from dataclasses import dataclass
 from enum import Enum, auto
-from typing import Generic, Literal, TypeVar
+from typing import Any, Literal, TypeVar
 
 import numpy as np
-from numpy import float32, float64
-from numpy.typing import NDArray
+import optype as op
 from typing_extensions import assert_never
+
+from pyarcfire._typing import AnyReal
 
 from .functions import log_spiral
 
-FloatType = TypeVar("FloatType", float32, float64)
+_SCT = TypeVar("_SCT", bound=np.generic)
+_SCT_f = TypeVar("_SCT_f", bound=np.floating[Any])
+_Shape = TypeVar("_Shape", bound=tuple[int, ...])
+_Array1D = np.ndarray[tuple[int], np.dtype[_SCT]]
+_ArrayND = np.ndarray[_Shape, np.dtype[_SCT]]
+_Array1D_f64 = _Array1D[np.float64]
 
 
 class FitErrorKind(Enum):
@@ -72,7 +78,7 @@ class Chirality(Enum):
 
 
 @dataclass
-class LogSpiralFitResult(Generic[FloatType]):
+class LogSpiralFitResult:
     """The result of a log spiral fit to a cluster.
 
     A log spiral is a curve of the form
@@ -105,7 +111,7 @@ class LogSpiralFitResult(Generic[FloatType]):
     initial_radius: float
     arc_bounds: tuple[float, float]
     total_error: float
-    errors: NDArray[FloatType]
+    errors: _Array1D[np.float64]
     has_multiple_revolutions: bool
 
     def __post_init__(self) -> None:
@@ -145,40 +151,43 @@ class LogSpiralFitResult(Generic[FloatType]):
 
     def calculate_radii(
         self,
-        theta: NDArray[float32],
+        theta: _ArrayND[_Shape, _SCT_f],
         *,
-        pixel_to_distance: float,
-    ) -> NDArray[float32]:
+        pixel_to_distance: AnyReal,
+    ) -> _ArrayND[_Shape, _SCT_f]:
         """Calculate the radii corresponding to the given angles.
 
         Parameters
         ----------
-        theta : NDArray[float32]
+        theta : ArrayND[S, F]
             The theta values to calculate at.
         pixel_to_distance : float
             The unit conversion factor to convert pixels to another unit.
 
         Returns
         -------
-        radii : NDArray[float32]
+        radii : ArrayND[S, F]
             The radial coordinates.
 
         """
-        return pixel_to_distance * log_spiral(
-            theta,
-            self.offset,
-            self.growth_factor,
-            self.initial_radius,
-            use_modulo=not self.has_multiple_revolutions,
-        )
+        return (
+            pixel_to_distance
+            * log_spiral(
+                theta,
+                self.offset,
+                self.growth_factor,
+                self.initial_radius,
+                use_modulo=not self.has_multiple_revolutions,
+            )
+        ).astype(theta.dtype)
 
     def calculate_cartesian_coordinates(
         self,
-        num_points: int,
-        pixel_to_distance: float,
+        num_points: op.CanIndex,
+        pixel_to_distance: AnyReal,
         *,
-        flip_y: bool = False,
-    ) -> tuple[NDArray[float32], NDArray[float32]]:
+        flip_y: op.CanBool = False,
+    ) -> tuple[_Array1D_f64, _Array1D_f64]:
         """Return the x and y Cartesian coordinates of the log spiral.
 
         Parameters
@@ -192,9 +201,9 @@ class LogSpiralFitResult(Generic[FloatType]):
 
         Returns
         -------
-        x : NDArray[float32]
+        x : Array1D[f64]
             The x coordinates.
-        z : NDArray[float32]
+        z : Array1D[f64]
             The z coordinates.
 
         """
@@ -203,9 +212,9 @@ class LogSpiralFitResult(Generic[FloatType]):
 
         theta = np.linspace(start_angle, end_angle, num_points, dtype=np.float32)
         radii = self.calculate_radii(theta, pixel_to_distance=pixel_to_distance)
-        x = np.multiply(radii, np.cos(theta))
+        x = np.multiply(radii, np.cos(theta)).astype(np.float64)
         y = y_flip_factor * np.multiply(radii, np.sin(theta))
-        return (x, y)
+        return (x, y.astype(x.dtype))
 
     @property
     def pitch_angle(self) -> float:
@@ -232,7 +241,7 @@ class LogSpiralFitResult(Generic[FloatType]):
         """float: The sign of the pitch angle."""
         return np.sign(self._pitch_angle)
 
-    def get_normalised_total_error(self, kind: FitErrorKind, *, pixel_to_distance: float) -> float:
+    def get_normalised_total_error(self, kind: FitErrorKind, *, pixel_to_distance: AnyReal) -> float:
         """Return the fit error normalised by the chosen scheme.
 
         Parameters
@@ -248,16 +257,15 @@ class LogSpiralFitResult(Generic[FloatType]):
             The normalised error in the units of distance squared.
 
         """
-        error: float
-        if kind == FitErrorKind.NONORM:
-            error = self.total_error * pixel_to_distance**2
-        elif kind == FitErrorKind.NUM_PIXELS_NORM:
-            error = self._total_error_pixels * pixel_to_distance**2
-        else:
-            assert_never(kind)
-        return error
+        error: AnyReal
+        match kind:
+            case FitErrorKind.NONORM:
+                error = self.total_error * pixel_to_distance**2
+            case FitErrorKind.NUM_PIXELS_NORM:
+                error = self._total_error_pixels * pixel_to_distance**2
+        return float(error)
 
-    def get_arc_length_in_units(self, pixel_to_distance: float) -> float:
+    def get_arc_length_in_units(self, pixel_to_distance: AnyReal) -> float:
         """Return the arc length in the given user units.
 
         Parameters
@@ -271,4 +279,4 @@ class LogSpiralFitResult(Generic[FloatType]):
             The arc length in the given units.
 
         """
-        return pixel_to_distance * self._arc_length
+        return float(pixel_to_distance * self._arc_length)

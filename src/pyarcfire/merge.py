@@ -3,23 +3,23 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, TypeVar
+from typing import Any, TypeVar
 
 import numpy as np
 
 from .arc import fit_spiral_to_image
 
+_SCT = TypeVar("_SCT", bound=np.generic)
+_SCT_f = TypeVar("_SCT_f", bound=np.floating[Any])
+_Array2D = np.ndarray[tuple[int, int], np.dtype[_SCT]]
+_Array3D = np.ndarray[tuple[int, int, int], np.dtype[_SCT]]
+
 log: logging.Logger = logging.getLogger(__name__)
-
-if TYPE_CHECKING:
-    from numpy.typing import NDArray
-
-    FloatType = TypeVar("FloatType", np.float32, np.float64)
 
 
 def calculate_arc_merge_error(
-    first_cluster_array: NDArray[FloatType],
-    second_cluster_array: NDArray[FloatType],
+    first_cluster_array: _Array2D[_SCT_f],
+    second_cluster_array: _Array2D[_SCT_f],
 ) -> float:
     """Calculate the arc merge error ratio for two clusters.
 

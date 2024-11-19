@@ -5,7 +5,7 @@ from __future__ import annotations
 import functools
 import logging
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Generic, TypeVar, cast
+from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 import numpy as np
 import skimage
@@ -27,13 +27,19 @@ from .utils import (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    import optype as op
 
-    from numpy.typing import NDArray
+    from pyarcfire._typing import AnyReal
 
-IndexType = TypeVar("IndexType", np.int32, np.int64)
-FloatType = TypeVar("FloatType", np.float32, np.float64)
-BoolType = np.bool_
+
+_SCT = TypeVar("_SCT", bound=np.generic)
+_SCT_f = TypeVar("_SCT_f", bound=np.floating[Any])
+_SCT_i = TypeVar("_SCT_i", bound=np.integer[Any])
+_Shape = TypeVar("_Shape", bound=tuple[int, ...])
+_Array1D = np.ndarray[tuple[int], np.dtype[_SCT]]
+_Array2D = np.ndarray[tuple[int, int], np.dtype[_SCT]]
+_ArrayND = np.ndarray[_Shape, np.dtype[_SCT]]
+
 
 SINGLE_REVOLUTION_TOLERANCE: float = 1e-8
 MULTIPLE_REVOLUTION_TOLERANCE: float = 1e-12
@@ -76,26 +82,26 @@ class WrapData:
 
 
 @dataclass
-class _LogSpiralFitResult(Generic[FloatType]):
-    theta: NDArray[FloatType]
+class _LogSpiralFitResult:
+    theta: _Array1D[np.float64]
     offset: float
     growth_factor: float
     initial_radius: float
     total_error: float
-    residuals: NDArray[FloatType]
+    residuals: _Array1D[np.float64]
 
 
 def fit_spiral_to_image(
-    image: NDArray[FloatType],
-    initial_growth_factor: float = 0,
+    image: _Array2D[_SCT_f],
+    initial_growth_factor: AnyReal = 0,
     *,
-    force_single_revolution: bool = False,
-) -> LogSpiralFitResult[FloatType]:
+    force_single_revolution: op.CanBool = False,
+) -> LogSpiralFitResult:
     """Fits a single log spiral to the given cluster encoded as an image of non-zero pixels.
 
     Parameters
     ----------
-    image : NDArray[FloatType]
+    image : Array2D[F]
         The cluster encoded as an array of non-zero pixels.
     initial_growth_factor : float
         The initial guess of the growth factor k.
@@ -104,7 +110,7 @@ def fit_spiral_to_image(
 
     Returns
     -------
-    LogSpiralFitResult[FloatType]
+    LogSpiralFitResult
         The result of the fit.
 
     """
@@ -114,7 +120,7 @@ def fit_spiral_to_image(
     # Check if the cluster revolves more than once
     bad_bounds, _, _, _ = calculate_bounds(theta)
 
-    inner_region: NDArray[BoolType] | None = None
+    inner_region: _Array1D[np.bool_] | None = None
 
     # Gap in theta is not large enough to not need multiple revolutions
     # and the cluster does not contain the origin or is not closed around centre
@@ -141,11 +147,11 @@ def fit_spiral_to_image(
 
 
 def _fit_spiral_to_image_single_revolution_core(
-    radii: NDArray[FloatType],
-    theta: NDArray[FloatType],
-    weights: NDArray[FloatType],
-    initial_growth_factor: float,
-) -> LogSpiralFitResult[FloatType]:
+    radii: _Array1D[_SCT_f],
+    theta: _Array1D[_SCT_f],
+    weights: _Array1D[_SCT_f],
+    initial_growth_factor: AnyReal,
+) -> LogSpiralFitResult:
     # Find suitable bounds for the offset parameter
     bad_bounds, (lower_bound, upper_bound), rotation_amount, _ = calculate_bounds(theta)
     rotated_theta = np.mod(theta - rotation_amount, 2 * np.pi)
@@ -159,13 +165,13 @@ def _fit_spiral_to_image_single_revolution_core(
     else:
         offset = (lower_bound + upper_bound) / 2
         res = optimize.least_squares(
-            calculate_log_spiral_error_from_growth_factor,
+            calculate_log_spiral_error_from_growth_factor,  # pyright:ignore[reportArgumentType]
             x0=initial_growth_factor,
             args=(radii, rotated_theta, weights, offset),
             kwargs={"use_modulo": True},
         )
         assert res.success, "Failed to fit growth factor"
-        growth_factor = res.x[0]
+        growth_factor = float(res.x[0])  # pyright:ignore[reportUnknownArgumentType, reportIndexIssue]
 
     # Calculate the error from the fit
     initial_radius = calculate_best_initial_radius(
@@ -194,7 +200,7 @@ def _fit_spiral_to_image_single_revolution_core(
 
     return LogSpiralFitResult(
         offset=offset,
-        growth_factor=growth_factor,
+        growth_factor=float(growth_factor),
         initial_radius=initial_radius,
         arc_bounds=arc_bounds,
         total_error=error,
@@ -204,12 +210,12 @@ def _fit_spiral_to_image_single_revolution_core(
 
 
 def _fit_spiral_to_image_multiple_revolution_core(
-    radii: NDArray[FloatType],
-    theta: NDArray[FloatType],
-    weights: NDArray[FloatType],
-    initial_growth_factor: float,
-    inner_region: NDArray[BoolType],
-) -> LogSpiralFitResult[FloatType]:
+    radii: _Array1D[_SCT_f],
+    theta: _Array1D[_SCT_f],
+    weights: _Array1D[_SCT_f],
+    initial_growth_factor: AnyReal,
+    inner_region: _Array1D[np.bool_],
+) -> LogSpiralFitResult:
     # fitting depends on the arc bounds, but we don't know what the arc
     # bounds are (i.e., whether to calculate the bounds from the inner or
     # outer points) until we know the chirality.  Since we only know the
@@ -260,14 +266,17 @@ def _fit_spiral_to_image_multiple_revolution_core(
 
 
 def __fit_multiple_revolution_spiral(
-    radii: NDArray[FloatType],
-    theta: NDArray[FloatType],
-    weights: NDArray[FloatType],
-    region: NDArray[BoolType],
-    initial_growth_factor: float,
+    radii: _Array1D[_SCT_f],
+    theta: _Array1D[_SCT_f],
+    weights: _Array1D[_SCT_f],
+    region: _Array1D[np.bool_],
+    initial_growth_factor: AnyReal,
     *,
-    clockwise: bool,
+    clockwise: op.CanBool,
 ) -> _LogSpiralFitResult:
+    # Type conversion
+    initial_growth_factor = float(initial_growth_factor)
+
     bad_bounds, (lower_bound, upper_bound), rotation_amount, _ = calculate_bounds(
         theta[region],
     )
@@ -281,17 +290,17 @@ def __fit_multiple_revolution_spiral(
     if clockwise and initial_growth_factor < 0:
         initial_growth_factor = -initial_growth_factor
     res = optimize.least_squares(
-        calculate_log_spiral_error_from_growth_factor,
+        calculate_log_spiral_error_from_growth_factor,  # pyright:ignore[reportArgumentType]
         x0=initial_growth_factor,
         bounds=growth_factor_bounds,
-        args=(radii, rotated_theta, weights, offset),
+        args=(radii, rotated_theta.astype(radii.dtype), weights.astype(radii.dtype), offset),
         kwargs={"use_modulo": False},
         ftol=MULTIPLE_REVOLUTION_TOLERANCE,
         gtol=MULTIPLE_REVOLUTION_TOLERANCE,
         xtol=MULTIPLE_REVOLUTION_TOLERANCE,
     )
     assert res.success, "Failed to fit growth factor"
-    growth_factor: float = cast(float, res.x[0])
+    growth_factor: float = cast(float, res.x[0])  # pyright:ignore[reportIndexIssue]
 
     # Calculate the error from the fit
     initial_radius = calculate_best_initial_radius(
@@ -326,7 +335,7 @@ def __fit_multiple_revolution_spiral(
 
 
 def __cluster_has_no_endpoints_or_contains_origin(
-    image: NDArray[FloatType],
+    image: _Array2D[_SCT_f],
     max_half_gap_fill_for_undefined_bounds: int = 3,
 ) -> bool:
     # See if the cluster has actual spiral endpoints by seeing if it is
@@ -338,9 +347,9 @@ def __cluster_has_no_endpoints_or_contains_origin(
         return True
     in_cluster = image > 0
     structure_element_size = 2 * max_half_gap_fill_for_undefined_bounds + 1
-    structure_element = np.ones((structure_element_size, structure_element_size))
+    structure_element = np.ones((structure_element_size, structure_element_size), dtype=np.bool_)
     is_hole_or_cluster = ndimage.binary_fill_holes(
-        ndimage.binary_closing(in_cluster, structure=structure_element),
+        ndimage.binary_closing(in_cluster.astype(np.int32), structure=structure_element).astype(np.int32)
     )
     assert is_hole_or_cluster is not None
     # NOTE: Check if is_hole_or_cluster is not already a binary array
@@ -348,15 +357,15 @@ def __cluster_has_no_endpoints_or_contains_origin(
 
 
 def identify_inner_and_outer_spiral(
-    image: NDArray[FloatType],
+    image: _Array2D[_SCT_f],
     shrink_amount: int,
     max_diagonal_distance: float = 1.5,
-) -> NDArray[BoolType] | None:
+) -> _Array1D[np.bool_] | None:
     """Identify the inner and outer portion of a mutliple revolution spiral.
 
     Parameters
     ----------
-    image : NDArray[FloatType]
+    image : Array2D[F]
         The cluster encoded as an image of non-zero pixels.
     shrink_amount : int
         The amount of polar angle bin units to each cluster by on each side.
@@ -365,7 +374,7 @@ def identify_inner_and_outer_spiral(
 
     Returns
     -------
-    NDArray[BoolType] | None
+    region_mask : Array1D[bool]
         An array of booleans which determine whether a cluster pixel is part of the inner or outer
         spiral. If the pixel is part of the inner spiral it will have a value of `True`.
         This value is `None` if it is not possible to split the spiral into two parts.
@@ -386,8 +395,8 @@ def identify_inner_and_outer_spiral(
 
     # Find the start and end of each region
     single_revolution_differences = np.diff(can_be_single_revolution.astype(np.float32))
-    start_indices: NDArray[np.int32] = np.flatnonzero(single_revolution_differences == 1) + 1
-    end_indices: NDArray[np.int32] = np.flatnonzero(single_revolution_differences == -1)
+    start_indices = np.flatnonzero(single_revolution_differences == 1) + 1
+    end_indices = np.flatnonzero(single_revolution_differences == -1)
 
     # No start and end
     if len(start_indices) == 0 and len(end_indices) == 0:
@@ -407,7 +416,7 @@ def identify_inner_and_outer_spiral(
         start_indices,
         end_indices,
     )
-    theta_bin_values: NDArray[FloatType] = np.linspace(
+    theta_bin_values = np.linspace(
         2 * np.pi,
         0,
         num_theta,
@@ -458,10 +467,9 @@ def identify_inner_and_outer_spiral(
         return_distances=True,
     )
     assert isinstance(second_region_distance, np.ndarray)
-    connected_components, num_components = skimage.measure.label(
-        non_region_mask,
-        return_num=True,
-    )
+    connected_components, num_components = ndimage.label(non_region_mask, output=None)  # pyright:ignore[reportGeneralTypeIssues, reportUnknownVariableType]
+    connected_components = cast(_Array2D[np.intp | np.int32], connected_components)
+    num_components = cast(int, num_components)
     assert isinstance(connected_components, np.ndarray)
     for label in range(1, num_components + 1):
         current_row_indices, current_column_indices = (connected_components == label).nonzero()
@@ -510,10 +518,10 @@ def identify_inner_and_outer_spiral(
         return_distances=True,
     )
     assert isinstance(second_region_distance, np.ndarray)
-    connected_components, num_components = skimage.measure.label(
-        non_region_mask,
-        return_num=True,
-    )
+
+    connected_components, num_components = ndimage.label(non_region_mask, output=None)  # pyright:ignore[reportGeneralTypeIssues, reportUnknownVariableType]
+    connected_components = cast(_Array2D[np.intp | np.int32], connected_components)
+    num_components = cast(int, num_components)
     assert isinstance(connected_components, np.ndarray)
     for label in range(1, num_components + 1):
         current_row_indices, current_column_indices = (connected_components == label).nonzero()
@@ -570,31 +578,59 @@ def identify_inner_and_outer_spiral(
 
 
 def _find_single_revolution_regions(
-    image: NDArray[FloatType],
-    num_radii: int,
-    num_theta: int,
-    min_acceptable_length: int,
-    shrink_amount: int,
-) -> NDArray[BoolType]:
-    assert shrink_amount <= min_acceptable_length
+    image: _Array2D[_SCT_f],
+    num_radii: op.CanIndex,
+    num_theta: op.CanIndex,
+    min_acceptable_length: op.CanInt,
+    shrink_amount: op.CanInt,
+) -> _Array1D[np.bool_]:
+    assert int(shrink_amount) <= int(min_acceptable_length)
     polar_image = np.flip(
         __image_transform_from_cartesian_to_polar(image, num_radii, num_theta),
         axis=1,
     )
     polar_image = np.nan_to_num(polar_image, nan=0)
 
-    dilated_polar_image: NDArray[BoolType] = ndimage.binary_dilation(
+    dilated_polar_image = ndimage.binary_dilation(
         polar_image,
-        structure=np.ones((3, 3)),
+        structure=np.ones((3, 3), dtype=bool),
     )
 
-    return _find_single_revolution_regions_polar(dilated_polar_image, shrink_amount)
+    return _find_single_revolution_regions_polar(dilated_polar_image, int(shrink_amount))
 
 
 def _find_single_revolution_regions_polar(
-    polar_image: NDArray[BoolType],
-    shrink_amount: int,
-) -> NDArray[BoolType]:
+    polar_image: _Array2D[np.bool_],
+    shrink_amount: op.CanIndex,
+) -> _Array1D[np.bool_]:
+    """Identify angles in a polar image that only intersect the cluster once.
+
+    Parameters
+    ----------
+    polar_image : _Array2D[np.bool_]
+        An image in polar coordinates with axes [0 -> radial direction, 1 -> theta direction].
+        The values are boolean indicating whether the cell is part of a cluster.
+    shrink_amount : int
+        The amount to shrink the valid region by rolling the identified bins
+        forward and backward along the angular axis.
+
+    Returns
+    -------
+    single_revolution_region : _Array1D[np.bool_]
+        A 1D binary array where each value indicates whether the corresponding
+        theta bin intersects a cluster only once.
+
+    Notes
+    -----
+    - Several logical conditions are evaluated to ensure a single-revolution
+      region:
+        1. Exactly one entry and one exit point in each theta bin.
+        2. The radial range of adjacent theta bins can not differ too much.
+        3. Shrinkage applied to further constrain the regions.
+
+    """
+    shrink_amount = int(shrink_amount)
+
     num_radii: int = polar_image.shape[0]
     num_theta: int = polar_image.shape[1]
     # Pad columns with zeros
@@ -617,7 +653,7 @@ def _find_single_revolution_regions_polar(
     neighbour_max_location_right = np.roll(max_locations, -1)
     neighbour_min_location_left = np.roll(min_locations, 1)
     neighbour_min_location_right = np.roll(min_locations, -1)
-    conditions: Sequence[NDArray[BoolType]] = (
+    conditions = (
         can_be_single_revolution,
         np.logical_or(
             min_locations <= neighbour_max_location_left,
@@ -651,10 +687,32 @@ def _find_single_revolution_regions_polar(
 
 
 def __image_transform_from_cartesian_to_polar(
-    image: NDArray[FloatType],
-    num_radii: int,
-    num_theta: int,
-) -> NDArray[FloatType]:
+    image: _Array2D[_SCT_f],
+    num_radii: op.CanIndex,
+    num_theta: op.CanIndex,
+) -> _Array2D[_SCT_f]:
+    """Transform a 2D Cartesian image into its polar representation.
+
+    This function converts a given Cartesian image into polar coordinates
+    using a specified number of radii and angular divisions. The center of
+    the image is used as the origin for the polar transformation.
+
+    Parameters
+    ----------
+    image : _Array2D[_SCT_f]
+        The input 2D array representing the Cartesian image.
+    num_radii : int
+        The number of radial divisions in the polar output.
+    num_theta : int
+        The number of angular divisions (theta) in the polar output.
+
+    Returns
+    -------
+    polar_image : _Array2D[_SCT_f]
+        A 2D array in polar coordinates, with shape (num_radii, num_theta),
+        representing the transformed image.
+
+    """
     centre_x = image.shape[1] / 2 - 0.5
     centre_y = image.shape[0] / 2 - 0.5
 
@@ -662,27 +720,49 @@ def __image_transform_from_cartesian_to_polar(
     row_indices, column_indices = image.nonzero()
     dx = max(centre_x, (column_indices - centre_x).max())
     dy = max(centre_y, -(row_indices - centre_y).max())
-    max_radius = np.sqrt(dx**2 + dy**2)
+    max_radius: float = np.sqrt(dx**2 + dy**2)
 
-    return (
-        skimage.transform.warp_polar(
-            image,
-            center=(centre_x, centre_y),
-            radius=max_radius,
-            output_shape=(num_theta, num_radii),
-        )
-        .astype(image.dtype)
-        .T
+    result = skimage.transform.warp_polar(  # pyright:ignore[reportUnknownMemberType, reportUnknownVariableType]
+        image,
+        center=(centre_x, centre_y),
+        radius=max_radius,
+        output_shape=(num_theta, num_radii),
     )
+    return result.astype(image.dtype).T  # pyright:ignore[reportUnknownMemberType, reportUnknownVariableType]
 
 
 def __split_regions(
-    start_indices: NDArray[IndexType],
-    end_indices: NDArray[IndexType],
-    theta: NDArray[FloatType],
-    theta_bin_centres: NDArray[FloatType],
+    start_indices: _Array1D[_SCT_i],
+    end_indices: _Array1D[_SCT_i],
+    theta: _Array1D[_SCT_f],
+    theta_bin_centres: _Array1D[_SCT_f],
     wrap_data: WrapData | None,
-) -> tuple[NDArray[BoolType], NDArray[BoolType], int]:
+) -> tuple[_Array1D[np.bool_], _Array1D[np.bool_], int]:
+    """Split the regions defined by `start_indices` and `end_indices` into two parts.
+
+    Parameters
+    ----------
+    start_indices : Array1D[I]
+        An array of start indices for the regions to be split.
+    end_indices : Array1D[I]
+        An array of end indices for the regions to be split.
+    theta : Array1D[F]
+        An array of theta values corresponding to the data points to be split.
+    theta_bin_centres : Array1D[F]
+        An array of the center values of the theta bins.
+    wrap_data : WrapData | None
+        Information about the wrapping region if not `None`.
+
+    Returns
+    -------
+    first_region : Array1D[bool]
+        A boolean array where `True` indicates values falling in the first split region.
+    second_region : Array1D[bool]
+        A boolean array where `True` indicates values falling in the second split region.
+    max_length : int
+        The maximum length of the regions.
+
+    """
     region_lengths = end_indices - start_indices + 1
     max_region_length: int | None = region_lengths.max() if len(region_lengths) > 0 else None
     only_wrap_exists: bool = max_region_length is None
@@ -723,10 +803,36 @@ def __split_regions(
 
 
 def __calculate_wrap(
-    can_be_single_revolution: NDArray[BoolType],
-    start_indices: NDArray[IndexType],
-    end_indices: NDArray[IndexType],
-) -> tuple[NDArray[IndexType], NDArray[IndexType], WrapData | None]:
+    region_mask: _Array1D[np.bool_],
+    start_indices: _Array1D[_SCT_i],
+    end_indices: _Array1D[_SCT_i],
+) -> tuple[_Array1D[_SCT_i], _Array1D[_SCT_i], WrapData | None]:
+    """Find wrapping regions if they exist and adjust the start and end indices for the given regions if so.
+
+    A wrapping region is a region which either:
+    1. Starts but does not end.
+    2. Ends but does not start.
+    3. The start is to the right of the end.
+
+    Parameters
+    ----------
+    region_mask : Array1D[bool]
+        A 1D mask indicating whether a bin is part of a region or not.
+    start_indices : Array1D[I]
+        A 1D array of start indices for each region i.e. contiguous blocks.
+    end_indices : Array1D[I]
+        A 1D array of end indices for each region i.e. contiguous blocks.
+
+    Returns
+    -------
+    updated_start_indices : Array1D[I]
+        A 1D array of start indices for each region after accounting for wrapping regions.
+    updated_end_indices : Array1D[I]
+        A 1D array of end indices for each region after accounting for wrapping regions.
+    wrap_data : WrapData | None
+        If not `None`, data about the wrapped region.
+
+    """
     has_wrapped: bool = False
     wrap_start: int | None = None
     wrap_end: int | None = None
@@ -757,11 +863,11 @@ def __calculate_wrap(
         elif wrap_end is None:
             assert wrap_start is not None, "Other branch must be executed as this has wrapped"
             start_indices = np.insert(start_indices, 0, wrap_start)
-            end_indices = np.insert(end_indices, 0, len(can_be_single_revolution) - 1)
+            end_indices = np.insert(end_indices, 0, len(region_mask) - 1)
         # Wrap does happen
         else:
             # Length of region from start to edge
-            wrap_start_length = len(can_be_single_revolution) - wrap_start + 1
+            wrap_start_length = len(region_mask) - wrap_start + 1
             # Length of region from end to end
             wrap_end_length = wrap_end
             wrap_data = WrapData(
@@ -775,10 +881,10 @@ def __calculate_wrap(
 
 
 def _remove_theta_discontinuities(
-    theta: NDArray[FloatType],
-    image: NDArray[FloatType],
-    inner_region: NDArray[BoolType],
-) -> NDArray[FloatType]:
+    theta: _Array1D[_SCT_f],
+    image: _Array2D[_SCT_f],
+    inner_region: _Array1D[np.bool_],
+) -> _Array1D[_SCT_f]:
     assert np.count_nonzero(inner_region) > 0
     adjusted_theta = np.copy(theta)
     inner_adjusted_theta = _adjust_theta_for_gap(theta, image, inner_region)
@@ -814,10 +920,10 @@ def _remove_theta_discontinuities(
 
 
 def _adjust_theta_for_gap(
-    theta: NDArray[FloatType],
-    image: NDArray[FloatType],
-    region: NDArray[BoolType],
-) -> NDArray[FloatType] | None:
+    theta: _Array1D[_SCT_f],
+    image: _Array2D[_SCT_f],
+    region: _Array1D[np.bool_],
+) -> _Array1D[_SCT_f] | None:
     row_indices, column_indices = image.nonzero()
     assert len(row_indices) == len(column_indices)
     assert len(region) == len(row_indices)
@@ -843,7 +949,7 @@ def _adjust_theta_for_gap(
         negative_image[row_indices[region], column_indices[region]] = True
 
         negative_distances = ndimage.distance_transform_edt(
-            negative_image,
+            negative_image.astype(np.int32),
             return_distances=True,
         )
         assert isinstance(negative_distances, np.ndarray)

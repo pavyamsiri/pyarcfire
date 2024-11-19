@@ -13,14 +13,6 @@ from matplotlib import pyplot as plt
 from numpy import float32
 from PIL import Image
 
-from pyarcfire import (
-    GenerateClustersSettings,
-    GenerateOrientationFieldSettings,
-    GenerateSimilarityMatrixSettings,
-    MergeClustersByFitSettings,
-    UnsharpMaskSettings,
-)
-
 from .arc import fit_spiral_to_image
 from .log_utils import setup_logging
 from .spiral import detect_spirals_in_image
