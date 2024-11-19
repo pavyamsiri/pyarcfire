@@ -1,19 +1,24 @@
 """Tests for the orientation module."""
 
+from typing import TypeVar
+
 import numpy as np
 from hypothesis import given
 from hypothesis import strategies as st
 from hypothesis.extra.numpy import arrays
-from numpy.typing import NDArray
 
 from pyarcfire import orientation
+
+_SCT = TypeVar("_SCT", bound=np.generic)
+_Array2D = np.ndarray[tuple[int, int], np.dtype[_SCT]]
+_Array2D_f32 = _Array2D[np.float32]
 
 
 def valid_images(
     levels: int,
     min_multiple: int,
     max_multiple: int,
-) -> st.SearchStrategy[NDArray[np.float32]]:
+) -> st.SearchStrategy[_Array2D_f32]:
     """Generate a valid test image.
 
     Parameters
@@ -27,7 +32,7 @@ def valid_images(
 
     Returns
     -------
-    st.SearchStrategy[NDArray[np.float32]]
+    valid_image : st.SearchStrategy[Array2D[f32]]
         The generated image.
 
     """
@@ -49,12 +54,12 @@ def valid_images(
 
 
 @given(valid_images(levels=3, min_multiple=2, max_multiple=16))
-def test_generation(arr: NDArray[np.float32]) -> None:
+def test_generation(arr: _Array2D_f32) -> None:
     """Test the generate orientation fields function.
 
     Parameters
     ----------
-    arr : NDArray[np.float32]
+    arr : Array2D[f32]
         A valid test image.
 
     """
