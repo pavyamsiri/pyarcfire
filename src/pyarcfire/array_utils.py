@@ -1,20 +1,24 @@
 """Utilities related to dealing with NDArrays."""
 
-from collections.abc import Sequence
-from typing import TypeVar
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, TypeVar
 
 import numpy as np
-from numpy.typing import NDArray
 
-ScalarType_co = TypeVar("ScalarType_co", bound=np.generic, covariant=True)
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+
+_SCT = TypeVar("_SCT", bound=np.generic)
+_Array2D = np.ndarray[tuple[int, int], np.dtype[_SCT]]
 
 
-def get_origin_points(image: NDArray[ScalarType_co]) -> Sequence[tuple[int, int]]:
+def get_origin_points(image: _Array2D[_SCT]) -> Sequence[tuple[int, int]]:
     """Return points that are either the centre of the image or touching the centre.
 
     Parameters
     ----------
-    image : NDArray[ScalarType_co]
+    image : Array2D
         The image.
 
     Returns
@@ -72,7 +76,7 @@ def get_origin_points(image: NDArray[ScalarType_co]) -> Sequence[tuple[int, int]
 
 
 def get_origin_points_unnested(
-    image: NDArray[ScalarType_co],
+    image: _Array2D[_SCT],
 ) -> tuple[Sequence[int], Sequence[int]]:
     """Return points that are either the centre of the image or touching the centre.
 
@@ -81,7 +85,7 @@ def get_origin_points_unnested(
 
     Parameters
     ----------
-    image : NDArray[ScalarType_co]
+    image : Array2D
         The image.
 
     Returns
