@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 import numpy as np
 
@@ -32,19 +32,25 @@ def verify_data_is_normalized(data: _ArrayND[_Shape, _SCT_f]) -> None:
         raise ValueError(msg)
 
 
-def verify_data_is_2d(data: _ArrayND[_Shape, _SCT]) -> None:
+def verify_data_is_2d(data: _ArrayND[_Shape, _SCT]) -> _Array2D[_SCT]:
     """Verify that the given data is 2D.
 
     Parameters
     ----------
-    data : NDArray[Any]
+    data : Array[S, T]
         The data to verify.
+
+    Returns
+    -------
+    data_2d : Array2D[T]
+        The verified 2D data.
 
     """
     is_not_2d = len(data.shape) != 2
     if is_not_2d:
         msg = "The data is not 2D! This function requires a 2D array."
         raise ValueError(msg)
+    return cast(_Array2D[_SCT], data)
 
 
 def verify_data_can_be_shrunk_orientation(
