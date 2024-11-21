@@ -28,6 +28,7 @@ dependencies = [
 cli = [
     "matplotlib>=3.5",
     "Pillow",
+    "types-Pillow",
     "rich>=4.2.1",
 ]
 test = [
@@ -66,6 +67,16 @@ reportPrivateUsage = true
 reportUnnecessaryTypeIgnoreComment = true
 reportUnsafeMultipleInheritance = true
 reportUnknownMemberType = false # matplotlib does not have sufficient typing
+
+[tool.mypy]
+python_version = "3.10"
+strict = true
+disable_bytearray_promotion = true
+disable_memoryview_promotion = true
+warn_unused_ignores = true
+warn_unreachable = true
+disallow_any_explicit = false  # no other way to type e.g. `float64 <: number[Any]`
+enable_error_code = ["ignore-without-code", "redundant-expr", "truthy-bool"]
 
 [tool.ruff]
 line-length = 130
