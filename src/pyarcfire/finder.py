@@ -21,6 +21,7 @@ from .orientation import OrientationField, generate_orientation_fields
 from .preprocess import (
     ImageContrastBooster,
     ImageDivisibleResizer,
+    ImageIdentityNormalizer,
     ImageLinearNormalizer,
     ImageNormalizer,
     ImageResizer,
@@ -308,7 +309,7 @@ class SpiralFinderResult:
 class SpiralFinder:
     """Class that contains the parameters for the SpArcFiRe algorithm.
 
-    Create this class and then call `extract` to run the algorithm.
+    Create an instance of this class and then call `extract` to run the algorithm.
     """
 
     def __init__(self) -> None:
@@ -330,11 +331,23 @@ class SpiralFinder:
 
         # Preprocessors
         self._normalizer: ImageNormalizer = ImageLinearNormalizer()
-        self._resizer: ImageResizer = ImageDivisibleResizer(self._size_divisor)
+        self._resizer: ImageResizer | None = ImageDivisibleResizer(self._size_divisor)
+        self._booster: ImageContrastBooster | None = ImageUnsharpMaskBooster()
 
-        self._unsharp_radius: float = 25
-        self._unsharp_amount: float = 6
-        self._booster: ImageContrastBooster = ImageUnsharpMaskBooster(25, 6)
+    @property
+    def normalizer(self) -> ImageNormalizer:
+        """ImageNormalizer: The image normalizer used."""
+        return self._normalizer
+
+    @property
+    def resizer(self) -> ImageResizer | None:
+        """ImageResizer | None: The resizer used if it is set otherwise `None`."""
+        return self._resizer
+
+    @property
+    def booster(self) -> ImageContrastBooster | None:
+        """ImageContrastBooster | None: The contrast booster used if it is set otherwise `None`."""
+        return self._booster
 
     def extract(self, image: _ArrayLikeFloat_co) -> SpiralFinderResult:
         """Extract spiral arm segments from an image.
@@ -358,8 +371,10 @@ class SpiralFinder:
 
         # Step 0: Preprocess the image
         processed_image = self._normalizer.normalize(image_array)
-        processed_image = self._resizer.resize(processed_image)
-        processed_image = self._booster.boost(processed_image)
+        if self._resizer is not None:
+            processed_image = self._resizer.resize(processed_image)
+        if self._booster is not None:
+            processed_image = self._booster.boost(processed_image)
 
         # Step 1: Generate orientation field
         field = generate_orientation_fields(
@@ -404,3 +419,54 @@ class SpiralFinder:
             processed_image=processed_image,
             field=field,
         )
+
+    def with_normalizer(self, normalizer: ImageNormalizer | None) -> SpiralFinder:
+        """Set the current normalizer to the given normalizer.
+
+        Parameters
+        ----------
+        normalizer : ImageNormalizer | None
+            The new normalizer to use. If `None` is given then the normalizer will be the identity normalizer.
+
+        Returns
+        -------
+        new_finder : SpiralFinder
+            The finder with the new normalizer.
+
+        """
+        self._normalizer = normalizer if normalizer is not None else ImageIdentityNormalizer()
+        return self
+
+    def with_resizer(self, resizer: ImageResizer | None) -> SpiralFinder:
+        """Set the current resizer to the given resizer.
+
+        Parameters
+        ----------
+        resizer : ImageResizer | None
+            The new resizer to use. If `None` is given then the image will not be resized.
+
+        Returns
+        -------
+        new_finder : SpiralFinder
+            The finder with the new resizer.
+
+        """
+        self._resizer = resizer
+        return self
+
+    def with_booster(self, booster: ImageContrastBooster | None) -> SpiralFinder:
+        """Set the current booster to the given booster.
+
+        Parameters
+        ----------
+        booster : ImageContrastBooster | None
+            The new booster to use. If `None` is given then the image will not be boosted.
+
+        Returns
+        -------
+        new_finder : SpiralFinder
+            The finder with the new booster.
+
+        """
+        self._booster = booster
+        return self

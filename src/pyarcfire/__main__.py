@@ -71,6 +71,8 @@ def process_from_image(args: argparse.Namespace) -> None:
     contrast_image = result.processed_image
     field = result.orientation_field
 
+    booster = finder.booster
+
     width: float = result.original_image_width / 2 - 0.5
     height: float = result.original_image_height / 2 - 0.5
     processed_width: float = result.processed_image_width / 2 - 0.5
@@ -98,9 +100,7 @@ def process_from_image(args: argparse.Namespace) -> None:
         extent=(-processed_width, processed_width, -processed_height, processed_height),
         cmap="gray",
     )
-    contrast_axis.set_title(
-        rf"Unsharp image $\mathrm{{Radius}} = {finder._unsharp_radius}, \; \mathrm{{Amount}} = {finder._unsharp_amount}$",
-    )
+    contrast_axis.set_title(f"Preprocessed image\nboosted with {booster}" if booster is not None else "Preprocessed Image")
     contrast_axis.set_axis_off()
 
     x_space_range = np.linspace(-width, width, num_horizontal_pixels)

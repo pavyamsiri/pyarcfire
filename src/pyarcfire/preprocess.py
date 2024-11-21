@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Any, Protocol, TypeVar, cast
 import numpy as np
 from skimage import filters, transform
 
-from .assert_utils import verify_data_is_2d
+from .assert_utils import verify_data_is_2d, verify_data_is_normalized
 
 if TYPE_CHECKING:
     import optype as op
@@ -23,30 +23,6 @@ _Array2D_f64 = _Array2D[np.float64]
 
 
 log: logging.Logger = logging.getLogger(__name__)
-
-
-class ImagePreprocessor(Protocol):
-    """The interface for an image preprocessor."""
-
-    def preprocess(self, image: _Array2D[_SCT_f]) -> _Array2D[_SCT_f]:
-        """Preprocess the input image.
-
-        Parameters
-        ----------
-        image : Array2D[F]
-            The image to preprocess.
-
-        Returns
-        -------
-        processed_image : Array2D[F]
-            The processed image.
-
-        Notes
-        -----
-        Implementors can not change the dimensionality of the image or its data type however its sizes may change.
-
-        """
-        ...
 
 
 class ImageNormalizer(Protocol):
@@ -165,6 +141,33 @@ class ImageLinearNormalizer:
         return ((finite_image - min_value) / (max_value - min_value)).astype(image.dtype)
 
 
+class ImageIdentityNormalizer:
+    """Validates an image is normalized to the range [0, 1].
+
+    This does not do any normalization itself.
+    """
+
+    def __init__(self) -> None:
+        """Initialize the normalizer."""
+
+    def normalize(self, image: _Array2D[_SCT_f]) -> _Array2D[_SCT_f]:
+        """Ensure that the input image is in the range [0, 1].
+
+        Parameters
+        ----------
+        image : Array2D[F]
+            The image to validate.
+
+        Returns
+        -------
+        normalized_image : Array2D[F]
+            The normalized image.
+
+        """
+        verify_data_is_normalized(image)
+        return image
+
+
 class ImageDivisibleResizer:
     """An image resizer that resizes images so that they are divisible by a given number."""
 
@@ -230,7 +233,7 @@ class ImageDivisibleResizer:
 class ImageUnsharpMaskBooster:
     """Boost the contrast of a normalized image using an unsharp mask."""
 
-    def __init__(self, radius: op.CanFloat, amount: op.CanFloat) -> None:
+    def __init__(self, radius: op.CanFloat = 25, amount: op.CanFloat = 6) -> None:
         """Initialize the unsharp mask booster.
 
         Parameters
@@ -266,6 +269,17 @@ class ImageUnsharpMaskBooster:
                 amount=self._amount,
             ),
         )
+
+    def __str__(self) -> str:
+        """Return the string representation.
+
+        Returns
+        -------
+        str
+            The string representation.
+
+        """
+        return f"{type(self).__qualname__}(radius={self._radius:.2f}, amount={self._amount:.2f})"
 
 
 def preprocess_image(image: _Array2D[_SCT_f], *, num_orientation_field_levels: op.CanInt) -> _Array2D[_SCT_f]:
