@@ -673,7 +673,12 @@ def detect_spirals_in_image(
 
     # Generate orientation fields
     log.info("[cyan]PROGRESS[/cyan]: Generating orientation field...")
-    field = generate_orientation_fields(unsharp_image, orientation_field_settings)
+    field = generate_orientation_fields(
+        unsharp_image,
+        neighbour_distance=orientation_field_settings.neighbour_distance,
+        kernel_radius=orientation_field_settings.kernel_radius,
+        num_orientation_field_levels=orientation_field_settings.num_orientation_field_levels,
+    )
     log.info("[cyan]PROGRESS[/cyan]: Done generating orientation field.")
     if field.count_nonzero() == 0:
         return None

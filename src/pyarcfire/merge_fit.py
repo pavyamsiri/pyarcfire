@@ -62,7 +62,9 @@ def merge_clusters_by_fit(
         The clusters after being merged.
 
     """
-    assert len(clusters) > 0
+    if len(clusters) == 0:
+        return clusters
+
     # Maximum pixel distance
     num_rows, num_columns = clusters[0].shape
     max_pixel_distance = np.mean([num_rows, num_columns]).astype(np.float64) / 20

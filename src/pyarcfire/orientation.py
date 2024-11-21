@@ -471,7 +471,10 @@ class OrientationField:
 @benchmark
 def generate_orientation_fields(
     image: _Array2D[_SCT_f],
-    settings: GenerateOrientationFieldSettings,
+    *,
+    neighbour_distance: int,
+    kernel_radius: int,
+    num_orientation_field_levels: int,
 ) -> OrientationField:
     """Generate an orientation field for the given image.
 
@@ -481,8 +484,13 @@ def generate_orientation_fields(
     ----------
     image : Array2D[F]
         The image to generate an orientation field of.
-    settings : GenerateOrientationFieldSettings
-        The parameters of the generation.
+    neighbour_distance : int
+        The distance in pixels between a cell and its neighbour.
+        Used when denoising.
+    kernel_radius : int
+        The radius of the orientation filter kernel in pixels.
+    num_orientation_field_levels : int
+        The number of orientation field levels to create and then join.
 
     Returns
     -------
@@ -494,25 +502,25 @@ def generate_orientation_fields(
     verify_data_is_normalized(image)
     verify_data_can_be_shrunk_orientation(
         image,
-        num_orientation_field_levels=settings.num_orientation_field_levels,
+        num_orientation_field_levels=num_orientation_field_levels,
     )
 
     # Neighbour distance must be smaller than both dimensions
-    if settings.neighbour_distance >= image.shape[0] or settings.neighbour_distance >= image.shape[1]:
+    if neighbour_distance >= image.shape[0] or neighbour_distance >= image.shape[1]:
         msg = "The neighbour distance must be strictly less than both of the image dimensions."
         raise ValueError(msg)
 
     # Generate all the different orientation field levels
     orientation_field_levels: list[OrientationField] = []
-    for idx in range(settings.num_orientation_field_levels):
+    for idx in range(num_orientation_field_levels):
         # Resize
-        scale_factor: float = 1 / 2 ** (settings.num_orientation_field_levels - idx - 1)
+        scale_factor: float = 1 / 2 ** (num_orientation_field_levels - idx - 1)
         resized_image = cast(_Array2D[_SCT_f], transform.rescale(image, scale_factor).astype(image.dtype))  # pyright:ignore[reportUnknownMemberType]
 
         # Generate
         current_level = _generate_raw_orientation_field(
             resized_image,
-            settings.kernel_radius,
+            kernel_radius,
         )
         orientation_field_levels.append(current_level)
 
@@ -524,7 +532,7 @@ def generate_orientation_fields(
 
     # Denoise
     denoised_field = merged_field.denoise(
-        neighbour_distance=settings.neighbour_distance,
+        neighbour_distance=neighbour_distance,
     )
     num_nonzero_elements = denoised_field.count_nonzero()
 

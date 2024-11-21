@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import colorsys
 import logging
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -13,9 +14,9 @@ from matplotlib import pyplot as plt
 from numpy import float32
 from PIL import Image
 
-from .arc import fit_spiral_to_image
+from pyarcfire.finder import SpiralFinder
+
 from .log_utils import setup_logging
-from .spiral import detect_spirals_in_image
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -59,28 +60,23 @@ def process_from_image(args: argparse.Namespace) -> None:
 
     """
     input_path: Path = Path(args.input_path)
-    image: NDArray[float32] = _load_image(input_path)
+    image: NDArray[np.float64] = _load_image(input_path).astype(np.float64)
 
-    result = detect_spirals_in_image(
-        image,
-        preprocess=True,
-    )
+    finder = SpiralFinder()
+    result = finder.extract(image)
 
-    if result is None:
-        log.critical("Could not find any suitable clusters!")
-        return
+    cluster_arrays = result.mask
 
-    unsharp_settings = result.unsharp_mask_settings
-    cluster_arrays = result.get_cluster_arrays()
+    image = result.original_image
+    contrast_image = result.processed_image
+    field = result.orientation_field
 
-    image = result.get_image()
-    contrast_image = result.get_unsharp_image()
-    field = result.get_field()
-
-    width: float = result.get_image_width() / 2 - 0.5
-    height: float = result.get_image_height() / 2 - 0.5
-    num_horizontal_pixels: int = result.get_image_width()
-    num_vertical_pixels: int = result.get_image_height()
+    width: float = result.original_image_width / 2 - 0.5
+    height: float = result.original_image_height / 2 - 0.5
+    processed_width: float = result.processed_image_width / 2 - 0.5
+    processed_height: float = result.processed_image_height / 2 - 0.5
+    num_horizontal_pixels: int = result.processed_image_width
+    num_vertical_pixels: int = result.processed_image_height
     log.debug("Dominant chirality %s", result.get_dominant_chirality())
     log.debug("Overall pitch angle %.2f degrees", np.rad2deg(result.get_overall_pitch_angle()))
 
@@ -99,11 +95,11 @@ def process_from_image(args: argparse.Namespace) -> None:
     contrast_axis = fig.add_subplot(232)
     contrast_axis.imshow(
         contrast_image,
-        extent=(-width, width, -height, height),
+        extent=(-processed_width, processed_width, -processed_height, processed_height),
         cmap="gray",
     )
     contrast_axis.set_title(
-        rf"Unsharp image $\mathrm{{Radius}} = {unsharp_settings.radius}, \; \mathrm{{Amount}} = {unsharp_settings.amount}$",
+        rf"Unsharp image $\mathrm{{Radius}} = {finder._unsharp_radius}, \; \mathrm{{Amount}} = {finder._unsharp_amount}$",
     )
     contrast_axis.set_axis_off()
 
@@ -142,43 +138,43 @@ def process_from_image(args: argparse.Namespace) -> None:
     colored_image_overlay_axis.set_axis_off()
 
     color_map = mpl.colormaps["hsv"]
-    num_clusters: int = cluster_arrays.shape[2]
-    colored_image = np.zeros((image.shape[0], image.shape[1], 4))
-    colored_image[:, :, 0] = image / image.max()
-    colored_image[:, :, 1] = image / image.max()
-    colored_image[:, :, 2] = image / image.max()
+    num_clusters: int = result.num_clusters
+    colored_image = np.zeros((contrast_image.shape[0], contrast_image.shape[1], 4))
+    colored_image[:, :, 0] = contrast_image
+    colored_image[:, :, 1] = contrast_image
+    colored_image[:, :, 2] = contrast_image
     colored_image[:, :, 3] = 1.0
-    for cluster_idx in range(num_clusters):
-        current_array = cluster_arrays[:, :, cluster_idx]
+    for cluster_index in range(num_clusters):
+        current_array = np.where(cluster_arrays == (cluster_index + 1), contrast_image, 0)
         mask = current_array > 0
         cluster_mask = np.zeros((current_array.shape[0], current_array.shape[1], 4))
-        cluster_color = color_map((cluster_idx + 0.5) / num_clusters)
-        arc_color = color_map((num_clusters - cluster_idx + 0.5) / num_clusters)
+        cluster_color = color_map((cluster_index + 0.5) / num_clusters)
+        arc_color = get_complementary_color(cluster_color)
         cluster_mask[mask, :] = cluster_color
         colored_image[mask, :] *= cluster_color
         cluster_axis.imshow(
             cluster_mask,
             extent=(-width, width, -height, height),
         )
-        spiral_fit = fit_spiral_to_image(current_array)
+        spiral_fit = result.get_fit(cluster_index)
         x, y = spiral_fit.calculate_cartesian_coordinates(100, pixel_to_distance=1, flip_y=False)
         cluster_axis.plot(
             x,
             y,
             color=arc_color,
-            label=f"Cluster {cluster_idx}",
+            label=f"Cluster {cluster_index}",
         )
         image_overlay_axis.plot(
             x,
             y,
             color=arc_color,
-            label=f"Cluster {cluster_idx}",
+            label=f"Cluster {cluster_index}",
         )
         colored_image_overlay_axis.plot(
             x,
             y,
             color=arc_color,
-            label=f"Cluster {cluster_idx}",
+            label=f"Cluster {cluster_index}",
         )
     colored_image_overlay_axis.imshow(
         colored_image,
@@ -226,6 +222,30 @@ def _load_image(input_path: Path) -> NDArray[float32]:
         raw_image = Image.open(input_path).convert("L")
         image = np.asarray(raw_image).astype(float32) / 255
     return image
+
+
+def get_complementary_color(rgba: tuple[float, float, float, float]) -> tuple[float, float, float, float]:
+    """Calculate the complementary color using hue rotation.
+
+    Parameters
+    ----------
+    rgba : tuple[float, float, float, float]
+        The base color as a tuple of RGBA values normalized to the range [0, 1].
+        rgb_color (tuple): The base color as an RGB tuple, with values in [0, 1].
+
+    Returns
+    -------
+    complement : tuple[float, float, float, float]
+        The complementary color in normalized RGBA.
+
+    """
+    # Convert RGB to HSV
+    h, s, v = colorsys.rgb_to_hsv(rgba[0], rgba[1], rgba[2])
+    # Rotate the hue by 180 degrees (0.5 in normalized hue space)
+    complementary_hue = (h + 0.5) % 1.0
+    # Convert back to RGB
+    complementary_rgba = colorsys.hsv_to_rgb(complementary_hue, s, v)
+    return (complementary_rgba[0], complementary_rgba[1], complementary_rgba[2], rgba[3])
 
 
 def _parse_args(args: Sequence[str]) -> argparse.Namespace:
