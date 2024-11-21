@@ -6,11 +6,11 @@ import logging
 from collections.abc import Callable
 from os import PathLike
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Protocol, TypeAlias, TypeVar, assert_never, cast
+from typing import TYPE_CHECKING, TypeAlias, TypeVar
 
 import numpy as np
 import scipy.io
-from skimage import filters, transform
+from typing_extensions import assert_never
 
 from .arc import Chirality, FitErrorKind, LogSpiralFitResult, fit_spiral_to_image
 from .arc.utils import get_polar_coordinates
@@ -18,6 +18,14 @@ from .assert_utils import verify_data_is_2d
 from .cluster import generate_clusters
 from .merge_fit import merge_clusters_by_fit
 from .orientation import OrientationField, generate_orientation_fields
+from .preprocess import (
+    ImageContrastBooster,
+    ImageDivisibleResizer,
+    ImageLinearNormalizer,
+    ImageNormalizer,
+    ImageResizer,
+    ImageUnsharpMaskBooster,
+)
 from .similarity import generate_similarity_matrix
 
 if TYPE_CHECKING:
@@ -32,7 +40,6 @@ if TYPE_CHECKING:
 StrPath: TypeAlias = str | PathLike[str]
 
 _SCT = TypeVar("_SCT", bound=np.generic)
-_SCT_f = TypeVar("_SCT_f", bound=np.floating[Any])
 _Array1D = np.ndarray[tuple[int], np.dtype[_SCT]]
 _Array2D = np.ndarray[tuple[int, int], np.dtype[_SCT]]
 _Array1D_f64 = _Array1D[np.float64]
@@ -43,93 +50,27 @@ _CalculateRadiiFn: TypeAlias = Callable[[_Array1D_f64], _Array1D_f64]
 
 log: logging.Logger = logging.getLogger(__name__)
 
-# Preprocessors:
-# - Normalizer
-# - Resizer
-# - Constrast booster
-
-
-class ImagePreprocessor(Protocol):
-    def preprocess(self, image: _Array2D[_SCT_f]) -> _Array2D[_SCT_f]: ...
-
-
-class ImageNormalizer(Protocol):
-    def normalize(self, image: _Array2D[_SCT]) -> _Array2D_f64: ...
-
-
-class ImageResizer(Protocol):
-    def resize(self, image: _Array2D[_SCT_f]) -> _Array2D[_SCT_f]: ...
-
-
-class ImageContrastBooster(Protocol):
-    def boost(self, image: _Array2D[_SCT_f]) -> _Array2D[_SCT_f]: ...
-
-
-class ImageLinearNormalizer:
-    def __init__(self) -> None:
-        pass
-
-    def normalize(self, image: _Array2D[_SCT]) -> _Array2D_f64:
-        float_image = image.astype(np.float64)
-        # Map non-finite values to finite values
-        float_image = np.nan_to_num(float_image, nan=0, posinf=1, neginf=0)
-
-        min_value = np.min(float_image)
-        max_value = np.max(float_image)
-        # Array is the exactly the same value throughout
-        if max_value == min_value:
-            # Array should be all one
-            if max_value != 0:
-                return np.ones_like(float_image)
-            # Array is all zero
-            return np.zeros_like(float_image)
-        return (float_image - min_value) / (max_value - min_value)
-
-
-class ImageDivisibleResizer:
-    def __init__(self, divisor: op.CanInt) -> None:
-        self._divisor: int = int(divisor)
-
-    def resize(self, image: _Array2D[_SCT_f]) -> _Array2D[_SCT_f]:
-        height: int = image.shape[0]
-        width: int = image.shape[1]
-        compatible_height = self._closest_multiple(height, self._divisor)
-        compatible_width = self._closest_multiple(width, self._divisor)
-        return cast(_Array2D[_SCT_f], transform.resize(image, (compatible_height, compatible_width)).astype(image.dtype))  # pyright:ignore[reportUnknownMemberType]
-
-    @staticmethod
-    def _closest_multiple(num: int, divisor: int) -> int:
-        quotient = num / divisor
-        smaller_multiple = int(np.floor(quotient)) * divisor
-        larger_multiple = int(np.ceil(quotient)) * divisor
-
-        smaller_multiple_distance = num - smaller_multiple
-        larger_multiple_distance = larger_multiple - num
-        if smaller_multiple_distance <= larger_multiple_distance:
-            return smaller_multiple
-        return larger_multiple
-
-
-class ImageUnsharpMaskBooster:
-    def __init__(self, radius: op.CanFloat, amount: op.CanFloat) -> None:
-        self._radius: float = float(radius)
-        self._amount: float = float(amount)
-
-    def boost(self, image: _Array2D[_SCT_f]) -> _Array2D[_SCT_f]:
-        return cast(
-            _Array2D[_SCT_f],
-            filters.unsharp_mask(  # pyright:ignore[reportUnknownMemberType]
-                image,
-                radius=self._radius,
-                amount=self._amount,
-            ),
-        )
-
 
 class SpiralFinderResult:
+    """The result of the spiral finding algorithm."""
+
     def __init__(
         self, mask: _Array2D_u32, *, original_image: _Array2D_f64, processed_image: _Array2D_f64, field: OrientationField
     ) -> None:
+        """Initialize the result.
+
+        Parameters
+        ----------
+        mask : Array2D[u32]
+            The cluster mask where non-zero values indicate the cluster id the pixel belongs to.
+        original_image : Array2D[f64]
+            The original image before preprocessing.
+        processed_image : Array2D[f64]
+            The image after preprocessing.
+        field : OrientationField
+            The orientation field of the processed image.
+
+        """
         self._mask: _Array2D_u32 = mask
         self._original_image: _Array2D_f64 = original_image
         self._processed_image: _Array2D_f64 = processed_image
@@ -149,42 +90,55 @@ class SpiralFinderResult:
 
     @property
     def mask(self) -> _Array2D_u32:
+        """Array2D[u32]: The cluster mask.
+
+        Non-zero integers indicate the presence of a cluster and its value determines the cluster id.
+        """
         return self._mask
 
     @property
     def original_image(self) -> _Array2D_f64:
+        """Array2D[f64]: The original image before preprocessing."""
         return self._original_image
 
     @property
     def original_image_height(self) -> int:
+        """int: The original image's pixel height."""
         return self._original_image.shape[0]
 
     @property
     def original_image_width(self) -> int:
+        """int: The original image's pixel width."""
         return self._original_image.shape[1]
 
     @property
+    def processed_image(self) -> _Array2D_f64:
+        """Array2D[f64]: The image after preprocessing."""
+        return self._processed_image
+
+    @property
     def processed_image_height(self) -> int:
+        """int: The processed image's pixel height."""
         return self._processed_image.shape[0]
 
     @property
     def processed_image_width(self) -> int:
+        """int: The processed image's pixel width."""
         return self._processed_image.shape[1]
 
     @property
-    def processed_image(self) -> _Array2D_f64:
-        return self._processed_image
-
-    @property
     def orientation_field(self) -> OrientationField:
+        """OrientationField: The orientation field."""
         return self._field
 
     @property
     def num_clusters(self) -> int:
+        """int: The number of clusters found."""
         return self._num_clusters
 
     @property
     def sizes(self) -> tuple[int, ...]:
+        """tuple[int, ...]: The sizes of the clusters found."""
         return self._sizes
 
     def __str__(self) -> str:
@@ -237,6 +191,19 @@ class SpiralFinderResult:
         return float(np.mean(pitch_angles))
 
     def get_fit(self, cluster_index: op.CanIndex) -> LogSpiralFitResult:
+        """Return the log spiral fit to a cluster.
+
+        Parameters
+        ----------
+        cluster_index : int
+            The index of the cluster to get the index of.
+
+        Returns
+        -------
+        fit : LogSpiralFitResult
+            The log spiral fit.
+
+        """
         if cluster_index not in range(self.num_clusters):
             msg = f"Cluster index {cluster_index} is not in the range [0, {self.num_clusters})!"
             raise IndexError(msg)
@@ -345,6 +312,7 @@ class SpiralFinder:
     """
 
     def __init__(self) -> None:
+        """Initialize the finder."""
         # Orientation field parameters
         self._field_neighbour_distance: int = 5
         self._field_kernel_radius: int = 5
@@ -369,6 +337,19 @@ class SpiralFinder:
         self._booster: ImageContrastBooster = ImageUnsharpMaskBooster(25, 6)
 
     def extract(self, image: _ArrayLikeFloat_co) -> SpiralFinderResult:
+        """Extract spiral arm segments from an image.
+
+        Parameters
+        ----------
+        image : ArrayLike[float]
+            A 2D array representing a black and white image centered on a galaxy or object with spiral structure.
+
+        Returns
+        -------
+        result : SpiralFinderResult
+            The result of the extraction algorithm.
+
+        """
         # Step -1: Convert image to numpy array
         image_array = np.asarray(image)
 

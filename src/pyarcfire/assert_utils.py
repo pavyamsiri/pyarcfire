@@ -32,6 +32,22 @@ def verify_data_is_normalized(data: _ArrayND[_Shape, _SCT_f]) -> None:
         raise ValueError(msg)
 
 
+def verify_arrays_have_same_shape(left: _ArrayND[_Shape, _SCT], right: _ArrayND[_Shape, _SCT]) -> None:
+    """Verify that the given data is 2D.
+
+    Parameters
+    ----------
+    left : Array[S, T]
+        The lefthand data to compare.
+    right : Array[S, T]
+        The righthand data to compare.
+
+    """
+    if left.shape != right.shape:
+        msg = "The left and right data are not the same shape!"
+        raise ValueError(msg)
+
+
 def verify_data_is_2d(data: _ArrayND[_Shape, _SCT]) -> _Array2D[_SCT]:
     """Verify that the given data is 2D.
 
