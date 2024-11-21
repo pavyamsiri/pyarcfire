@@ -9,9 +9,8 @@ and from the SpArcFiRe code [https://github.com/waynebhayes/SpArcFiRe]
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
 from functools import reduce
-from typing import TYPE_CHECKING, Any, TypeVar, cast
+from typing import TYPE_CHECKING, Any, TypeAlias, TypeVar, cast
 
 import numpy as np
 from scipy import signal
@@ -32,52 +31,13 @@ if TYPE_CHECKING:
 
 _SCT = TypeVar("_SCT", bound=np.generic)
 _SCT_f = TypeVar("_SCT_f", bound=np.floating[Any])
-_Shape = TypeVar("_Shape", bound=tuple[int, ...])
-_Array1D = np.ndarray[tuple[int], np.dtype[_SCT]]
-_Array2D = np.ndarray[tuple[int, int], np.dtype[_SCT]]
-_Array3D = np.ndarray[tuple[int, int, int], np.dtype[_SCT]]
-_ArrayND = np.ndarray[_Shape, np.dtype[_SCT]]
-_Array2D_f64 = _Array2D[np.float64]
-_Array3D_f64 = _Array3D[np.float64]
+_Array2D: TypeAlias = np.ndarray[tuple[int, int], np.dtype[_SCT]]
+_Array3D: TypeAlias = np.ndarray[tuple[int, int, int], np.dtype[_SCT]]
+_Array2D_f64: TypeAlias = _Array2D[np.float64]
+_Array3D_f64: TypeAlias = _Array3D[np.float64]
 
 
 log: logging.Logger = logging.getLogger(__name__)
-
-
-@dataclass
-class GenerateOrientationFieldSettings:
-    """Settings to configure generate_orientation_field.
-
-    Attributes
-    ----------
-    neighbour_distance : int
-        The distance in pixels between a cell and its neighbour.
-        Used when denoising.
-    kernel_radius : int
-        The radius of the orientation filter kernel in pixels.
-    num_orientation_field_levels : int
-        The number of orientation field levels to create and then join.
-
-    """
-
-    neighbour_distance: int = 5
-    kernel_radius: int = 5
-    num_orientation_field_levels: int = 3
-
-    def __post_init__(self) -> None:
-        """Verify field values."""
-        if self.neighbour_distance < 0:
-            msg = "The neighbour distance must be nonnegative."
-            raise ValueError(msg)
-        if self.kernel_radius < 1:
-            msg = "The kernel radius must be at least 1."
-            raise ValueError(msg)
-        if self.num_orientation_field_levels < 1:
-            msg = "The number of orientation field levels must be at least 1."
-            raise ValueError(msg)
-
-
-DEFAULT_ORIENTATION_FIELD_SETTINGS: GenerateOrientationFieldSettings = GenerateOrientationFieldSettings()
 
 
 class OrientationField:
@@ -232,9 +192,7 @@ class OrientationField:
             The resized field.
 
         """
-        return OrientationField(
-            cast(_Array3D_f64, transform.resize(self.field, (new_height, new_width)).astype(np.float64)),  # pyright:ignore[reportUnknownMemberType]
-        )
+        return OrientationField(cast(_Array3D_f64, transform.resize(self.field, (new_height, new_width)).astype(np.float64)))
 
     @staticmethod
     def merge(
@@ -471,7 +429,10 @@ class OrientationField:
 @benchmark
 def generate_orientation_fields(
     image: _Array2D[_SCT_f],
-    settings: GenerateOrientationFieldSettings,
+    *,
+    neighbour_distance: int,
+    kernel_radius: int,
+    num_orientation_field_levels: int,
 ) -> OrientationField:
     """Generate an orientation field for the given image.
 
@@ -481,8 +442,13 @@ def generate_orientation_fields(
     ----------
     image : Array2D[F]
         The image to generate an orientation field of.
-    settings : GenerateOrientationFieldSettings
-        The parameters of the generation.
+    neighbour_distance : int
+        The distance in pixels between a cell and its neighbour.
+        Used when denoising.
+    kernel_radius : int
+        The radius of the orientation filter kernel in pixels.
+    num_orientation_field_levels : int
+        The number of orientation field levels to create and then join.
 
     Returns
     -------
@@ -494,25 +460,25 @@ def generate_orientation_fields(
     verify_data_is_normalized(image)
     verify_data_can_be_shrunk_orientation(
         image,
-        num_orientation_field_levels=settings.num_orientation_field_levels,
+        num_orientation_field_levels=num_orientation_field_levels,
     )
 
     # Neighbour distance must be smaller than both dimensions
-    if settings.neighbour_distance >= image.shape[0] or settings.neighbour_distance >= image.shape[1]:
+    if neighbour_distance >= image.shape[0] or neighbour_distance >= image.shape[1]:
         msg = "The neighbour distance must be strictly less than both of the image dimensions."
         raise ValueError(msg)
 
     # Generate all the different orientation field levels
     orientation_field_levels: list[OrientationField] = []
-    for idx in range(settings.num_orientation_field_levels):
+    for idx in range(num_orientation_field_levels):
         # Resize
-        scale_factor: float = 1 / 2 ** (settings.num_orientation_field_levels - idx - 1)
-        resized_image = cast(_Array2D[_SCT_f], transform.rescale(image, scale_factor).astype(image.dtype))  # pyright:ignore[reportUnknownMemberType]
+        scale_factor: float = 1 / 2 ** (num_orientation_field_levels - idx - 1)
+        resized_image = cast(_Array2D[_SCT_f], transform.rescale(image, scale_factor).astype(image.dtype))
 
         # Generate
         current_level = _generate_raw_orientation_field(
             resized_image,
-            settings.kernel_radius,
+            kernel_radius,
         )
         orientation_field_levels.append(current_level)
 
@@ -524,7 +490,7 @@ def generate_orientation_fields(
 
     # Denoise
     denoised_field = merged_field.denoise(
-        neighbour_distance=settings.neighbour_distance,
+        neighbour_distance=neighbour_distance,
     )
     num_nonzero_elements = denoised_field.count_nonzero()
 

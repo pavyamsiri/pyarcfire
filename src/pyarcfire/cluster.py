@@ -4,8 +4,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Iterable
-from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import TYPE_CHECKING, Any, TypeAlias, TypeVar
 
 import numpy as np
 from scipy import sparse
@@ -69,47 +68,10 @@ if TYPE_CHECKING:
 
 _SCT = TypeVar("_SCT", bound=np.generic)
 _SCT_f = TypeVar("_SCT_f", bound=np.floating[Any])
-_Shape = TypeVar("_Shape", bound=tuple[int, ...])
-_Array1D = np.ndarray[tuple[int], np.dtype[_SCT]]
-_Array2D = np.ndarray[tuple[int, int], np.dtype[_SCT]]
-_Array3D = np.ndarray[tuple[int, int, int], np.dtype[_SCT]]
-_ArrayND = np.ndarray[_Shape, np.dtype[_SCT]]
-_Array2D_f64 = _Array2D[np.float64]
-_Array3D_f64 = _Array3D[np.float64]
+_Array1D: TypeAlias = np.ndarray[tuple[int], np.dtype[_SCT]]
+_Array2D: TypeAlias = np.ndarray[tuple[int, int], np.dtype[_SCT]]
 
 log: logging.Logger = logging.getLogger(__name__)
-
-
-@dataclass
-class GenerateClustersSettings:
-    """Settings to configure generate_orientation_field.
-
-    Attributes
-    ----------
-    stop_threshold: float
-        The minimum similarity allowed between clusters before stopping
-        merges.
-    error_ratio_threshold : float
-        The maximum error ratio allowed for a merge between two clusters
-        to be permitted. This error ratio is the ratio of an arc fit's error to
-        the merged cluster relative to the error of two arc fits to the clusters
-        individually.
-    merge_check_minimum_cluster_size : int
-        The maximum size of each cluster before their merges become checked and
-        potentially stopped.
-    remove_central_cluster : bool
-        Set this flag to remove clusters that touch the centre.
-
-    """
-
-    stop_threshold: float = 0.15
-    error_ratio_threshold: float = 2.5
-    merge_check_minimum_cluster_size: int = 25
-    minimum_cluster_size: int = 150
-    remove_central_cluster: bool = True
-
-
-DEFAULT_CLUSTER_SETTINGS: GenerateClustersSettings = GenerateClustersSettings()
 
 
 class Cluster:
@@ -253,13 +215,13 @@ def generate_clusters(
     stop_threshold : float
         The minimum similarity value where cluster merging can happen.
     error_ratio_threshold : float, optional
-        The maximum merge error ratio allowed for a cluster merge to happen. Default is 2.5.
+        The maximum merge error ratio allowed for a cluster merge to happen.
     merge_check_minimum_cluster_size : int, optional
-        The minimum size for each cluster when performing a merge check. Default is 25.
+        The minimum size for each cluster when performing a merge check.
     minimum_cluster_size : int, optional
-        The minimum size a cluster is allowed to be after merging. Default is 150.
+        The minimum size a cluster is allowed to be after merging.
     remove_central_cluster : bool, optional
-        If this flag is set, the cluster that contains the origin will be removed. Default is true.
+        If this flag is set, the cluster that contains the origin will be removed.
 
     Returns
     -------

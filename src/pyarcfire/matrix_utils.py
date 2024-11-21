@@ -1,6 +1,6 @@
 """Utilities regarding matrices."""
 
-from typing import TypeVar
+from typing import TypeAlias, TypeVar
 
 import numpy as np
 from scipy import sparse
@@ -37,8 +37,8 @@ SparseMatrixSupportsIndex = TypeVar(
 
 
 _SCT = TypeVar("_SCT", bound=np.generic)
-_Array1D = np.ndarray[tuple[int], np.dtype[_SCT]]
-_Array1D_f64 = _Array1D[np.float64]
+_Array1D: TypeAlias = np.ndarray[tuple[int], np.dtype[_SCT]]
+_Array1D_f64: TypeAlias = _Array1D[np.float64]
 
 
 def is_sparse_matrix_hollow(matrix: SparseMatrix) -> bool:

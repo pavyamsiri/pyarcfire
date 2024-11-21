@@ -1,6 +1,6 @@
 """Tests for the arc module, specifically regarding how multiple revolution spirals are fitted."""
 
-from typing import TypeVar
+from typing import TypeAlias, TypeVar
 
 import numpy as np
 from hypothesis import given
@@ -11,10 +11,10 @@ from numpy import testing as nptesting
 from pyarcfire.arc.fit import _find_single_revolution_regions_polar  # pyright:ignore[reportPrivateUsage]
 
 _SCT = TypeVar("_SCT", bound=np.generic)
-_Array1D = np.ndarray[tuple[int], np.dtype[_SCT]]
-_Array2D = np.ndarray[tuple[int, int], np.dtype[_SCT]]
-_Array1D_bool = _Array1D[np.bool_]
-_Array2D_bool = _Array2D[np.bool_]
+_Array1D: TypeAlias = np.ndarray[tuple[int], np.dtype[_SCT]]
+_Array2D: TypeAlias = np.ndarray[tuple[int, int], np.dtype[_SCT]]
+_Array1D_bool: TypeAlias = _Array1D[np.bool_]
+_Array2D_bool: TypeAlias = _Array2D[np.bool_]
 
 
 @st.composite

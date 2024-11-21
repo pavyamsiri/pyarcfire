@@ -5,7 +5,7 @@ from __future__ import annotations
 import functools
 import logging
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, TypeVar, cast
+from typing import TYPE_CHECKING, Any, TypeAlias, TypeVar, cast
 
 import numpy as np
 import skimage
@@ -35,10 +35,9 @@ if TYPE_CHECKING:
 _SCT = TypeVar("_SCT", bound=np.generic)
 _SCT_f = TypeVar("_SCT_f", bound=np.floating[Any])
 _SCT_i = TypeVar("_SCT_i", bound=np.integer[Any])
-_Shape = TypeVar("_Shape", bound=tuple[int, ...])
-_Array1D = np.ndarray[tuple[int], np.dtype[_SCT]]
-_Array2D = np.ndarray[tuple[int, int], np.dtype[_SCT]]
-_ArrayND = np.ndarray[_Shape, np.dtype[_SCT]]
+_Array1D: TypeAlias = np.ndarray[tuple[int], np.dtype[_SCT]]
+_Array2D: TypeAlias = np.ndarray[tuple[int, int], np.dtype[_SCT]]
+_Array1D_bool: TypeAlias = _Array1D[np.bool_]
 
 
 SINGLE_REVOLUTION_TOLERANCE: float = 1e-8
@@ -120,7 +119,7 @@ def fit_spiral_to_image(
     # Check if the cluster revolves more than once
     bad_bounds, _, _, _ = calculate_bounds(theta)
 
-    inner_region: _Array1D[np.bool_] | None = None
+    inner_region: _Array1D_bool | None = None
 
     # Gap in theta is not large enough to not need multiple revolutions
     # and the cluster does not contain the origin or is not closed around centre
@@ -214,7 +213,7 @@ def _fit_spiral_to_image_multiple_revolution_core(
     theta: _Array1D[_SCT_f],
     weights: _Array1D[_SCT_f],
     initial_growth_factor: AnyReal,
-    inner_region: _Array1D[np.bool_],
+    inner_region: _Array1D_bool,
 ) -> LogSpiralFitResult:
     # fitting depends on the arc bounds, but we don't know what the arc
     # bounds are (i.e., whether to calculate the bounds from the inner or
@@ -269,7 +268,7 @@ def __fit_multiple_revolution_spiral(
     radii: _Array1D[_SCT_f],
     theta: _Array1D[_SCT_f],
     weights: _Array1D[_SCT_f],
-    region: _Array1D[np.bool_],
+    region: _Array1D_bool,
     initial_growth_factor: AnyReal,
     *,
     clockwise: op.CanBool,
@@ -360,7 +359,7 @@ def identify_inner_and_outer_spiral(
     image: _Array2D[_SCT_f],
     shrink_amount: int,
     max_diagonal_distance: float = 1.5,
-) -> _Array1D[np.bool_] | None:
+) -> _Array1D_bool | None:
     """Identify the inner and outer portion of a mutliple revolution spiral.
 
     Parameters
@@ -583,7 +582,7 @@ def _find_single_revolution_regions(
     num_theta: op.CanIndex,
     min_acceptable_length: op.CanInt,
     shrink_amount: op.CanInt,
-) -> _Array1D[np.bool_]:
+) -> _Array1D_bool:
     assert int(shrink_amount) <= int(min_acceptable_length)
     polar_image = np.flip(
         __image_transform_from_cartesian_to_polar(image, num_radii, num_theta),
@@ -602,7 +601,7 @@ def _find_single_revolution_regions(
 def _find_single_revolution_regions_polar(
     polar_image: _Array2D[np.bool_],
     shrink_amount: op.CanIndex,
-) -> _Array1D[np.bool_]:
+) -> _Array1D_bool:
     """Identify angles in a polar image that only intersect the cluster once.
 
     Parameters
@@ -616,7 +615,7 @@ def _find_single_revolution_regions_polar(
 
     Returns
     -------
-    single_revolution_region : _Array1D[np.bool_]
+    single_revolution_region : _Array1D_bool
         A 1D binary array where each value indicates whether the corresponding
         theta bin intersects a cluster only once.
 
@@ -653,7 +652,7 @@ def _find_single_revolution_regions_polar(
     neighbour_max_location_right = np.roll(max_locations, -1)
     neighbour_min_location_left = np.roll(min_locations, 1)
     neighbour_min_location_right = np.roll(min_locations, -1)
-    conditions = (
+    conditions: tuple[_Array1D_bool, ...] = (
         can_be_single_revolution,
         np.logical_or(
             min_locations <= neighbour_max_location_left,
@@ -722,13 +721,13 @@ def __image_transform_from_cartesian_to_polar(
     dy = max(centre_y, -(row_indices - centre_y).max())
     max_radius: float = np.sqrt(dx**2 + dy**2)
 
-    result = skimage.transform.warp_polar(  # pyright:ignore[reportUnknownMemberType, reportUnknownVariableType]
+    result = skimage.transform.warp_polar(  # pyright:ignore[reportUnknownVariableType]
         image,
         center=(centre_x, centre_y),
         radius=max_radius,
         output_shape=(num_theta, num_radii),
     )
-    return result.astype(image.dtype).T  # pyright:ignore[reportUnknownMemberType, reportUnknownVariableType]
+    return result.astype(image.dtype).T  # pyright:ignore[reportUnknownVariableType]
 
 
 def __split_regions(
@@ -737,7 +736,7 @@ def __split_regions(
     theta: _Array1D[_SCT_f],
     theta_bin_centres: _Array1D[_SCT_f],
     wrap_data: WrapData | None,
-) -> tuple[_Array1D[np.bool_], _Array1D[np.bool_], int]:
+) -> tuple[_Array1D_bool, _Array1D_bool, int]:
     """Split the regions defined by `start_indices` and `end_indices` into two parts.
 
     Parameters
@@ -803,7 +802,7 @@ def __split_regions(
 
 
 def __calculate_wrap(
-    region_mask: _Array1D[np.bool_],
+    region_mask: _Array1D_bool,
     start_indices: _Array1D[_SCT_i],
     end_indices: _Array1D[_SCT_i],
 ) -> tuple[_Array1D[_SCT_i], _Array1D[_SCT_i], WrapData | None]:
@@ -883,7 +882,7 @@ def __calculate_wrap(
 def _remove_theta_discontinuities(
     theta: _Array1D[_SCT_f],
     image: _Array2D[_SCT_f],
-    inner_region: _Array1D[np.bool_],
+    inner_region: _Array1D_bool,
 ) -> _Array1D[_SCT_f]:
     assert np.count_nonzero(inner_region) > 0
     adjusted_theta = np.copy(theta)
@@ -922,7 +921,7 @@ def _remove_theta_discontinuities(
 def _adjust_theta_for_gap(
     theta: _Array1D[_SCT_f],
     image: _Array2D[_SCT_f],
-    region: _Array1D[np.bool_],
+    region: _Array1D_bool,
 ) -> _Array1D[_SCT_f] | None:
     row_indices, column_indices = image.nonzero()
     assert len(row_indices) == len(column_indices)

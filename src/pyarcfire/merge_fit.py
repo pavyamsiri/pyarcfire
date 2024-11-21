@@ -3,8 +3,7 @@
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import TYPE_CHECKING, Any, TypeAlias, TypeVar
 
 import numpy as np
 from scipy.ndimage import distance_transform_edt
@@ -20,26 +19,9 @@ if TYPE_CHECKING:
 
 _SCT = TypeVar("_SCT", bound=np.generic)
 _SCT_f = TypeVar("_SCT_f", bound=np.floating[Any])
-_Array2D = np.ndarray[tuple[int, int], np.dtype[_SCT]]
+_Array2D: TypeAlias = np.ndarray[tuple[int, int], np.dtype[_SCT]]
 
 log: logging.Logger = logging.getLogger(__name__)
-
-
-@dataclass
-class MergeClustersByFitSettings:
-    """Settings to configure merge_clusters_by_fit.
-
-    Attributes
-    ----------
-    stop_threshold : float
-        The maximum merge error ratio before stopping merges.
-
-    """
-
-    stop_threshold: float = 2.5
-
-
-DEFAULT_MERGE_CLUSTER_BY_FIT_SETTINGS: MergeClustersByFitSettings = MergeClustersByFitSettings()
 
 
 @benchmark
@@ -62,7 +44,9 @@ def merge_clusters_by_fit(
         The clusters after being merged.
 
     """
-    assert len(clusters) > 0
+    if len(clusters) == 0:
+        return clusters
+
     # Maximum pixel distance
     num_rows, num_columns = clusters[0].shape
     max_pixel_distance = np.mean([num_rows, num_columns]).astype(np.float64) / 20

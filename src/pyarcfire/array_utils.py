@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, TypeVar
+from typing import TYPE_CHECKING, TypeAlias, TypeVar
 
 import numpy as np
 
@@ -10,7 +10,7 @@ if TYPE_CHECKING:
     from collections.abc import Sequence
 
 _SCT = TypeVar("_SCT", bound=np.generic)
-_Array2D = np.ndarray[tuple[int, int], np.dtype[_SCT]]
+_Array2D: TypeAlias = np.ndarray[tuple[int, int], np.dtype[_SCT]]
 
 
 def get_origin_points(image: _Array2D[_SCT]) -> Sequence[tuple[int, int]]:
