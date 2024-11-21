@@ -65,6 +65,7 @@ reportInvalidCast = true
 reportPrivateUsage = true
 reportUnnecessaryTypeIgnoreComment = true
 reportUnsafeMultipleInheritance = true
+reportUnknownMemberType = false # matplotlib does not have sufficient typing
 
 [tool.ruff]
 line-length = 130

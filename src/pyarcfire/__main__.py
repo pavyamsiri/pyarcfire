@@ -11,7 +11,6 @@ from typing import TYPE_CHECKING
 import matplotlib as mpl
 import numpy as np
 from matplotlib import pyplot as plt
-from numpy import float32
 from PIL import Image
 
 from pyarcfire.finder import SpiralFinder
@@ -21,7 +20,7 @@ from .log_utils import setup_logging
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-    from numpy.typing import NDArray
+    import numpy.typing as npt
 
 log: logging.Logger = logging.getLogger(__name__)
 
@@ -60,7 +59,7 @@ def process_from_image(args: argparse.Namespace) -> None:
 
     """
     input_path: Path = Path(args.input_path)
-    image: NDArray[np.float64] = _load_image(input_path).astype(np.float64)
+    image: npt.NDArray[np.float64] = _load_image(input_path)
 
     finder = SpiralFinder()
     result = finder.extract(image)
@@ -193,7 +192,7 @@ def process_from_image(args: argparse.Namespace) -> None:
     plt.close()
 
 
-def _load_image(input_path: Path) -> NDArray[float32]:
+def _load_image(input_path: Path) -> npt.NDArray[np.float64]:
     """Load an image from a file.
 
     The returned image should in row-major storage form that is the first
@@ -207,20 +206,20 @@ def _load_image(input_path: Path) -> NDArray[float32]:
 
     Returns
     -------
-    image : NDArray[float32]
+    image : ArrayND[S, f64]
         The image in row-major form.
 
     """
-    image: NDArray[float32]
+    image: npt.NDArray[np.float64]
     extension = Path(input_path).suffix.lstrip(".")
     # Numpy arrays from npy are already in row major form
     if extension == "npy":
-        image = np.load(input_path).astype(float32)
+        image = np.load(input_path).astype(np.float64)
     # Assume it is an image format like .png
     else:
         # Load image
         raw_image = Image.open(input_path).convert("L")
-        image = np.asarray(raw_image).astype(float32) / 255
+        image = (np.asarray(raw_image) / 255).astype(np.float64)
     return image
 
 
