@@ -253,13 +253,13 @@ def generate_clusters(
     stop_threshold : float
         The minimum similarity value where cluster merging can happen.
     error_ratio_threshold : float, optional
-        The maximum merge error ratio allowed for a cluster merge to happen. Default is 2.5.
+        The maximum merge error ratio allowed for a cluster merge to happen.
     merge_check_minimum_cluster_size : int, optional
-        The minimum size for each cluster when performing a merge check. Default is 25.
+        The minimum size for each cluster when performing a merge check.
     minimum_cluster_size : int, optional
-        The minimum size a cluster is allowed to be after merging. Default is 150.
+        The minimum size a cluster is allowed to be after merging.
     remove_central_cluster : bool, optional
-        If this flag is set, the cluster that contains the origin will be removed. Default is true.
+        If this flag is set, the cluster that contains the origin will be removed.
 
     Returns
     -------
