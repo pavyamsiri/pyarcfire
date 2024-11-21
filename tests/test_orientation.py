@@ -65,11 +65,9 @@ def test_generation(arr: _Array2D_f32) -> None:
     """
     field = orientation.generate_orientation_fields(
         arr,
-        settings=orientation.GenerateOrientationFieldSettings(
-            num_orientation_field_levels=3,
-            neighbour_distance=5,
-            kernel_radius=5,
-        ),
+        num_orientation_field_levels=3,
+        neighbour_distance=5,
+        kernel_radius=5,
     )
     assert field.shape[0] == arr.shape[0]
     assert field.shape[1] == arr.shape[1]
