@@ -1,6 +1,6 @@
 """Tests for the orientation module."""
 
-from typing import TypeVar
+from typing import TypeAlias, TypeVar
 
 import numpy as np
 from hypothesis import given
@@ -10,8 +10,8 @@ from hypothesis.extra.numpy import arrays
 from pyarcfire import orientation
 
 _SCT = TypeVar("_SCT", bound=np.generic)
-_Array2D = np.ndarray[tuple[int, int], np.dtype[_SCT]]
-_Array2D_f32 = _Array2D[np.float32]
+_Array2D: TypeAlias = np.ndarray[tuple[int, int], np.dtype[_SCT]]
+_Array2D_f32: TypeAlias = _Array2D[np.float32]
 
 
 def valid_images(

@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass
 from enum import Enum, auto
-from typing import Any, Literal, TypeVar
+from typing import Any, Literal, TypeAlias, TypeVar
 
 import numpy as np
 import optype as op
@@ -15,9 +15,9 @@ from .functions import log_spiral
 _SCT = TypeVar("_SCT", bound=np.generic)
 _SCT_f = TypeVar("_SCT_f", bound=np.floating[Any])
 _Shape = TypeVar("_Shape", bound=tuple[int, ...])
-_Array1D = np.ndarray[tuple[int], np.dtype[_SCT]]
-_ArrayND = np.ndarray[_Shape, np.dtype[_SCT]]
-_Array1D_f64 = _Array1D[np.float64]
+_Array1D: TypeAlias = np.ndarray[tuple[int], np.dtype[_SCT]]
+_ArrayND: TypeAlias = np.ndarray[_Shape, np.dtype[_SCT]]
+_Array1D_f64: TypeAlias = _Array1D[np.float64]
 
 
 class FitErrorKind(Enum):

@@ -1,5 +1,7 @@
 """Test functions in the `arc.functions` module."""
 
+from typing import TypeAlias
+
 import numpy as np
 from hypothesis import given
 from hypothesis import strategies as st
@@ -7,7 +9,7 @@ from hypothesis.extra.numpy import arrays
 
 from pyarcfire.arc.functions import log_spiral
 
-_Array1D_f64 = np.ndarray[tuple[int], np.dtype[np.float64]]
+_Array1D_f64: TypeAlias = np.ndarray[tuple[int], np.dtype[np.float64]]
 
 
 def test_log_spiral_basic_no_modulo() -> None:

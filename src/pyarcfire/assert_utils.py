@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, TypeVar, cast
+from typing import TYPE_CHECKING, Any, TypeAlias, TypeVar, cast
 
 import numpy as np
 
@@ -13,8 +13,8 @@ if TYPE_CHECKING:
 _SCT = TypeVar("_SCT", bound=np.generic)
 _SCT_f = TypeVar("_SCT_f", bound=np.floating[Any])
 _Shape = TypeVar("_Shape", bound=tuple[int, ...])
-_Array2D = np.ndarray[tuple[int, int], np.dtype[_SCT]]
-_ArrayND = np.ndarray[_Shape, np.dtype[_SCT]]
+_Array2D: TypeAlias = np.ndarray[tuple[int, int], np.dtype[_SCT]]
+_ArrayND: TypeAlias = np.ndarray[_Shape, np.dtype[_SCT]]
 
 
 def verify_data_is_normalized(data: _ArrayND[_Shape, _SCT_f]) -> None:

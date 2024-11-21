@@ -41,11 +41,11 @@ if TYPE_CHECKING:
 StrPath: TypeAlias = str | PathLike[str]
 
 _SCT = TypeVar("_SCT", bound=np.generic)
-_Array1D = np.ndarray[tuple[int], np.dtype[_SCT]]
-_Array2D = np.ndarray[tuple[int, int], np.dtype[_SCT]]
-_Array1D_f64 = _Array1D[np.float64]
-_Array2D_f64 = _Array2D[np.float64]
-_Array2D_u32 = _Array2D[np.uint32]
+_Array1D: TypeAlias = np.ndarray[tuple[int], np.dtype[_SCT]]
+_Array2D: TypeAlias = np.ndarray[tuple[int, int], np.dtype[_SCT]]
+_Array1D_f64: TypeAlias = _Array1D[np.float64]
+_Array2D_f64: TypeAlias = _Array2D[np.float64]
+_Array2D_u32: TypeAlias = _Array2D[np.uint32]
 
 _CalculateRadiiFn: TypeAlias = Callable[[_Array1D_f64], _Array1D_f64]
 

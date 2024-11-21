@@ -16,7 +16,7 @@ __all__ = [
 ]
 
 import logging
-from typing import TYPE_CHECKING, Any, Protocol, TypeVar, cast
+from typing import TYPE_CHECKING, Any, Protocol, TypeAlias, TypeVar, cast
 
 import numpy as np
 from skimage import filters, transform
@@ -30,8 +30,7 @@ if TYPE_CHECKING:
 
 _SCT = TypeVar("_SCT", bound=np.generic)
 _SCT_f = TypeVar("_SCT_f", bound=np.floating[Any])
-_Array2D = np.ndarray[tuple[int, int], np.dtype[_SCT]]
-_Array2D_f64 = _Array2D[np.float64]
+_Array2D: TypeAlias = np.ndarray[tuple[int, int], np.dtype[_SCT]]
 
 
 log: logging.Logger = logging.getLogger(__name__)
@@ -234,7 +233,7 @@ class ImageDivisibleResizer:
         width: int = image.shape[1]
         compatible_height = self._closest_multiple(height, self._divisor)
         compatible_width = self._closest_multiple(width, self._divisor)
-        return cast(_Array2D[_SCT_f], transform.resize(image, (compatible_height, compatible_width)).astype(image.dtype))  # pyright:ignore[reportUnknownMemberType]
+        return cast(_Array2D[_SCT_f], transform.resize(image, (compatible_height, compatible_width)).astype(image.dtype))
 
     @staticmethod
     def _closest_multiple(num: int, divisor: int) -> int:
@@ -297,7 +296,7 @@ class ImageUnsharpMaskBooster:
         """
         return cast(
             _Array2D[_SCT_f],
-            filters.unsharp_mask(  # pyright:ignore[reportUnknownMemberType]
+            filters.unsharp_mask(
                 image,
                 radius=self._radius,
                 amount=self._amount,

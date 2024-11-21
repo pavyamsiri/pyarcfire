@@ -7,28 +7,26 @@ the corresponding [paper](https://ui.adsabs.harvard.edu/abs/2014ApJ...790...87D/
 import importlib.metadata
 
 from . import preprocess
-from .arc import LogSpiralFitResult, fit_spiral_to_image, log_spiral
-from .cluster import GenerateClustersSettings, generate_clusters
+from .arc import Chirality, FitErrorKind, LogSpiralFitResult, fit_spiral_to_image, log_spiral
+from .cluster import generate_clusters
 from .finder import SpiralFinder, SpiralFinderResult
-from .merge_fit import MergeClustersByFitSettings, merge_clusters_by_fit
-from .orientation import GenerateOrientationFieldSettings, generate_orientation_fields
-from .similarity import GenerateSimilarityMatrixSettings, generate_similarity_matrix
+from .merge_fit import merge_clusters_by_fit
+from .orientation import generate_orientation_fields
+from .similarity import generate_similarity_matrix
 
 __version__ = importlib.metadata.version(__name__)
 
 
 __all__ = [
+    "Chirality",
+    "FitErrorKind",
     "fit_spiral_to_image",
     "generate_clusters",
-    "GenerateClustersSettings",
     "generate_orientation_fields",
-    "GenerateOrientationFieldSettings",
     "generate_similarity_matrix",
-    "GenerateSimilarityMatrixSettings",
     "log_spiral",
     "LogSpiralFitResult",
     "merge_clusters_by_fit",
-    "MergeClustersByFitSettings",
     "preprocess",
     "SpiralFinder",
     "SpiralFinderResult",

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, TypeVar
+from typing import Any, TypeAlias, TypeVar
 
 import numpy as np
 
@@ -11,8 +11,7 @@ from .arc import fit_spiral_to_image
 
 _SCT = TypeVar("_SCT", bound=np.generic)
 _SCT_f = TypeVar("_SCT_f", bound=np.floating[Any])
-_Array2D = np.ndarray[tuple[int, int], np.dtype[_SCT]]
-_Array3D = np.ndarray[tuple[int, int, int], np.dtype[_SCT]]
+_Array2D: TypeAlias = np.ndarray[tuple[int, int], np.dtype[_SCT]]
 
 log: logging.Logger = logging.getLogger(__name__)
 

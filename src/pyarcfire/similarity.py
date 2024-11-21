@@ -3,8 +3,7 @@
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
-from typing import TYPE_CHECKING, TypeVar
+from typing import TYPE_CHECKING, TypeAlias, TypeVar
 
 import numpy as np
 from scipy import sparse
@@ -21,28 +20,11 @@ if TYPE_CHECKING:
     from .orientation import OrientationField
 
 _SCT = TypeVar("_SCT", bound=np.generic)
-_Array1D = np.ndarray[tuple[int], np.dtype[_SCT]]
-_Array1D_f64 = _Array1D[np.float64]
-_Array1D_pointer = _Array1D[np.intp]
+_Array1D: TypeAlias = np.ndarray[tuple[int], np.dtype[_SCT]]
+_Array1D_f64: TypeAlias = _Array1D[np.float64]
+_Array1D_pointer: TypeAlias = _Array1D[np.intp]
 
 log: logging.Logger = logging.getLogger(__name__)
-
-
-@dataclass
-class GenerateSimilarityMatrixSettings:
-    """Settings to configure generate_similarity_matrix.
-
-    Attributes
-    ----------
-    similarity_cutoff : float
-        The minimum amount of similarity allowed before it is clipped to zero.
-
-    """
-
-    similarity_cutoff: float = 0.15
-
-
-DEFAULT_SIMILARITY_MATRIX_SETTINGS: GenerateSimilarityMatrixSettings = GenerateSimilarityMatrixSettings()
 
 
 @benchmark
