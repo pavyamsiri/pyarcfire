@@ -321,7 +321,6 @@ class SpiralFinder:
         self._field_neighbour_distance: int = 5
         self._field_kernel_radius: int = 5
         self._field_num_orientation_field_levels: int = 3
-        self._size_divisor: int = 2**self._field_num_orientation_field_levels
         # Similarity matrix parameters
         self._similarity_cutoff: float = 0.15
         # Clustering parameters
@@ -334,7 +333,7 @@ class SpiralFinder:
 
         # Preprocessors
         self._normalizer: ImageNormalizer = ImageLinearNormalizer()
-        self._resizer: ImageResizer | None = ImageDivisibleResizer(self._size_divisor)
+        self._resizer: ImageResizer | None = ImageDivisibleResizer(2**self._field_num_orientation_field_levels)
         self._booster: ImageContrastBooster | None = ImageUnsharpMaskBooster()
 
     @property
@@ -423,6 +422,7 @@ class SpiralFinder:
             field=field,
         )
 
+    # Configuration functions
     def with_normalizer(self, normalizer: ImageNormalizer | None) -> SpiralFinder:
         """Set the current normalizer to the given normalizer.
 
@@ -472,4 +472,138 @@ class SpiralFinder:
 
         """
         self._booster = booster
+        return self
+
+    def with_orientation_field_settings(
+        self,
+        *,
+        neighbour_distance: op.CanInt | None = None,
+        kernel_radius: op.CanInt | None = None,
+        num_levels: op.CanInt | None = None,
+    ) -> SpiralFinder:
+        """Configure the settings for the orientation field creation step.
+
+        Parameters
+        ----------
+        neighbour_distance : int | None
+            The distance in pixels between a cell and its neighbour when denoising.
+        kernel_radius : int | None
+            The radius of the orientation filter kernel in pixels.
+        num_levels : int | None
+            The number of orientation field levels to create and then join.
+
+        Returns
+        -------
+        new_finder : SpiralFinder
+            The newly configured finder.
+
+        Notes
+        -----
+        If `None` is given for any parameter then the current value is kept.
+
+        """
+        if neighbour_distance is not None:
+            self._field_neighbour_distance = int(neighbour_distance)
+        if kernel_radius is not None:
+            self._field_kernel_radius = int(kernel_radius)
+        if num_levels is not None:
+            self._field_num_orientation_field_levels = int(num_levels)
+            # Update resizer
+            if self._resizer is not None:
+                self._resizer.update(self._field_num_orientation_field_levels)
+        return self
+
+    def with_similarity_matrix_settings(self, *, cutoff: op.CanFloat | None = None) -> SpiralFinder:
+        """Configure the settings for the similarity matrix creation step.
+
+        Parameters
+        ----------
+        cutoff : float | None
+            The minimum amount of similarity allowed before it is clipped to zero.
+
+
+        Returns
+        -------
+        new_finder : SpiralFinder
+            The newly configured finder.
+
+        Notes
+        -----
+        If `None` is given for any parameter then the current value is kept.
+
+        """
+        if cutoff is not None:
+            self._similarity_cutoff = float(cutoff)
+
+        return self
+
+    def with_clustering_settings(
+        self,
+        *,
+        error_ratio_threshold: op.CanFloat | None = None,
+        merge_check_minimum_cluster_size: op.CanInt | None = None,
+        minimum_cluster_size: op.CanInt | None = None,
+        remove_central_cluster: op.CanBool | None = None,
+    ) -> SpiralFinder:
+        """Configure the settings for the clustering step.
+
+        Parameters
+        ----------
+        error_ratio_threshold : float | None
+            The maximum error ratio allowed for a merge between two clusters
+            to be permitted. This error ratio is the ratio of an arc fit's error to
+            the merged cluster relative to the error of two arc fits to the clusters
+            individually.
+        merge_check_minimum_cluster_size : int | None
+            The maximum size of each cluster before their merges become checked and
+            potentially stopped.
+        minimum_cluster_size : int | None
+            The minimum cluster size allowed after all merges are complete.
+            Clusters with sizes below this value are discarded.
+        remove_central_cluster : bool | None
+            Set this flag to remove clusters that touch the centre.
+
+
+        Returns
+        -------
+        new_finder : SpiralFinder
+            The newly configured finder.
+
+        Notes
+        -----
+        If `None` is given for any parameter then the current value is kept.
+
+        """
+        if error_ratio_threshold is not None:
+            self._error_ratio_threshold = float(error_ratio_threshold)
+        if merge_check_minimum_cluster_size is not None:
+            self._merge_check_minimum_cluster_size = int(merge_check_minimum_cluster_size)
+        if minimum_cluster_size is not None:
+            self._minimum_cluster_size = int(minimum_cluster_size)
+        if remove_central_cluster is not None:
+            self._remove_central_cluster = bool(remove_central_cluster)
+
+        return self
+
+    def with_merge_fit_settings(self, stop_threshold: op.CanFloat | None = None) -> SpiralFinder:
+        """Configure the settings for the cluster merging via fit step.
+
+        Parameters
+        ----------
+        stop_threshold : float | None
+            The maximum merge error ratio before stopping merges.
+
+
+        Returns
+        -------
+        new_finder : SpiralFinder
+            The newly configured finder.
+
+        Notes
+        -----
+        If `None` is given for any parameter then the current value is kept.
+
+        """
+        if stop_threshold is not None:
+            self._merge_fit_stop_threshold = float(stop_threshold)
         return self

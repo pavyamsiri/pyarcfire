@@ -76,6 +76,17 @@ class ImageResizer(Protocol):
         """
         ...
 
+    def update(self, num_levels: int) -> None:
+        """Update the parameters of the resizer given the number of orientation field levels.
+
+        Parameters
+        ----------
+        num_levels : int
+            The number of orientation field levels.
+
+        """
+        ...
+
 
 class ImageContrastBooster(Protocol):
     """The interface for an image contrast booster."""
@@ -193,6 +204,17 @@ class ImageDivisibleResizer:
 
         """
         self._divisor: int = int(divisor)
+
+    def update(self, num_levels: int) -> None:
+        """Update the parameters of the resizer given the number of orientation field levels.
+
+        Parameters
+        ----------
+        num_levels : int
+            The number of orientation field levels.
+
+        """
+        self._divisor = 2**num_levels
 
     def resize(self, image: _Array2D[_SCT_f]) -> _Array2D[_SCT_f]:
         """Resize an image.
