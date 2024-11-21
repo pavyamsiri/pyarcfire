@@ -186,6 +186,9 @@ class SpiralFinderResult:
             The overall pitch angle in radians.
 
         """
+        if self._num_clusters == 0:
+            log.warning("There are no clusters so the overall pitch angle is undefined!")
+            return float("nan")
         dominant_chirality = self.get_dominant_chirality()
         fits = [fit for fit in self._fits if fit.chirality == dominant_chirality]
         pitch_angles = np.asarray([fit.pitch_angle for fit in fits])
