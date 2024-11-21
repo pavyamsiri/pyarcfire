@@ -7,6 +7,7 @@ __all__ = [
     "ImageNormalizer",
     "ImageLinearNormalizer",
     "ImageIdentityNormalizer",
+    "ImageLogNormalizer",
     # Resizers
     "ImageResizer",
     "ImageDivisibleResizer",
@@ -161,6 +162,66 @@ class ImageLinearNormalizer:
             # Array is all zero
             return np.zeros_like(finite_image)
         return ((finite_image - min_value) / (max_value - min_value)).astype(image.dtype)
+
+
+class ImageLogNormalizer:
+    """Normalizes an image using a logarithmic scale."""
+
+    def __init__(self, *, vmin: AnyReal | None = None, vmax: AnyReal | None = None) -> None:
+        """Initialize the log normalizer.
+
+        Parameters
+        ----------
+        vmin : float | None
+            The minimum value in the logarithmic scale. If `None`, it will be computed from the image.
+        vmax : float | None
+            The maximum value in the logarithmic scale. If `None`, it will be computed from the image.
+
+        """
+        self._vmin = float(vmin) if vmin is not None else None
+        self._vmax = float(vmax) if vmax is not None else None
+
+    def normalize(self, image: _Array2D[_SCT_f]) -> _Array2D[_SCT_f]:
+        """Normalize the input image using a logarithmic scale.
+
+        Parameters
+        ----------
+        image : Array2D[F]
+            The image to preprocess.
+
+        Returns
+        -------
+        normalized_image : Array2D[F]
+            The log-normalized image, with values scaled to the range [0, 1].
+
+        """
+        # Replace non-finite values with a default for normalization
+        finite_image = np.nan_to_num(image, nan=0, posinf=1, neginf=0)
+
+        # Determine vmin and vmax dynamically if not provided
+        min_value = self._vmin if self._vmin is not None else np.min(finite_image[finite_image > 0])
+        max_value = self._vmax if self._vmax is not None else np.max(finite_image)
+
+        if max_value <= min_value:
+            msg = f"Given vmin {min_value} that is greater than vmax {max_value}!"
+            raise ValueError(msg)
+
+        if min_value <= 0:
+            msg = f"Given vmin {min_value} that is negative!"
+            raise ValueError(msg)
+
+        # Clip values
+        finite_image = np.clip(finite_image, min_value, max_value)
+
+        # Apply log normalization
+        log_image = np.log10(np.maximum(finite_image, min_value))
+        log_vmin = np.log10(min_value)
+        log_vmax = np.log10(max_value)
+
+        # Scale to [0, 1]
+        normalized_image = (log_image - log_vmin) / (log_vmax - log_vmin)
+
+        return normalized_image.astype(image.dtype)
 
 
 class ImageIdentityNormalizer:
