@@ -10,11 +10,12 @@ from typing import TYPE_CHECKING, TypeAlias, TypeVar
 
 import numpy as np
 import scipy.io
+from numpy.lib.npyio import NpzFile
 from typing_extensions import assert_never
 
 from .arc import Chirality, FitErrorKind, LogSpiralFitResult, fit_spiral_to_image
 from .arc.utils import get_polar_coordinates
-from .assert_utils import verify_data_is_2d
+from .assert_utils import verify_array_dtype, verify_data_is_2d, verify_data_is_3d
 from .cluster import generate_clusters
 from .merge_fit import merge_clusters_by_fit
 from .orientation import OrientationField, generate_orientation_fields
@@ -261,6 +262,56 @@ class SpiralFinderResult:
             assert_never(fit_error_kind)
         return total_error
 
+    @staticmethod
+    def load(path: StrPath) -> SpiralFinderResult | None:
+        """Load the result from a file.
+
+        Parameters
+        ----------
+        path : str
+            The path to load from.
+
+        Returns
+        -------
+        result : SpiralFinderResult | None
+            The loaded result if the extension is supported.
+
+        Notes
+        -----
+        The supported formats are currently:
+        - npz
+            - numpy archive file.
+        - mat
+            - MatLab mat file.
+
+        """
+        extension = Path(path).suffix.lstrip(".")
+        if extension == "mat":
+            file = scipy.io.loadmat(path)
+            mask = verify_data_is_2d(verify_array_dtype(file["mask"], np.uint32))
+            original_image = verify_data_is_2d(verify_array_dtype(file["original_image"], np.float64))
+            processed_image = verify_data_is_2d(verify_array_dtype(file["processed_image"], np.float64))
+            field = verify_data_is_3d(verify_array_dtype(file["field"], np.float64))
+        elif extension == "npz":
+            file = np.load(path)
+            if not isinstance(file, NpzFile):
+                msg = "Expected the file to be a npz archive!"
+                raise TypeError(msg)
+
+            mask = verify_data_is_2d(verify_array_dtype(file["mask"], np.uint32))
+            original_image = verify_data_is_2d(verify_array_dtype(file["original_image"], np.float64))
+            processed_image = verify_data_is_2d(verify_array_dtype(file["processed_image"], np.float64))
+            field = verify_data_is_3d(verify_array_dtype(file["field"], np.float64))
+        else:
+            return None
+
+        return SpiralFinderResult(
+            mask=mask,
+            original_image=original_image,
+            processed_image=processed_image,
+            field=OrientationField(field),
+        )
+
     def dump(self, path: StrPath) -> None:
         """Dump the result into one of the supported formats.
 
@@ -272,14 +323,14 @@ class SpiralFinderResult:
         Notes
         -----
         The supported formats are currently:
-        - npy
-            - numpy array file.
+        - npz
+            - numpy archive file.
         - mat
             - MatLab mat file.
 
         """
         extension = Path(path).suffix.lstrip(".")
-        if extension == "npy":
+        if extension == "npz":
             np.savez_compressed(
                 path,
                 mask=self._mask,
@@ -302,11 +353,6 @@ class SpiralFinderResult:
                 "[yellow]FILESYST[/yellow]: Can not dump due to unknown extension [yellow]%s[/yellow]",
                 extension,
             )
-            return
-        log.info(
-            "[yellow]FILESYST[/yellow]: Dumped masks to [yellow]%s[/yellow]",
-            extension,
-        )
 
 
 class SpiralFinder:

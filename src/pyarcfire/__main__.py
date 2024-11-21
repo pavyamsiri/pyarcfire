@@ -13,7 +13,7 @@ import numpy as np
 from matplotlib import pyplot as plt
 from PIL import Image
 
-from pyarcfire.finder import SpiralFinder
+from pyarcfire.finder import SpiralFinder, SpiralFinderResult
 
 from .log_utils import setup_logging
 
@@ -59,10 +59,25 @@ def process_from_image(args: argparse.Namespace) -> None:
 
     """
     input_path: Path = Path(args.input_path)
-    image: npt.NDArray[np.float64] = _load_image(input_path)
+    output_path: Path | None = Path(args.output_path) if args.output_path is not None else None
 
+    loaded_result = SpiralFinderResult.load(input_path)
     finder = SpiralFinder()
-    result = finder.extract(image)
+
+    result: SpiralFinderResult
+    if loaded_result is None:
+        image: npt.NDArray[np.float64] = _load_image(input_path)
+        result = finder.extract(image)
+    else:
+        result = loaded_result
+
+    if output_path is not None and output_path.suffix != ".png":
+        result.dump(output_path)
+        log.info(
+            "[yellow]FILESYST[/yellow]: Saved result to [yellow]%s[/yellow]",
+            output_path.absolute(),
+        )
+        return
 
     cluster_arrays = result.mask
 
@@ -80,8 +95,6 @@ def process_from_image(args: argparse.Namespace) -> None:
     num_vertical_pixels: int = result.processed_image_height
     log.debug("Dominant chirality %s", result.get_dominant_chirality())
     log.debug("Overall pitch angle %.2f degrees", np.rad2deg(result.get_overall_pitch_angle()))
-
-    show_flag: bool = args.output_path is None
 
     fig = plt.figure(figsize=(14, 8))
     original_axis = fig.add_subplot(231)
@@ -181,14 +194,11 @@ def process_from_image(args: argparse.Namespace) -> None:
     )
 
     fig.tight_layout()
-    if show_flag:
+    if output_path is None:
         plt.show()
     else:
-        fig.savefig(args.output_path)
-        log.info(
-            "[yellow]FILESYST[/yellow]: Saved plot to [yellow]%s[/yellow]",
-            args.output_path,
-        )
+        fig.savefig(output_path)
+        log.info("[yellow]FILESYST[/yellow]: Saved plot to [yellow]%s[/yellow]", output_path.absolute())
     plt.close()
 
 
