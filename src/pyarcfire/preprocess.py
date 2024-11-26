@@ -3,16 +3,16 @@
 from __future__ import annotations
 
 __all__ = [
-    # Normalizers
-    "ImageNormalizer",
-    "ImageLinearNormalizer",
-    "ImageIdentityNormalizer",
-    "ImageLogNormalizer",
-    # Resizers
-    "ImageResizer",
-    "ImageDivisibleResizer",
     # Boosters
     "ImageContrastBooster",
+    "ImageDivisibleResizer",
+    "ImageIdentityNormalizer",
+    "ImageLinearNormalizer",
+    "ImageLogNormalizer",
+    # Normalizers
+    "ImageNormalizer",
+    # Resizers
+    "ImageResizer",
     "ImageUnsharpMaskBooster",
 ]
 
