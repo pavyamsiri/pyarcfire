@@ -191,3 +191,7 @@ You can create custom preprocessors as well by implementing the `ImageNormalizer
 
 PyArcFiRe can also be interacted with through the command line interface via `python -m pyarcfire ...`. Currently this is a work in progress and is mainly
 a way to drive debugging code.
+
+### Precautions :warning:
+
+The spiral finding algorithm is not invariant under image transpose. That is the results may differ between an image and its transpose.
