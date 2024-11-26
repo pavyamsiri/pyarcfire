@@ -69,6 +69,8 @@ def process_from_image(args: argparse.Namespace) -> None:
     result: SpiralFinderResult
     if loaded_result is None:
         image = _load_image(input_path)
+        if args.use_transpose:
+            image = image.T
         result = finder.extract(image)
     else:
         result = loaded_result
@@ -299,6 +301,9 @@ def _configure_image_command_parser(parser: argparse.ArgumentParser) -> None:
         dest="output_path",
         help="Path to save plot to. If this argument is not given, the plot will be shown in a GUI instead.",
         required=False,
+    )
+    parser.add_argument(
+        "-t", "--t", action="store_true", dest="use_transpose", help="Set this flag to transpose the image before running."
     )
 
 
