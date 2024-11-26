@@ -13,6 +13,7 @@ import numpy as np
 from matplotlib import pyplot as plt
 from PIL import Image
 
+from pyarcfire.assert_utils import verify_data_is_2d
 from pyarcfire.finder import SpiralFinder, SpiralFinderResult
 
 from .log_utils import setup_logging
@@ -20,7 +21,8 @@ from .log_utils import setup_logging
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-    import numpy.typing as npt
+    import optype.numpy as onp
+
 
 log: logging.Logger = logging.getLogger(__name__)
 
@@ -66,7 +68,7 @@ def process_from_image(args: argparse.Namespace) -> None:
 
     result: SpiralFinderResult
     if loaded_result is None:
-        image: npt.NDArray[np.float64] = _load_image(input_path)
+        image = _load_image(input_path)
         result = finder.extract(image)
     else:
         result = loaded_result
@@ -202,7 +204,7 @@ def process_from_image(args: argparse.Namespace) -> None:
     plt.close()
 
 
-def _load_image(input_path: Path) -> npt.NDArray[np.float64]:
+def _load_image(input_path: Path) -> onp.Array2D[np.float64]:
     """Load an image from a file.
 
     The returned image should in row-major storage form that is the first
@@ -216,21 +218,20 @@ def _load_image(input_path: Path) -> npt.NDArray[np.float64]:
 
     Returns
     -------
-    image : ArrayND[S, f64]
+    image : Array2D[S, f64]
         The image in row-major form.
 
     """
-    image: npt.NDArray[np.float64]
     extension = Path(input_path).suffix.lstrip(".")
     # Numpy arrays from npy are already in row major form
     if extension == "npy":
-        image = np.load(input_path).astype(np.float64)
+        image = np.asarray(np.load(input_path))
     # Assume it is an image format like .png
     else:
         # Load image
         raw_image = Image.open(input_path).convert("L")
-        image = (np.asarray(raw_image) / 255).astype(np.float64)
-    return image
+        image = np.asarray(raw_image) / 255
+    return verify_data_is_2d(image.astype(np.float64))
 
 
 def get_complementary_color(rgba: tuple[float, float, float, float]) -> tuple[float, float, float, float]:
