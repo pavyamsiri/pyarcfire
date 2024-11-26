@@ -15,6 +15,7 @@ from PIL import Image
 
 from pyarcfire.assert_utils import verify_data_is_2d
 from pyarcfire.finder import SpiralFinder, SpiralFinderResult
+from pyarcfire.preprocess import ImageStaticResizer
 
 from .log_utils import setup_logging
 
@@ -64,7 +65,10 @@ def process_from_image(args: argparse.Namespace) -> None:
     output_path: Path | None = Path(args.output_path) if args.output_path is not None else None
 
     loaded_result = SpiralFinderResult.load(input_path)
+
     finder = SpiralFinder()
+    if (image_size := args.image_size) is not None:
+        finder.with_resizer(ImageStaticResizer(image_size[0], image_size[1]))
 
     result: SpiralFinderResult
     if loaded_result is None:
@@ -305,6 +309,7 @@ def _configure_image_command_parser(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "-t", "--t", action="store_true", dest="use_transpose", help="Set this flag to transpose the image before running."
     )
+    parser.add_argument("-s", "--s", type=int, dest="image_size", nargs=2, help="Set the image size (width, height).")
 
 
 if __name__ == "__main__":
