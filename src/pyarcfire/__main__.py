@@ -13,11 +13,11 @@ import numpy as np
 from matplotlib import pyplot as plt
 from PIL import Image
 
-from pyarcfire.assert_utils import verify_data_is_2d
-from pyarcfire.finder import SpiralFinder, SpiralFinderResult
-from pyarcfire.preprocess import ImageStaticResizer
-
+from .arc.utils import get_polar_coordinates
+from .assert_utils import verify_data_is_2d
+from .finder import SpiralFinder, SpiralFinderResult
 from .log_utils import setup_logging
+from .preprocess import ImageStaticResizer
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -95,10 +95,10 @@ def process_from_image(args: argparse.Namespace) -> None:
 
     booster = finder.booster
 
-    width: float = result.original_image_width / 2 - 0.5
-    height: float = result.original_image_height / 2 - 0.5
-    processed_width: float = result.processed_image_width / 2 - 0.5
-    processed_height: float = result.processed_image_height / 2 - 0.5
+    original_width: float = result.original_image_width / 2 - 0.5
+    original_height: float = result.original_image_height / 2 - 0.5
+    width: float = result.processed_image_width / 2 - 0.5
+    height: float = result.processed_image_height / 2 - 0.5
     num_horizontal_pixels: int = result.processed_image_width
     num_vertical_pixels: int = result.processed_image_height
     log.debug("Dominant chirality %s", result.get_dominant_chirality())
@@ -108,7 +108,7 @@ def process_from_image(args: argparse.Namespace) -> None:
     original_axis = fig.add_subplot(231)
     original_axis.imshow(
         image,
-        extent=(-width, width, -height, height),
+        extent=(-original_width, original_width, -original_height, original_height),
         cmap="gray",
     )
     original_axis.set_title("Original image")
@@ -117,7 +117,7 @@ def process_from_image(args: argparse.Namespace) -> None:
     contrast_axis = fig.add_subplot(232)
     contrast_axis.imshow(
         contrast_image,
-        extent=(-processed_width, processed_width, -processed_height, processed_height),
+        extent=(-width, width, -height, height),
         cmap="gray",
     )
     contrast_axis.set_title(f"Preprocessed image\nboosted with {booster}" if booster is not None else "Preprocessed Image")
