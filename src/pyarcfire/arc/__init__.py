@@ -6,8 +6,8 @@ from .functions import log_spiral
 
 __all__ = [
     "Chirality",
+    "FitErrorKind",
     "LogSpiralFitResult",
     "fit_spiral_to_image",
     "log_spiral",
-    "FitErrorKind",
 ]

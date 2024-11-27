@@ -20,14 +20,14 @@ __version__ = importlib.metadata.version(__name__)
 __all__ = [
     "Chirality",
     "FitErrorKind",
+    "LogSpiralFitResult",
+    "SpiralFinder",
+    "SpiralFinderResult",
     "fit_spiral_to_image",
     "generate_clusters",
     "generate_orientation_fields",
     "generate_similarity_matrix",
     "log_spiral",
-    "LogSpiralFitResult",
     "merge_clusters_by_fit",
     "preprocess",
-    "SpiralFinder",
-    "SpiralFinderResult",
 ]

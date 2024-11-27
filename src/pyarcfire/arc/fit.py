@@ -123,7 +123,7 @@ def fit_spiral_to_image(
 
     # Gap in theta is not large enough to not need multiple revolutions
     # and the cluster does not contain the origin or is not closed around centre
-    if not force_single_revolution and bad_bounds or not __cluster_has_no_endpoints_or_contains_origin(image):
+    if (not force_single_revolution and bad_bounds) or not __cluster_has_no_endpoints_or_contains_origin(image):
         inner_region = identify_inner_and_outer_spiral(image, shrink_amount=5)
         if inner_region is None or inner_region.sum() == 0 or inner_region.sum() == len(inner_region):
             inner_region = None

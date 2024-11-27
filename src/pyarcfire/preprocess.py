@@ -3,16 +3,16 @@
 from __future__ import annotations
 
 __all__ = [
-    # Normalizers
-    "ImageNormalizer",
-    "ImageLinearNormalizer",
-    "ImageIdentityNormalizer",
-    "ImageLogNormalizer",
-    # Resizers
-    "ImageResizer",
-    "ImageDivisibleResizer",
     # Boosters
     "ImageContrastBooster",
+    "ImageDivisibleResizer",
+    "ImageIdentityNormalizer",
+    "ImageLinearNormalizer",
+    "ImageLogNormalizer",
+    # Normalizers
+    "ImageNormalizer",
+    # Resizers
+    "ImageResizer",
     "ImageUnsharpMaskBooster",
 ]
 
@@ -295,6 +295,78 @@ class ImageDivisibleResizer:
         compatible_height = self._closest_multiple(height, self._divisor)
         compatible_width = self._closest_multiple(width, self._divisor)
         return cast(_Array2D[_SCT_f], transform.resize(image, (compatible_height, compatible_width)).astype(image.dtype))
+
+    @staticmethod
+    def _closest_multiple(num: int, divisor: int) -> int:
+        """Find the closest multiple of `divisor` to `num`.
+
+        Parameters
+        ----------
+        num : int
+            The number to get the closest multiple of `divisor` of.
+        divisor : int
+            The base factor of the multiple.
+
+        Returns
+        -------
+        closest_multiple : int
+            The closest multiple of `divisor` to `num`.
+
+        """
+        quotient = num / divisor
+        smaller_multiple = int(np.floor(quotient)) * divisor
+        larger_multiple = int(np.ceil(quotient)) * divisor
+
+        smaller_multiple_distance = num - smaller_multiple
+        larger_multiple_distance = larger_multiple - num
+        if smaller_multiple_distance <= larger_multiple_distance:
+            return smaller_multiple
+        return larger_multiple
+
+
+class ImageStaticResizer:
+    """An image resizer that resizes images to a predetermined size."""
+
+    def __init__(self, width: int, height: int) -> None:
+        """Initialize the resizer.
+
+        Parameters
+        ----------
+        width : int
+            The width of the image in pixels.
+        height : int
+            The height of the image in pixels.
+
+        """
+        self._width: int = width
+        self._height: int = height
+
+    def update(self, num_levels: int) -> None:
+        """Update the parameters of the resizer given the number of orientation field levels.
+
+        Parameters
+        ----------
+        num_levels : int
+            The number of orientation field levels.
+
+        """
+        _ = num_levels
+
+    def resize(self, image: _Array2D[_SCT_f]) -> _Array2D[_SCT_f]:
+        """Resize an image.
+
+        Parameters
+        ----------
+        image : Array2D[F]
+            The image to resize.
+
+        Returns
+        -------
+        resized_image  : Array2D[F]
+            The resized image.
+
+        """
+        return cast(_Array2D[_SCT_f], transform.resize(image, (self._height, self._width)).astype(image.dtype))
 
     @staticmethod
     def _closest_multiple(num: int, divisor: int) -> int:

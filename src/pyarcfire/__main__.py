@@ -13,14 +13,17 @@ import numpy as np
 from matplotlib import pyplot as plt
 from PIL import Image
 
-from pyarcfire.finder import SpiralFinder, SpiralFinderResult
-
+from .arc.utils import get_polar_coordinates
+from .assert_utils import verify_data_is_2d
+from .finder import SpiralFinder, SpiralFinderResult
 from .log_utils import setup_logging
+from .preprocess import ImageStaticResizer
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-    import numpy.typing as npt
+    import optype.numpy as onp
+
 
 log: logging.Logger = logging.getLogger(__name__)
 
@@ -62,11 +65,16 @@ def process_from_image(args: argparse.Namespace) -> None:
     output_path: Path | None = Path(args.output_path) if args.output_path is not None else None
 
     loaded_result = SpiralFinderResult.load(input_path)
+
     finder = SpiralFinder()
+    if (image_size := args.image_size) is not None:
+        finder.with_resizer(ImageStaticResizer(image_size[0], image_size[1]))
 
     result: SpiralFinderResult
     if loaded_result is None:
-        image: npt.NDArray[np.float64] = _load_image(input_path)
+        image = _load_image(input_path)
+        if args.use_transpose:
+            image = image.T
         result = finder.extract(image)
     else:
         result = loaded_result
@@ -87,10 +95,10 @@ def process_from_image(args: argparse.Namespace) -> None:
 
     booster = finder.booster
 
-    width: float = result.original_image_width / 2 - 0.5
-    height: float = result.original_image_height / 2 - 0.5
-    processed_width: float = result.processed_image_width / 2 - 0.5
-    processed_height: float = result.processed_image_height / 2 - 0.5
+    original_width: float = result.original_image_width / 2 - 0.5
+    original_height: float = result.original_image_height / 2 - 0.5
+    width: float = result.processed_image_width / 2 - 0.5
+    height: float = result.processed_image_height / 2 - 0.5
     num_horizontal_pixels: int = result.processed_image_width
     num_vertical_pixels: int = result.processed_image_height
     log.debug("Dominant chirality %s", result.get_dominant_chirality())
@@ -100,7 +108,7 @@ def process_from_image(args: argparse.Namespace) -> None:
     original_axis = fig.add_subplot(231)
     original_axis.imshow(
         image,
-        extent=(-width, width, -height, height),
+        extent=(-original_width, original_width, -original_height, original_height),
         cmap="gray",
     )
     original_axis.set_title("Original image")
@@ -109,7 +117,7 @@ def process_from_image(args: argparse.Namespace) -> None:
     contrast_axis = fig.add_subplot(232)
     contrast_axis.imshow(
         contrast_image,
-        extent=(-processed_width, processed_width, -processed_height, processed_height),
+        extent=(-width, width, -height, height),
         cmap="gray",
     )
     contrast_axis.set_title(f"Preprocessed image\nboosted with {booster}" if booster is not None else "Preprocessed Image")
@@ -202,7 +210,7 @@ def process_from_image(args: argparse.Namespace) -> None:
     plt.close()
 
 
-def _load_image(input_path: Path) -> npt.NDArray[np.float64]:
+def _load_image(input_path: Path) -> onp.Array2D[np.float64]:
     """Load an image from a file.
 
     The returned image should in row-major storage form that is the first
@@ -216,21 +224,20 @@ def _load_image(input_path: Path) -> npt.NDArray[np.float64]:
 
     Returns
     -------
-    image : ArrayND[S, f64]
+    image : Array2D[S, f64]
         The image in row-major form.
 
     """
-    image: npt.NDArray[np.float64]
     extension = Path(input_path).suffix.lstrip(".")
     # Numpy arrays from npy are already in row major form
     if extension == "npy":
-        image = np.load(input_path).astype(np.float64)
+        image = np.asarray(np.load(input_path))
     # Assume it is an image format like .png
     else:
         # Load image
         raw_image = Image.open(input_path).convert("L")
-        image = (np.asarray(raw_image) / 255).astype(np.float64)
-    return image
+        image = np.asarray(raw_image) / 255
+    return verify_data_is_2d(image.astype(np.float64))
 
 
 def get_complementary_color(rgba: tuple[float, float, float, float]) -> tuple[float, float, float, float]:
@@ -299,6 +306,10 @@ def _configure_image_command_parser(parser: argparse.ArgumentParser) -> None:
         help="Path to save plot to. If this argument is not given, the plot will be shown in a GUI instead.",
         required=False,
     )
+    parser.add_argument(
+        "-t", "--t", action="store_true", dest="use_transpose", help="Set this flag to transpose the image before running."
+    )
+    parser.add_argument("-s", "--s", type=int, dest="image_size", nargs=2, help="Set the image size (width, height).")
 
 
 if __name__ == "__main__":

@@ -84,7 +84,7 @@ def test_log_spiral_sign(
 
     # Case 1: The initial radius is very close to zero -> result is approximately zero as well
     if abs(initial_radius) < atol:
-        assert np.all(np.abs(result) < 1e2 * atol)
+        assert np.allclose(result, 0)
     # Case 2: The initial radius is not close to zero -> result has same sign as initial radius
     else:
         expected_sign = np.sign(initial_radius)

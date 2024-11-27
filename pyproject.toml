@@ -1,6 +1,6 @@
 [project]
 name = "pyarcfire"
-version = "0.1.1"
+version = "0.1.2.dev0"
 description = "A port of SpArcFiRe, a spiral arc finder"
 authors = [
     { name = "Pavadol Yamsiri" }
@@ -18,7 +18,7 @@ classifiers = [
 ]
 dependencies = [
     "numpy>=1.2",
-    "optype>=0.6.1",
+    "optype>=0.7.2",
     "scikit-image>=0.18",
     "scipy>=1.14",
     "typing_extensions>=3.10",
